@@ -1,0 +1,242 @@
+---
+description: Laravel backend coding standards for NexStay. Apply to all PHP files in app/, database/, routes/, config/, and tests/.
+globs: ["**/*.php", "app/**/*", "database/**/*", "routes/**/*", "tests/**/*"]
+alwaysApply: true
+---
+
+# NexStay Laravel Coding Rules
+
+## Architecture Mandate
+
+NexStay is a **Modular Monolith**. Business logic lives in `app/Domain/{Module}/`. Controllers are thin. Do not put business logic in controllers, models, or route closures.
+
+```
+Request → Controller (validate) → Action::execute() → Response
+                                       ↓
+                                  Services / Models / Events
+```
+
+## Action Classes
+
+Every business operation is an Action class. One action = one operation.
+
+```php
+// ✅ CORRECT
+namespace App\Domain\HBMS\Actions;
+
+class CheckInGuest
+{
+    public function __construct(
+        private readonly FolioService $folioService
+    ) {}
+
+    public function execute(Reservation $reservation, array $options = []): Folio
+    {
+        return DB::transaction(function () use ($reservation, $options) {
+            // ... business logic here
+        });
+    }
+}
+
+// ✅ Controller calls the action — nothing else
+class ReservationController extends Controller
+{
+    public function checkIn(CheckInRequest $request, Reservation $reservation): JsonResponse
+    {
+        $folio = app(CheckInGuest::class)->execute($reservation, $request->validated());
+        return FolioResource::make($folio)->response();
+    }
+}
+
+// ❌ NEVER — business logic in controller
+class ReservationController extends Controller
+{
+    public function checkIn(Request $request, Reservation $reservation): JsonResponse
+    {
+        $reservation->update(['status' => 'checked_in']); // NO
+        $folio = Folio::create([...]); // NO
+        return response()->json($folio);
+    }
+}
+```
+
+## Money — Always `brick/money`
+
+**Never use floats or plain integers for monetary values.**
+
+```php
+use Brick\Money\Money;
+use Brick\Math\RoundingMode;
+
+// ✅ CORRECT
+$price     = Money::of('15000.00', 'TZS');
+$tax       = $price->multipliedBy('0.18', RoundingMode::HALF_UP);
+$total     = $price->plus($tax);
+$stored    = $total->getAmount()->toFloat(); // only when writing to DB
+
+// ❌ NEVER
+$price = 15000.00;
+$tax   = $price * 0.18;  // float arithmetic on money = data corruption
+```
+
+## Database Transactions — Always on Financial Operations
+
+Any code touching folios, payments, till_sessions, or till_movements must be wrapped.
+
+```php
+// ✅ CORRECT
+DB::transaction(function () use ($folio, $order) {
+    $this->folioService->postCharge($folio, 'restaurant', $order->total);
+    $order->update(['status' => 'closed']);
+    TillMovement::create([...]);
+});
+
+// ❌ NEVER — partial writes on failure = corrupted folio
+$this->folioService->postCharge($folio, 'restaurant', $order->total);
+$order->update(['status' => 'closed']); // if this fails, folio is wrong
+```
+
+## Eloquent Rules
+
+```php
+// ✅ Always eager-load to prevent N+1
+Reservation::with(['guest', 'room.roomType', 'folio.transactions'])->get();
+
+// ✅ Use select() in production queries
+Reservation::select('id', 'booking_ref', 'status', 'check_in_date')
+    ->where('status', 'confirmed')
+    ->get();
+
+// ✅ Soft deletes on all domain models
+use Illuminate\Database\Eloquent\SoftDeletes;
+class Reservation extends Model
+{
+    use SoftDeletes;
+}
+
+// ❌ NEVER — raw string interpolation in queries
+DB::select("SELECT * FROM reservations WHERE id = '$id'"); // SQL injection
+
+// ✅ ALWAYS — use bindings
+DB::select('SELECT * FROM reservations WHERE id = ?', [$id]);
+```
+
+## FormRequest — Always
+
+Every API write operation uses a FormRequest. No `$request->all()` in controllers.
+
+```php
+// ✅ CORRECT
+class CreateReservationRequest extends FormRequest
+{
+    public function rules(): array
+    {
+        return [
+            'guest_id'       => ['required', 'uuid', 'exists:guests,id'],
+            'check_in_date'  => ['required', 'date', 'after_or_equal:today'],
+            'check_out_date' => ['required', 'date', 'after:check_in_date'],
+            'adults'         => ['required', 'integer', 'min:1', 'max:10'],
+        ];
+    }
+}
+
+// ❌ NEVER
+public function store(Request $request)
+{
+    $data = $request->all(); // unvalidated, dangerous
+}
+```
+
+## Model Conventions
+
+```php
+class Room extends Model
+{
+    use SoftDeletes;
+
+    // Always explicit fillable — never $guarded = []
+    protected $fillable = ['room_type_id', 'room_number', 'floor', 'status'];
+
+    // Cast JSON columns
+    protected $casts = [
+        'amenities' => 'array',
+        'photos'    => 'array',
+    ];
+
+    // UUID primary key setup
+    public $incrementing = false;
+    protected $keyType   = 'string';
+
+    protected static function booted(): void
+    {
+        static::creating(fn ($model) => $model->id ??= (string) Str::uuid());
+    }
+}
+```
+
+## Events & Listeners
+
+Domain events decouple side effects from core business logic.
+
+```php
+// Fire events for significant domain moments
+GuestCheckedIn::dispatch($reservation, $room, $folio);
+OrderFiredToKds::dispatch($order, $items);
+TillSessionClosed::dispatch($session, $overShort);
+
+// Listeners handle side effects
+class SendCheckInConfirmation
+{
+    public function handle(GuestCheckedIn $event): void
+    {
+        // send email/SMS — this is a side effect, not core logic
+    }
+}
+```
+
+## Error Handling
+
+```php
+// Domain exceptions for business rule violations
+throw new \DomainException('Reservation is not in confirmed status.');
+
+// Custom exception classes for typed catching
+throw new TillNotOpenException($outletId);
+throw new InsufficientStockException($item, $required, $available);
+
+// Use abort() only in controllers for HTTP errors
+abort(403, 'You do not have permission to void this transaction.');
+```
+
+## Naming Conventions
+
+| Thing | Convention | Example |
+|---|---|---|
+| Action classes | Verb + Noun | `CheckInGuest`, `RecordCashPayment`, `RunNightAudit` |
+| Service classes | Noun + Service | `FolioService`, `TaxService`, `KdsService` |
+| Events | Past tense | `GuestCheckedIn`, `OrderFiredToKds`, `TillSessionClosed` |
+| Jobs | Verb phrase | `SyncAvailabilityToOta`, `FiscalizePayment` |
+| Requests | Action + Request | `CreateReservationRequest`, `RecordCashPaymentRequest` |
+| Controllers | Noun + Controller | `ReservationController`, `TillSessionController` |
+| Resources | Noun + Resource | `ReservationResource`, `FolioResource` |
+
+## Artisan Commands
+
+Custom commands live in `app/Console/Commands/` and are prefixed `nexstay:`.
+
+```php
+// php artisan nexstay:night-audit
+// php artisan nexstay:sync-ota
+// php artisan nexstay:rebuild-availability
+// php artisan tenants:create {name} {slug}
+```
+
+## Security Checklist (Every Feature)
+
+- [ ] FormRequest validation on all inputs
+- [ ] `permission:` middleware on sensitive routes
+- [ ] No raw SQL string interpolation
+- [ ] Financial operations wrapped in `DB::transaction()`
+- [ ] Sensitive model fields encrypted (`id_number`, `date_of_birth`)
+- [ ] Activity log on financial model mutations
+- [ ] Webhook inputs verified via HMAC before processing

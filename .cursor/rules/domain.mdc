@@ -1,0 +1,221 @@
+---
+description: NexStay domain and business logic rules. Apply when working with reservations, folios, F&B orders, cash, payments, inventory, or any hospitality business logic.
+globs: ["app/Domain/**/*", "app/Http/Controllers/**/*", "app/Http/Requests/**/*"]
+alwaysApply: true
+---
+
+# NexStay Domain Rules
+
+## The Folio Is Sacred
+
+The guest folio (`folios` + `folio_transactions`) is the **single source of financial truth** for a stay. Every charge — room nights, restaurant meals, bar tabs, cash payments, card settlements, discounts — must post as a `folio_transaction`. There is no secondary revenue store.
+
+```php
+// ✅ CORRECT — all charges go through FolioService
+$this->folioService->postCharge(
+    folio: $folio,
+    type: 'restaurant',
+    description: 'Dinner — Table 4',
+    amount: Money::of('45000', 'TZS'),
+    meta: ['reference_id' => $order->id, 'reference_type' => Order::class]
+);
+
+// ❌ NEVER — posting revenue directly to orders without folio
+$order->update(['paid_amount' => 45000]); // doesn't touch the folio
+```
+
+## Reservation State Machine
+
+Valid status transitions only. Enforce in Action classes, not in models.
+
+```
+inquiry → confirmed → checked_in → checked_out
+    ↓           ↓
+cancelled   no_show
+```
+
+```php
+// Always validate state before transition
+throw_if(
+    ! in_array($reservation->status, ['confirmed']),
+    \DomainException::class,
+    "Cannot check in a reservation with status: {$reservation->status}"
+);
+```
+
+## Cash — The Till Session Gate
+
+**A cash payment cannot be recorded without an active till session.**  
+This is enforced by `ActiveTillSessionForOutlet` — a FormRequest rule, not just a comment.
+
+```php
+// RecordCashPaymentRequest.php
+'till_session_id' => [
+    'required', 'uuid', 'exists:till_sessions,id',
+    new ActiveTillSessionForOutlet($this->route('order')),
+],
+'amount_tendered' => [
+    'required', 'numeric',
+    'min:' . $this->route('order')->balance_due,  // can't under-tender
+],
+```
+
+Every cash payment creates TWO records atomically:
+1. `payments` row — the payment itself
+2. `till_movements` row — the ledger entry for the drawer
+
+```php
+DB::transaction(function () use ($order, $data) {
+    $payment = Payment::create([...]);
+    TillMovement::create([
+        'till_session_id' => $data['till_session_id'],
+        'movement_type'   => 'cash_payment',
+        'amount'          => $payment->amount,  // positive = cash IN
+        'reference_id'    => $payment->id,
+        'reference_type'  => Payment::class,
+        'performed_by'    => auth()->id(),
+    ]);
+});
+```
+
+## Order Lifecycle
+
+```
+open → sent_to_kitchen → partially_served → served → closed
+                                                         ↓
+                                                  (post to folio OR settle at POS)
+```
+
+- An order can only be closed when all items are `served` or `voided`
+- Closing an order triggers `OrderClosed` event → `DeductInventoryOnOrderClose` listener
+- Inventory deduction is **async** (listener queued) — never block the POS response for stock calc
+
+## Inventory Deduction Rules
+
+Stock is always deducted from the recipe, not the menu item directly.
+
+```php
+// Correct deduction flow (in listener, not action)
+foreach ($order->items as $item) {
+    foreach ($item->menuItem->recipeIngredients as $ingredient) {
+        $qty = $ingredient->quantity * $item->quantity;
+        StockMovement::create([
+            'stock_item_id'  => $ingredient->stock_item_id,
+            'movement_type'  => 'consumption',
+            'quantity'       => -$qty,              // negative = OUT
+            'reference_id'   => $order->id,
+            'reference_type' => Order::class,
+            'performed_by'   => $order->waiter_id,
+        ]);
+        $ingredient->stockItem->decrement('current_stock', $qty);
+    }
+}
+```
+
+Never decrement below zero in a single update. Log the discrepancy as a negative stock event and alert the manager.
+
+## Tax Calculation
+
+Tax is always calculated via `TaxService`, never inline.
+
+```php
+// ✅ CORRECT
+$tax = $this->taxService->calculate(
+    amount: Money::of('45000', 'TZS'),
+    chargeType: 'restaurant'
+);
+// Returns: { amount: Money, code: 'A', rate: 0.18, is_inclusive: false }
+
+// ❌ NEVER
+$tax = $amount * 0.18;  // hardcoded rate = wrong when rates change
+```
+
+Tax codes follow TRA Tanzania classification: A (18% VAT), B (0% VAT), C (exempt), D (special rate). The rate in `tax_configs` is the source of truth.
+
+## Night Audit Rules
+
+- Night audit runs at 23:59 tenant local time via the scheduler
+- It must acquire a lock before posting room charges — use `Cache::lock('night_audit', 300)`
+- All room charges post as `room_charge` type on the folio
+- No-show processing: mark status `no_show`, post penalty if `rate_plan.restrictions->no_show_penalty` is set
+- Unclosed till sessions at audit time: flag in report, alert GM — do NOT force-close them
+- The audit cannot be re-run for a date that's already been audited without manager override
+- Night audit is always a queued job — never run synchronously in a controller
+
+## Fiscalization (TRA VFD)
+
+Every payment must be fiscalized. Fiscalization is **always async and non-blocking**.
+
+```php
+// ✅ Queue it — do not await the VFD response in the payment flow
+FiscalizePayment::dispatch($payment)->onQueue('default');
+
+// ✅ On failure: retry 3 times, log, alert — do NOT reverse the payment
+public function failed(\Throwable $e): void
+{
+    Log::error('VFD fiscalization failed', ['payment_id' => $this->payment->id]);
+    // Payment stands — fiscalization is reported separately
+}
+```
+
+## Folio Settlement Rules
+
+A folio can be settled with **multiple payment methods** (split payment). The split payment service validates that the sum of all legs equals the outstanding balance before writing any record.
+
+```php
+// SplitPaymentService — all legs or none
+DB::transaction(function () use ($folio, $legs) {
+    $totalLegs = collect($legs)->sum('amount');
+    throw_if(
+        ! Money::of($totalLegs, $folio->currency)->isEqualTo($folio->balance),
+        \DomainException::class,
+        'Payment legs do not sum to the outstanding folio balance.'
+    );
+    foreach ($legs as $leg) {
+        $this->processLeg($folio, $leg);
+    }
+    $folio->update(['status' => 'closed']);
+});
+```
+
+## Module Boundary Rules
+
+Modules may call **Shared** services freely. Modules must NOT call each other's services directly.
+
+```php
+// ✅ Restaurant module calling Shared service — OK
+use App\Domain\Shared\Services\FolioService;
+$this->folioService->postCharge($folio, 'restaurant', ...);
+
+// ❌ Restaurant module calling Bar service — FORBIDDEN
+use App\Domain\Bar\Services\TabService;
+$this->tabService->openTab(...); // cross-module coupling
+
+// ✅ Instead — fire an event and let the Bar module listen
+RestaurantGuestMovedToBar::dispatch($guest, $table);
+```
+
+## Soft Delete Policy
+
+- All domain models use `SoftDeletes`
+- Restore is available for manager-level roles only
+- Hard delete (`forceDelete()`) is only allowed for: test data cleanup, GDPR erasure requests (with audit log entry)
+- Voided financial records are NEVER deleted — they are marked with `voided_at` timestamp
+
+## Audit Logging
+
+Use `spatie/laravel-activitylog` on all financial and identity-sensitive models.
+
+```php
+class FolioTransaction extends Model
+{
+    use LogsActivity;
+
+    protected static $logAttributes       = ['amount', 'tax_amount', 'voided_at'];
+    protected static $logOnlyDirty        = true;
+    protected static $submitEmptyLogs     = false;
+    protected static $recordEvents        = ['created', 'updated'];
+}
+```
+
+Never log: raw passwords, full card PANs, unmasked national ID numbers.
