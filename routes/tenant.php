@@ -29,7 +29,10 @@ use App\Http\Controllers\Web\StockItemController;
 use App\Http\Controllers\Web\LoungeController;
 use App\Http\Controllers\Web\OutletController;
 use App\Http\Controllers\Web\ReportController;
+use App\Http\Controllers\Web\RoomReservationReportController;
+use App\Http\Controllers\Web\RoomPaymentsAccountingReportController;
 use App\Http\Controllers\Web\ReservationController;
+use App\Http\Controllers\Web\ReservationSettingsController;
 use App\Http\Controllers\Web\RestaurantController;
 use App\Http\Controllers\Web\RoomController;
 use App\Http\Controllers\Web\TillController;
@@ -39,6 +42,7 @@ use App\Http\Controllers\Web\DebtController;
 use App\Http\Controllers\Web\ExpenditureController;
 use App\Http\Controllers\Web\FbReportController;
 use App\Http\Controllers\Web\PurchaseController;
+use App\Http\Controllers\Web\ReportDeliverySettingsController;
 use App\Http\Controllers\Web\RoomDamageController;
 use App\Http\Controllers\Web\TimeLeftController;
 use App\Http\Controllers\Web\UserController;
@@ -77,6 +81,23 @@ Route::middleware([
         });
 
         Route::middleware('permission:view-reservations|manage-reservations')->group(function () {
+            Route::post('/reservations/bulk-action', [ReservationController::class, 'bulkAction'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.bulk-action');
+            Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.cancel');
+            Route::get('/reservations/{reservation}/ticket', [ReservationController::class, 'ticket'])
+                ->name('reservations.ticket');
+            Route::get('/reservations/available-rooms', [ReservationController::class, 'availableRooms'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.available-rooms');
+            Route::get('/reservations/settings', [ReservationSettingsController::class, 'edit'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.settings.edit');
+            Route::put('/reservations/settings', [ReservationSettingsController::class, 'update'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.settings.update');
             Route::resource('reservations', ReservationController::class);
         });
 
@@ -125,9 +146,26 @@ Route::middleware([
             Route::resource('users', UserController::class)->except(['show']);
         });
 
-        Route::middleware('permission:view-reports|view-fb-reports')->group(function () {
+        Route::middleware('permission:view-reports|view-fb-reports|view-reservations')->group(function () {
             Route::get('/reports', ReportController::class)->name('reports');
             Route::get('/reports/fb-revenue', [FbReportController::class, 'index'])->name('reports.fb-revenue');
+        });
+        Route::middleware('permission:manage-reservations')->group(function () {
+            Route::put('/reports/delivery-settings', [ReportDeliverySettingsController::class, 'update'])
+                ->name('reports.delivery-settings.update');
+            Route::post('/reports/delivery-settings/send-now', [ReportDeliverySettingsController::class, 'sendNow'])
+                ->name('reports.delivery-settings.send-now');
+        });
+
+        Route::middleware('permission:view-reports|view-reservations')->group(function () {
+            Route::get('/reports/room-reservations', [RoomReservationReportController::class, 'index'])
+                ->name('reports.room-reservations');
+            Route::get('/reports/room-payments-accounting', [RoomPaymentsAccountingReportController::class, 'index'])
+                ->name('reports.room-payments-accounting');
+            Route::get('/reports/room-payments-accounting/export', [RoomPaymentsAccountingReportController::class, 'exportCsv'])
+                ->name('reports.room-payments-accounting.export');
+            Route::get('/reports/room-payments-accounting/export-excel', [RoomPaymentsAccountingReportController::class, 'exportExcel'])
+                ->name('reports.room-payments-accounting.export-excel');
         });
 
         Route::middleware('permission:view-debts')->group(function () {
@@ -280,6 +318,10 @@ Route::middleware([
             Route::get('/rooms/{room}', [ApiRoomController::class, 'show'])->name('rooms.show');
         });
 
+        Route::middleware('permission:manage-rooms|manage-room-status')->group(function () {
+            Route::patch('/rooms/{room}', [ApiRoomController::class, 'update'])->name('rooms.update');
+        });
+
         Route::middleware('permission:manage-room-status')->group(function () {
             Route::patch('/rooms/{room}/status', [ApiRoomController::class, 'updateStatus'])
                 ->name('rooms.status');
@@ -316,6 +358,7 @@ Route::middleware([
 
         Route::middleware('permission:manage-orders')->group(function () {
             Route::post('/orders/{order}/items', [ApiOrderController::class, 'addItems'])->name('orders.items.store');
+            Route::patch('/orders/{order}/items/status', [ApiOrderController::class, 'updateItemStatus'])->name('orders.items.status');
             Route::post('/orders/{order}/fire', [ApiOrderController::class, 'fire'])->name('orders.fire');
             Route::post('/orders/{order}/post-to-folio', [ApiOrderController::class, 'postToFolio'])->name('orders.post-to-folio');
             Route::post('/orders/{order}/cash-payment', [ApiOrderController::class, 'cashPayment'])->name('orders.cash-payment');
@@ -352,6 +395,13 @@ Route::middleware([
 
         Route::middleware('permission:view-fb-reports')->group(function () {
             Route::get('/reports/fb-revenue', [ApiReportController::class, 'fbRevenue'])->name('reports.fb-revenue');
+        });
+
+        Route::middleware('permission:view-reports|view-reservations')->group(function () {
+            Route::get('/reports/room-reservations', [ApiReportController::class, 'roomReservations'])
+                ->name('reports.room-reservations');
+            Route::get('/reports/room-payments-accounting', [ApiReportController::class, 'roomPaymentsAccounting'])
+                ->name('reports.room-payments-accounting');
         });
 
         Route::prefix('reservations')->name('reservations.')->group(function () {

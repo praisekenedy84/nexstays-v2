@@ -28,6 +28,22 @@ return [
         'require_manager_pin' => filter_var(env('TILL_REQUIRE_MANAGER_PIN', true), FILTER_VALIDATE_BOOLEAN),
     ],
 
+    'reservations' => [
+        'payment_mode' => env('NEXSTAY_RESERVATION_PAYMENT_MODE', 'prepaid'),
+        'cancellation' => [
+            'policy' => env('NEXSTAY_CANCELLATION_POLICY', 'stayed_nights'),
+            'refund_percentage' => (float) env('NEXSTAY_CANCELLATION_REFUND_PERCENTAGE', 0),
+        ],
+    ],
+
+    'reports' => [
+        'delivery' => [
+            'recipient_email' => env('NEXSTAY_REPORT_EMAIL', ''),
+            'send_time' => env('NEXSTAY_REPORT_SEND_TIME', '08:00'),
+            'timezone' => env('NEXSTAY_REPORT_TIMEZONE', env('APP_TIMEZONE', 'UTC')),
+        ],
+    ],
+
     'demo' => [
         'tenant_id' => env('DEMO_TENANT_ID', 'demo'),
         'domain' => env('DEMO_TENANT_DOMAIN', 'demo'),
@@ -105,7 +121,9 @@ return [
             'label' => 'Reports',
             'icon' => 'document',
             'children' => [
-                ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reports'],
+                ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reservations'],
+                ['id' => 'room-reservation-reports', 'label' => 'Room reservations finance', 'route' => 'tenant.reports.room-reservations', 'permission' => 'view-reservations'],
+                ['id' => 'room-payments-accounting-reports', 'label' => 'Room payments & accounting', 'route' => 'tenant.reports.room-payments-accounting', 'permission' => 'view-reservations'],
                 ['id' => 'fb-reports', 'label' => 'F&B revenue split', 'route' => 'tenant.reports.fb-revenue', 'permission' => 'view-fb-reports'],
             ],
         ],

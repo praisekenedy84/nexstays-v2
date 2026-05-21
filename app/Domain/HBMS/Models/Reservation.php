@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace App\Domain\HBMS\Models;
 
+use Brick\Math\RoundingMode;
+use Brick\Money\Money;
 use Database\Factories\ReservationFactory;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -24,6 +26,13 @@ class Reservation extends Model
         'room_id',
         'room_type_id',
         'status',
+        'cancelled_at',
+        'cancellation_policy',
+        'cancellation_nights_used',
+        'prepaid_amount_at_cancellation',
+        'cancellation_charge_amount',
+        'cancellation_refund_amount',
+        'cancellation_refund_percentage',
         'check_in_date',
         'check_out_date',
         'adults',
@@ -41,8 +50,13 @@ class Reservation extends Model
         return [
             'check_in_date' => 'date',
             'check_out_date' => 'date',
+            'cancelled_at' => 'datetime',
             'daily_rate' => 'decimal:2',
             'deposit_amount' => 'decimal:2',
+            'prepaid_amount_at_cancellation' => 'decimal:2',
+            'cancellation_charge_amount' => 'decimal:2',
+            'cancellation_refund_amount' => 'decimal:2',
+            'cancellation_refund_percentage' => 'decimal:2',
         ];
     }
 
@@ -69,6 +83,27 @@ class Reservation extends Model
     public function folio(): HasOne
     {
         return $this->hasOne(Folio::class);
+    }
+
+    public function getTotalNightsAttribute(): int
+    {
+        if ($this->check_in_date === null || $this->check_out_date === null) {
+            return 0;
+        }
+
+        return (int) max(0, (int) $this->check_in_date->diffInDays($this->check_out_date));
+    }
+
+    public function getTotalAmountAttribute(): string
+    {
+        if ($this->total_nights === 0) {
+            return '0.00';
+        }
+
+        return Money::of((string) ($this->daily_rate ?? 0), 'TZS')
+            ->multipliedBy((string) $this->total_nights, RoundingMode::HALF_UP)
+            ->getAmount()
+            ->__toString();
     }
 
     protected static function newFactory(): ReservationFactory

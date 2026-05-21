@@ -21,14 +21,13 @@ class CreateReservationRequest extends FormRequest
     {
         return [
             'guest_id' => ['required', 'uuid', 'exists:guests,id'],
-            'room_type_id' => ['required', 'uuid', 'exists:room_types,id'],
-            'room_id' => ['nullable', 'uuid', 'exists:rooms,id'],
+            'room_type_id' => ['sometimes', 'nullable', 'uuid', 'exists:room_types,id'],
+            'room_id' => ['required', 'uuid', 'exists:rooms,id'],
             'rate_plan_id' => ['nullable', 'uuid', 'exists:rate_plans,id'],
             'check_in_date' => ['required', 'date', 'after_or_equal:today'],
             'check_out_date' => ['required', 'date', 'after:check_in_date'],
             'adults' => ['required', 'integer', 'min:1', 'max:10'],
             'children' => ['sometimes', 'integer', 'min:0', 'max:10'],
-            'daily_rate' => ['sometimes', 'numeric', 'min:0'],
             'source' => ['sometimes', 'string', 'max:50'],
             'ota_ref' => ['sometimes', 'string', 'max:100'],
             'special_requests' => ['sometimes', 'string', 'max:2000'],

@@ -20,6 +20,7 @@ class RoomFactory extends Factory
             'room_number' => (string) fake()->unique()->numberBetween(100, 999),
             'floor' => fake()->numberBetween(1, 5),
             'status' => 'vacant_clean',
+            'daily_rate' => fake()->randomFloat(2, 50000, 400000),
         ];
     }
 }

@@ -38,7 +38,7 @@ class CheckInGuest
             $room = Room::query()->whereKey($roomId)->lockForUpdate()->firstOrFail();
 
             throw_if(
-                $room->status !== 'vacant_clean',
+                ! in_array($room->status, ['vacant_clean', 'blocked', 'occupied'], true),
                 DomainException::class,
                 "Room {$room->room_number} is not available for check-in."
             );

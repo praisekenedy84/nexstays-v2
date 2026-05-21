@@ -1,6 +1,7 @@
 <x-layouts.app active-nav="reservations" title="Reservations" subtitle="Booking lifecycle — inquiry → confirmed → checked in → checked out">
     @can('manage-reservations')
-        <div class="mb-4 flex justify-end">
+        <div class="mb-4 flex justify-end gap-2">
+            <a href="{{ route('tenant.reservations.settings.edit') }}" class="btn-outline">Reservation settings</a>
             <a href="{{ route('tenant.reservations.create') }}" class="btn-primary">New reservation</a>
         </div>
     @endcan
@@ -23,22 +24,50 @@
     </div>
 
     <div class="card overflow-hidden">
+        @can('manage-reservations')
+            <form id="bulk-reservation-action-form" method="POST" action="{{ route('tenant.reservations.bulk-action') }}" class="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
+                @csrf
+                <span class="text-xs font-medium uppercase tracking-wide text-ink-muted">Bulk actions</span>
+                <select name="action" required class="input-field max-w-[220px]">
+                    <option value="">Choose action</option>
+                    <option value="cancel">Cancel selected</option>
+                    <option value="delete">Delete selected permanently</option>
+                </select>
+                <button type="submit" class="btn-primary">Apply</button>
+            </form>
+        @endcan
         <div class="overflow-x-auto">
             <table class="w-full min-w-[720px] text-left text-sm">
                 <thead class="border-b border-slate-100 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-ink-muted">
                     <tr>
+                        @can('manage-reservations')
+                            <th class="px-5 py-3">
+                                <input id="select-all-reservations" type="checkbox" class="rounded border-slate-300 text-primary">
+                            </th>
+                        @endcan
                         <th class="px-5 py-3">Booking ref</th>
                         <th class="px-5 py-3">Guest</th>
                         <th class="px-5 py-3">Room / type</th>
                         <th class="px-5 py-3">Stay</th>
                         <th class="px-5 py-3">Status</th>
-                        <th class="px-5 py-3 text-right">Rate</th>
+                        <th class="px-5 py-3 text-right">Rate / total</th>
                         <th class="px-5 py-3 text-right"></th>
                     </tr>
                 </thead>
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($reservations as $reservation)
                         <tr class="hover:bg-slate-50/50">
+                            @can('manage-reservations')
+                                <td class="px-5 py-4">
+                                    <input
+                                        type="checkbox"
+                                        name="reservation_ids[]"
+                                        value="{{ $reservation->id }}"
+                                        form="bulk-reservation-action-form"
+                                        class="reservation-row-checkbox rounded border-slate-300 text-primary"
+                                    >
+                                </td>
+                            @endcan
                             <td class="px-5 py-4 font-mono text-xs font-semibold text-primary">{{ $reservation->booking_ref }}</td>
                             <td class="px-5 py-4">
                                 {{ $reservation->guest?->first_name }} {{ $reservation->guest?->last_name }}
@@ -56,19 +85,74 @@
                             <td class="px-5 py-4">
                                 <x-ui.status-badge :status="$reservation->status" />
                             </td>
-                            <td class="px-5 py-4 text-right font-medium">@money($reservation->daily_rate)</td>
                             <td class="px-5 py-4 text-right">
-                                <a href="{{ route('tenant.reservations.show', $reservation) }}" class="text-primary hover:underline">View</a>
+                                <p class="font-medium">@money($reservation->daily_rate)</p>
+                                <p class="text-xs text-ink-muted">
+                                    {{ $reservation->total_nights }} night(s) · @money($reservation->total_amount)
+                                </p>
+                            </td>
+                            <td class="px-5 py-4 text-right">
+                                <a
+                                    href="{{ route('tenant.reservations.show', $reservation) }}"
+                                    class="inline-flex items-center justify-center rounded-md p-1.5 text-primary hover:bg-slate-100"
+                                    title="View reservation"
+                                    aria-label="View reservation"
+                                >
+                                    <x-icon name="eye" class="size-4" />
+                                    <span class="sr-only">View</span>
+                                </a>
+                                <a
+                                    href="{{ route('tenant.reservations.ticket', $reservation) }}"
+                                    class="ml-1 inline-flex items-center justify-center rounded-md p-1.5 text-primary hover:bg-slate-100"
+                                    title="Download reservation ticket"
+                                    aria-label="Download reservation ticket"
+                                >
+                                    <x-icon name="document" class="size-4" />
+                                    <span class="sr-only">Download ticket</span>
+                                </a>
                                 @can('manage-reservations')
                                     @if (in_array($reservation->status, ['inquiry', 'confirmed'], true))
-                                        <a href="{{ route('tenant.reservations.edit', $reservation) }}" class="ml-2 text-primary hover:underline">Edit</a>
+                                        <a
+                                            href="{{ route('tenant.reservations.edit', $reservation) }}"
+                                            class="ml-1 inline-flex items-center justify-center rounded-md p-1.5 text-primary hover:bg-slate-100"
+                                            title="Edit reservation"
+                                            aria-label="Edit reservation"
+                                        >
+                                            <x-icon name="pencil" class="size-4" />
+                                            <span class="sr-only">Edit</span>
+                                        </a>
+                                        <form method="POST" action="{{ route('tenant.reservations.cancel', $reservation) }}" class="ml-1 inline" onsubmit="return confirm('Cancel this reservation?')">
+                                            @csrf
+                                            <button
+                                                type="submit"
+                                                class="inline-flex items-center justify-center rounded-md p-1.5 text-amber-600 hover:bg-amber-50"
+                                                title="Cancel reservation"
+                                                aria-label="Cancel reservation"
+                                            >
+                                                <x-icon name="x-circle" class="size-4" />
+                                                <span class="sr-only">Cancel</span>
+                                            </button>
+                                        </form>
                                     @endif
+                                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" class="ml-2 inline" onsubmit="return confirm('Permanently delete this reservation? This cannot be undone.')">
+                                        @csrf
+                                        @method('DELETE')
+                                        <button
+                                            type="submit"
+                                            class="inline-flex items-center justify-center rounded-md p-1.5 text-red-600 hover:bg-red-50"
+                                            title="Delete reservation permanently"
+                                            aria-label="Delete reservation permanently"
+                                        >
+                                            <x-icon name="trash" class="size-4" />
+                                            <span class="sr-only">Delete</span>
+                                        </button>
+                                    </form>
                                 @endcan
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="6" class="px-5 py-12 text-center text-ink-muted">No reservations found.</td>
+                            <td colspan="{{ auth()->user()?->can('manage-reservations') ? 8 : 7 }}" class="px-5 py-12 text-center text-ink-muted">No reservations found.</td>
                         </tr>
                     @endforelse
                 </tbody>
@@ -86,4 +170,32 @@
         @can('manage-reservations') · <code class="rounded bg-slate-100 px-1">POST /api/v1/reservations</code>@endcan
         @can('check-in-guests') · <code class="rounded bg-slate-100 px-1">POST …/check-in</code>@endcan
     </p>
+
+    @can('manage-reservations')
+        <script>
+            (() => {
+                const selectAll = document.getElementById('select-all-reservations');
+                const checkboxes = Array.from(document.querySelectorAll('.reservation-row-checkbox'));
+
+                if (!selectAll || checkboxes.length === 0) {
+                    return;
+                }
+
+                const syncState = () => {
+                    const checkedCount = checkboxes.filter((checkbox) => checkbox.checked).length;
+                    selectAll.checked = checkedCount > 0 && checkedCount === checkboxes.length;
+                    selectAll.indeterminate = checkedCount > 0 && checkedCount < checkboxes.length;
+                };
+
+                selectAll.addEventListener('change', () => {
+                    checkboxes.forEach((checkbox) => {
+                        checkbox.checked = selectAll.checked;
+                    });
+                    syncState();
+                });
+
+                checkboxes.forEach((checkbox) => checkbox.addEventListener('change', syncState));
+            })();
+        </script>
+    @endcan
 </x-layouts.app>

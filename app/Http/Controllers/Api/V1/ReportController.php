@@ -46,4 +46,44 @@ class ReportController extends Controller
 
         return $this->respond($this->reporting->fbRevenueSplit($from, $to));
     }
+
+    public function roomReservations(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('view-reports') || $request->user()?->can('view-reservations'), 403);
+
+        $from = $request->filled('from') ? Carbon::parse($request->input('from'))->startOfDay() : now()->startOfMonth();
+        $to = $request->filled('to') ? Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();
+
+        return $this->respond($this->reporting->roomReservationFinance($from, $to));
+    }
+
+    public function roomPaymentsAccounting(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('view-reports') || $request->user()?->can('view-reservations'), 403);
+
+        $from = $request->filled('from') ? Carbon::parse($request->input('from'))->startOfDay() : now()->startOfMonth();
+        $to = $request->filled('to') ? Carbon::parse($request->input('to'))->endOfDay() : now()->endOfDay();
+
+        $report = $this->reporting->roomPaymentsAccounting($from, $to);
+
+        $rows = $report['rows']->map(fn (array $row) => [
+            'reservation_id' => $row['reservation']->id,
+            'booking_ref' => $row['reservation']->booking_ref,
+            'status' => $row['reservation']->status,
+            'guest_name' => $row['guest_name'],
+            'room_number' => $row['room_number'],
+            'stay_nights' => $row['stay_nights'],
+            'room_revenue' => $row['room_revenue'],
+            'folio_charges' => $row['folio_charges'],
+            'payments_received' => $row['payments_received'],
+            'outstanding_balance' => $row['outstanding_balance'],
+        ])->values();
+
+        return $this->respond([
+            'from' => $report['from'],
+            'to' => $report['to'],
+            'totals' => $report['totals'],
+            'rows' => $rows,
+        ]);
+    }
 }

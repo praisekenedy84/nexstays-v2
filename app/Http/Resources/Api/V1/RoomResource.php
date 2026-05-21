@@ -23,6 +23,15 @@ class RoomResource extends JsonResource
                 'room_number' => $this->room_number,
                 'floor' => $this->floor,
                 'status' => $this->status,
+                'daily_rate' => $this->daily_rate,
+                'photos' => $this->photos ?? [],
+                'amenities' => $this->amenities ?? [],
+                'features' => $this->features ?? [],
+                'photo_urls' => collect($this->photos ?? [])
+                    ->map(fn (string $path): ?string => Room::photoUrl($path))
+                    ->filter()
+                    ->values()
+                    ->all(),
                 'is_smoking' => $this->is_smoking,
                 'room_type_id' => $this->room_type_id,
             ],

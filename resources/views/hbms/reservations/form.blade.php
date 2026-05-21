@@ -26,28 +26,6 @@
                 </select>
             </div>
 
-            <div class="grid gap-4 sm:grid-cols-2">
-                <div>
-                    <label for="room_type_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room type</label>
-                    <select id="room_type_id" name="room_type_id" required class="input-field">
-                        @foreach ($roomTypes as $type)
-                            <option value="{{ $type->id }}" @selected(old('room_type_id', $reservation->room_type_id) === $type->id)>{{ $type->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label for="room_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room (optional)</label>
-                    <select id="room_id" name="room_id" class="input-field">
-                        <option value="">Assign later</option>
-                        @foreach ($rooms as $room)
-                            <option value="{{ $room->id }}" @selected(old('room_id', $reservation->room_id) === $room->id)>
-                                {{ $room->room_number }} — {{ $room->roomType?->name }}
-                            </option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
             <div>
                 <label for="rate_plan_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Rate plan</label>
                 <select id="rate_plan_id" name="rate_plan_id" class="input-field">
@@ -78,6 +56,36 @@
             </p>
         @endunless
 
+        <div>
+            <label for="room_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room</label>
+            <select
+                id="room_id"
+                name="room_id"
+                required
+                class="input-field"
+                data-available-rooms-url="{{ route('tenant.reservations.available-rooms') }}"
+                data-exclude-reservation-id="{{ $reservation->id }}"
+            >
+                <option value="">Select room…</option>
+                @foreach ($rooms as $room)
+                    <option
+                        value="{{ $room->id }}"
+                        data-daily-rate="{{ $room->daily_rate ?? 0 }}"
+                        data-room-number="{{ $room->room_number }}"
+                        data-room-type="{{ $room->roomType?->name }}"
+                        data-status="{{ $room->status }}"
+                        @selected(old('room_id', $reservation->room_id) === $room->id)
+                    >
+                        {{ $room->room_number }} — {{ $room->roomType?->name }} ({{ ucfirst(str_replace('_', ' ', $room->status)) }} · @money($room->daily_rate ?? 0))
+                    </option>
+                @endforeach
+            </select>
+            <p class="mt-1 text-xs text-ink-subtle">
+                Room options refresh automatically based on selected stay dates.
+            </p>
+            <p id="room_rate_hint" class="mt-1 text-xs text-ink-subtle"></p>
+        </div>
+
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
                 <label for="check_in_date" class="mb-1.5 block text-xs font-medium text-ink-muted">Check-in</label>
@@ -89,7 +97,7 @@
             </div>
         </div>
 
-        <div class="grid gap-4 sm:grid-cols-3">
+        <div class="grid gap-4 sm:grid-cols-2">
             <div>
                 <label for="adults" class="mb-1.5 block text-xs font-medium text-ink-muted">Adults</label>
                 <input id="adults" type="number" min="1" max="10" name="adults" value="{{ old('adults', $reservation->adults ?? 2) }}" required class="input-field">
@@ -98,25 +106,9 @@
                 <label for="children" class="mb-1.5 block text-xs font-medium text-ink-muted">Children</label>
                 <input id="children" type="number" min="0" max="10" name="children" value="{{ old('children', $reservation->children ?? 0) }}" class="input-field">
             </div>
-            <div>
-                <label for="daily_rate" class="mb-1.5 block text-xs font-medium text-ink-muted">Daily rate (TZS)</label>
-                <input id="daily_rate" type="number" step="0.01" min="0" name="daily_rate" value="{{ old('daily_rate', $reservation->daily_rate) }}" class="input-field">
-            </div>
         </div>
 
-        @if ($isEdit)
-            <div>
-                <label for="room_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room</label>
-                <select id="room_id" name="room_id" class="input-field">
-                    <option value="">Unassigned</option>
-                    @foreach ($rooms as $room)
-                        <option value="{{ $room->id }}" @selected(old('room_id', $reservation->room_id) === $room->id)>
-                            {{ $room->room_number }} — {{ $room->roomType?->name }}
-                        </option>
-                    @endforeach
-                </select>
-            </div>
-        @endif
+        <p id="estimated_total" class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-ink-muted"></p>
 
         <div>
             <label for="special_requests" class="mb-1.5 block text-xs font-medium text-ink-muted">Special requests</label>
@@ -133,3 +125,133 @@
         </div>
     </form>
 </x-layouts.app>
+
+<script>
+    (() => {
+        const room = document.getElementById('room_id');
+        const checkIn = document.getElementById('check_in_date');
+        const checkOut = document.getElementById('check_out_date');
+        const rateHint = document.getElementById('room_rate_hint');
+        const estimatedTotal = document.getElementById('estimated_total');
+        const availabilityEndpoint = room?.dataset.availableRoomsUrl;
+        const excludeReservationId = room?.dataset.excludeReservationId;
+        let latestRequestId = 0;
+
+        if (!room || !checkIn || !checkOut || !estimatedTotal || !availabilityEndpoint) {
+            return;
+        }
+
+        const formatMoney = (value) =>
+            new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
+
+        const recalculate = () => {
+            const selectedOption = room.options[room.selectedIndex];
+            const rate = Number(selectedOption?.dataset.dailyRate ?? 0);
+            const inDate = checkIn.value ? new Date(checkIn.value + 'T00:00:00') : null;
+            const outDate = checkOut.value ? new Date(checkOut.value + 'T00:00:00') : null;
+            const nights = inDate && outDate ? Math.max(0, Math.round((outDate - inDate) / 86400000)) : 0;
+            const total = nights * rate;
+
+            if (selectedOption?.value) {
+                rateHint.textContent = `Daily rate from room: TZS ${formatMoney(rate)}.`;
+            } else {
+                rateHint.textContent = '';
+            }
+
+            if (nights > 0 && selectedOption?.value) {
+                estimatedTotal.textContent = `${nights} night(s) x TZS ${formatMoney(rate)} = TZS ${formatMoney(total)} estimated stay total.`;
+            } else {
+                estimatedTotal.textContent = 'Select room and stay dates to preview total stay amount.';
+            }
+        };
+
+        const renderOptionLabel = (item) => {
+            const statusLabel = String(item.status || '').replaceAll('_', ' ');
+            const rate = Number(item.daily_rate ?? 0);
+            const reason = item.reason === 'reserved_for_selected_dates'
+                ? 'reserved for selected dates'
+                : (item.reason === 'room_status_unavailable' ? 'not bookable by room status' : null);
+
+            return `${item.room_number} — ${item.room_type_name ?? 'Room'} (${statusLabel} · TZS ${formatMoney(rate)})${reason ? ` — ${reason}` : ''}`;
+        };
+
+        const isDateRangeValid = () => {
+            if (!checkIn.value || !checkOut.value) {
+                return false;
+            }
+
+            return checkOut.value > checkIn.value;
+        };
+
+        const refreshAvailableRooms = async () => {
+            if (!isDateRangeValid()) {
+                recalculate();
+                return;
+            }
+
+            const selectedRoomId = room.value;
+            const requestId = ++latestRequestId;
+            const params = new URLSearchParams({
+                check_in_date: checkIn.value,
+                check_out_date: checkOut.value,
+            });
+
+            if (excludeReservationId) {
+                params.set('exclude_reservation_id', excludeReservationId);
+            }
+
+            try {
+                const response = await fetch(`${availabilityEndpoint}?${params.toString()}`, {
+                    headers: {
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load available rooms.');
+                }
+
+                const payload = await response.json();
+                if (requestId !== latestRequestId) {
+                    return;
+                }
+
+                const rooms = Array.isArray(payload.data) ? payload.data : [];
+                room.innerHTML = '';
+
+                const placeholder = document.createElement('option');
+                placeholder.value = '';
+                placeholder.textContent = 'Select room…';
+                room.appendChild(placeholder);
+
+                rooms.forEach((item) => {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.dataset.dailyRate = item.daily_rate ?? '0';
+                    option.textContent = renderOptionLabel(item);
+
+                    const keepSelected = selectedRoomId !== '' && selectedRoomId === item.id;
+                    option.disabled = !item.is_available && !keepSelected;
+                    option.selected = keepSelected;
+
+                    room.appendChild(option);
+                });
+
+                if (selectedRoomId && !rooms.some((item) => item.id === selectedRoomId)) {
+                    room.value = '';
+                }
+            } catch (error) {
+                rateHint.textContent = error instanceof Error ? error.message : 'Unable to refresh room availability.';
+            } finally {
+                recalculate();
+            }
+        };
+
+        [room, checkIn, checkOut].forEach((el) => el.addEventListener('change', recalculate));
+        [checkIn, checkOut].forEach((el) => el.addEventListener('change', refreshAvailableRooms));
+        room.addEventListener('focus', refreshAvailableRooms);
+
+        refreshAvailableRooms();
+        recalculate();
+    })();
+</script>

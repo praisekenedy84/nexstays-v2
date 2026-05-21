@@ -28,6 +28,7 @@ class OrderResource extends JsonResource
             'tax_amount' => $this->tax_amount,
             'total' => $this->total,
             'items' => OrderItemResource::collection($this->whenLoaded('items')),
+            'status_logs' => OrderStatusLogResource::collection($this->whenLoaded('statusLogs')),
             'table' => $this->whenLoaded('table', fn () => [
                 'id' => $this->table?->id,
                 'table_number' => $this->table?->table_number,

@@ -16,9 +16,11 @@
 
 <article {{ $attributes->merge(['class' => 'card p-5']) }}>
     <div class="flex items-start gap-4">
-        <div @class(['flex size-12 shrink-0 items-center justify-center rounded-full', $accentClasses])>
-            {{ $icon }}
-        </div>
+        @isset($icon)
+            <div @class(['flex size-12 shrink-0 items-center justify-center rounded-full', $accentClasses])>
+                {{ $icon }}
+            </div>
+        @endisset
         <div class="min-w-0 flex-1">
             <p class="text-sm text-ink-muted">{{ $label }}</p>
             <p class="mt-1 text-3xl font-bold tracking-tight text-ink">{{ $value }}</p>

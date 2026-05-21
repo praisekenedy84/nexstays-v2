@@ -8,11 +8,13 @@ use App\Domain\HBMS\Models\Folio;
 use App\Domain\Shared\Models\MenuItem;
 use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\OrderItem;
+use App\Domain\Shared\Models\OrderStatusLog;
 use App\Domain\Shared\Models\Outlet;
 use App\Domain\Shared\Models\OutletTable;
 use App\Domain\Shared\Services\FolioService;
 use App\Domain\Shared\Support\OrderNumberGenerator;
 use App\Domain\Till\Models\Payment;
+use App\Domain\Till\Models\TillSession;
 use App\Domain\Till\Services\TillSessionService;
 use Brick\Math\RoundingMode;
 use Brick\Money\Money;
@@ -44,6 +46,8 @@ class OrderService
                 'notes' => $data['notes'] ?? null,
             ]);
 
+            $this->logOrderTransition($order, null, 'open', 'order_created');
+
             if ($order->table_id) {
                 OutletTable::query()
                     ->whereKey($order->table_id)
@@ -70,7 +74,7 @@ class OrderService
                 $menuItem = MenuItem::query()->findOrFail($line['menu_item_id']);
                 throw_if(! $menuItem->is_available, \DomainException::class, "Menu item {$menuItem->name} is not available.");
 
-                OrderItem::query()->create([
+                $item = OrderItem::query()->create([
                     'order_id' => $order->id,
                     'menu_item_id' => $menuItem->id,
                     'quantity' => $line['quantity'],
@@ -78,6 +82,15 @@ class OrderService
                     'notes' => $line['notes'] ?? null,
                     'status' => 'pending',
                 ]);
+
+                $this->logOrderItemTransition(
+                    $order,
+                    $item,
+                    null,
+                    'pending',
+                    'item_added',
+                    ['menu_item_id' => $menuItem->id, 'quantity' => $line['quantity']]
+                );
             }
 
             return $this->recalculate($order);
@@ -88,13 +101,20 @@ class OrderService
     {
         return DB::transaction(function () use ($order) {
             throw_if(! $order->isOpen(), \DomainException::class, 'Cannot fire a closed order.');
+            $order->load('items');
 
-            $order->items()->where('status', 'pending')->update([
-                'status' => 'sent',
-                'sent_to_kds_at' => now(),
-            ]);
+            foreach ($order->items->where('status', 'pending') as $item) {
+                $item->update([
+                    'status' => 'sent',
+                    'sent_to_kds_at' => now(),
+                ]);
 
+                $this->logOrderItemTransition($order, $item, 'pending', 'sent', 'fired_to_kitchen');
+            }
+
+            $previousStatus = $order->status;
             $order->update(['status' => 'sent_to_kitchen']);
+            $this->logOrderTransition($order, $previousStatus, 'sent_to_kitchen', 'fired_to_kitchen');
 
             return $order->fresh(['items.menuItem']);
         });
@@ -103,6 +123,7 @@ class OrderService
     public function postToFolio(Order $order, Folio $folio): Order
     {
         return DB::transaction(function () use ($order, $folio) {
+            $this->ensureReadyForSettlement($order);
             $order = $this->recalculate($order);
             $chargeType = match ($order->outlet->type) {
                 'bar' => 'bar',
@@ -120,11 +141,13 @@ class OrderService
                 ['reference_id' => $order->id, 'reference_type' => Order::class]
             );
 
+            $previousStatus = $order->status;
             $order->update([
                 'folio_id' => $folio->id,
                 'status' => 'closed',
                 'closed_at' => now(),
             ]);
+            $this->logOrderTransition($order, $previousStatus, 'closed', 'posted_to_folio', ['folio_id' => $folio->id]);
 
             if ($order->table_id) {
                 OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
@@ -137,6 +160,7 @@ class OrderService
     public function recordCashPayment(Order $order, Money $amount, Money $tendered, TillSession $tillSession): Payment
     {
         return DB::transaction(function () use ($order, $amount, $tendered, $tillSession) {
+            $this->ensureReadyForSettlement($order);
             $order = $this->recalculate($order);
             $currency = config('nexstay.currency.default', 'TZS');
             $change = $tendered->minus($amount, RoundingMode::HALF_UP);
@@ -164,7 +188,9 @@ class OrderService
                 Payment::class,
             );
 
+            $previousStatus = $order->status;
             $order->update(['status' => 'closed', 'closed_at' => now()]);
+            $this->logOrderTransition($order, $previousStatus, 'closed', 'cash_payment', ['payment_id' => $payment->id]);
 
             if ($order->table_id) {
                 OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
@@ -198,5 +224,126 @@ class OrderService
         ]);
 
         return $order->fresh(['items.menuItem']);
+    }
+
+    public function updateItemStatus(Order $order, OrderItem $item, string $toStatus, ?string $reason = null): Order
+    {
+        return DB::transaction(function () use ($order, $item, $toStatus, $reason) {
+            throw_if(! $order->isOpen(), \DomainException::class, 'Cannot update item status for a closed order.');
+            throw_if($item->order_id !== $order->id, \DomainException::class, 'Order item does not belong to this order.');
+
+            $fromStatus = (string) $item->status;
+            if ($fromStatus === $toStatus) {
+                return $order->fresh(['items.menuItem']);
+            }
+
+            $allowedTransitions = [
+                'pending' => ['sent', 'voided'],
+                'sent' => ['preparing', 'voided'],
+                'preparing' => ['ready', 'voided'],
+                'ready' => ['served', 'voided'],
+            ];
+
+            throw_if(
+                ! in_array($toStatus, $allowedTransitions[$fromStatus] ?? [], true),
+                \DomainException::class,
+                "Invalid status transition from {$fromStatus} to {$toStatus}."
+            );
+
+            $updates = ['status' => $toStatus];
+            if ($toStatus === 'sent') {
+                $updates['sent_to_kds_at'] = now();
+            }
+            if ($toStatus === 'preparing') {
+                $updates['prepared_at'] = now();
+            }
+            if ($toStatus === 'served') {
+                $updates['served_at'] = now();
+            }
+
+            $item->update($updates);
+            $this->logOrderItemTransition($order, $item, $fromStatus, $toStatus, $reason ?? 'manual_status_update');
+
+            $this->syncOrderStatusFromItems($order);
+
+            return $order->fresh(['items.menuItem']);
+        });
+    }
+
+    private function ensureReadyForSettlement(Order $order): void
+    {
+        $pendingCount = $order->items()->where('status', 'pending')->count();
+
+        throw_if(
+            $pendingCount > 0,
+            \DomainException::class,
+            'Cannot settle an order while there are pending items. Fire or void all pending items first.'
+        );
+    }
+
+    private function syncOrderStatusFromItems(Order $order): void
+    {
+        $order->load('items');
+        $current = (string) $order->status;
+        $statuses = $order->items->pluck('status')->all();
+
+        $next = $current;
+        if ($statuses === []) {
+            $next = 'open';
+        } elseif (count(array_unique($statuses)) === 1 && in_array($statuses[0], ['served', 'voided'], true)) {
+            $next = 'served';
+        } elseif (in_array('served', $statuses, true) || in_array('ready', $statuses, true) || in_array('preparing', $statuses, true)) {
+            $next = 'partially_served';
+        } elseif (in_array('sent', $statuses, true)) {
+            $next = 'sent_to_kitchen';
+        } else {
+            $next = 'open';
+        }
+
+        if ($next !== $current && ! in_array($current, ['closed', 'voided'], true)) {
+            $order->update(['status' => $next]);
+            $this->logOrderTransition($order, $current, $next, 'auto_sync_from_items');
+        }
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meta
+     */
+    private function logOrderTransition(Order $order, ?string $fromStatus, string $toStatus, ?string $reason = null, ?array $meta = null): void
+    {
+        OrderStatusLog::query()->create([
+            'order_id' => $order->id,
+            'entity_type' => 'order',
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'reason' => $reason,
+            'meta' => $meta,
+            'changed_by' => Auth::id(),
+            'changed_at' => now(),
+        ]);
+    }
+
+    /**
+     * @param  array<string, mixed>|null  $meta
+     */
+    private function logOrderItemTransition(
+        Order $order,
+        OrderItem $item,
+        ?string $fromStatus,
+        string $toStatus,
+        ?string $reason = null,
+        ?array $meta = null
+    ): void {
+        OrderStatusLog::query()->create([
+            'order_id' => $order->id,
+            'order_item_id' => $item->id,
+            'entity_type' => 'order_item',
+            'from_status' => $fromStatus,
+            'to_status' => $toStatus,
+            'reason' => $reason,
+            'meta' => $meta,
+            'changed_by' => Auth::id(),
+            'changed_at' => now(),
+        ]);
     }
 }

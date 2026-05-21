@@ -11,13 +11,18 @@ use App\Domain\HBMS\Models\Guest;
 use App\Domain\HBMS\Models\RatePlan;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
-use App\Domain\HBMS\Models\RoomType;
+use App\Domain\HBMS\Services\ReservationSettingsService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\HBMS\CreateReservationRequest;
+use Barryvdh\DomPDF\Facade\Pdf;
 use App\Http\Requests\Api\V1\HBMS\UpdateReservationRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
+use Symfony\Component\HttpFoundation\Response;
 
 class ReservationController extends Controller
 {
@@ -49,9 +54,58 @@ class ReservationController extends Controller
         return view('hbms.reservations.form', [
             'reservation' => new Reservation(['status' => 'confirmed', 'adults' => 2, 'children' => 0]),
             'guests' => Guest::query()->orderBy('last_name')->get(),
-            'roomTypes' => RoomType::query()->orderBy('name')->get(),
             'rooms' => Room::query()->with('roomType')->orderBy('room_number')->get(),
             'ratePlans' => RatePlan::query()->where('is_active', true)->get(),
+        ]);
+    }
+
+    public function availableRooms(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('manage-reservations'), 403);
+
+        $validated = validator($request->all(), [
+            'check_in_date' => ['required', 'date'],
+            'check_out_date' => ['required', 'date', 'after:check_in_date'],
+            'exclude_reservation_id' => ['nullable', 'uuid', 'exists:reservations,id'],
+        ])->validate();
+
+        $reservedRoomIds = Reservation::query()
+            ->whereIn('status', ['inquiry', 'confirmed', 'checked_in'])
+            ->when(
+                ! empty($validated['exclude_reservation_id']),
+                fn ($query) => $query->whereKeyNot($validated['exclude_reservation_id'])
+            )
+            ->where('check_in_date', '<', $validated['check_out_date'])
+            ->where('check_out_date', '>', $validated['check_in_date'])
+            ->pluck('room_id')
+            ->filter()
+            ->unique()
+            ->values()
+            ->all();
+
+        $rooms = Room::query()
+            ->with('roomType')
+            ->orderBy('room_number')
+            ->get()
+            ->map(function (Room $room) use ($reservedRoomIds): array {
+                $status = (string) $room->status;
+                $isReservedForDates = in_array($room->id, $reservedRoomIds, true);
+                $isBookableByStatus = ! in_array($status, ['out_of_order', 'blocked'], true);
+                $isAvailable = $isBookableByStatus && ! $isReservedForDates;
+
+                return [
+                    'id' => $room->id,
+                    'room_number' => $room->room_number,
+                    'room_type_name' => $room->roomType?->name,
+                    'status' => $status,
+                    'daily_rate' => (string) ($room->daily_rate ?? 0),
+                    'is_available' => $isAvailable,
+                    'reason' => $isReservedForDates ? 'reserved_for_selected_dates' : (! $isBookableByStatus ? 'room_status_unavailable' : null),
+                ];
+            });
+
+        return response()->json([
+            'data' => $rooms->values()->all(),
         ]);
     }
 
@@ -75,12 +129,30 @@ class ReservationController extends Controller
         return view('hbms.reservations.show', compact('reservation', 'folioBalance'));
     }
 
+    public function ticket(Reservation $reservation): Response
+    {
+        $reservation->loadMissing(['guest', 'room.roomType', 'roomType', 'ratePlan']);
+
+        $paymentMode = app(ReservationSettingsService::class)->all()['payment_mode'] ?? 'prepaid';
+        $filename = sprintf(
+            'reservation-ticket-%s.pdf',
+            Str::of($reservation->booking_ref)->slug()->value()
+        );
+
+        return Pdf::loadView('hbms.reservations.ticket', [
+            'reservation' => $reservation,
+            'paymentMode' => $paymentMode,
+            'generatedAt' => now(),
+        ])
+            ->setPaper('a4')
+            ->download($filename);
+    }
+
     public function edit(Reservation $reservation): View
     {
         return view('hbms.reservations.form', [
             'reservation' => $reservation,
             'guests' => Guest::query()->orderBy('last_name')->get(),
-            'roomTypes' => RoomType::query()->orderBy('name')->get(),
             'rooms' => Room::query()->with('roomType')->orderBy('room_number')->get(),
             'ratePlans' => RatePlan::query()->where('is_active', true)->get(),
         ]);
@@ -97,6 +169,23 @@ class ReservationController extends Controller
 
     public function destroy(Reservation $reservation): RedirectResponse
     {
+        abort_unless(auth()->user()?->can('manage-reservations'), 403);
+
+        try {
+            $this->deleteReservationPermanently($reservation);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('tenant.reservations.index')
+            ->with('success', 'Reservation deleted permanently.');
+    }
+
+    public function cancel(Reservation $reservation): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('manage-reservations'), 403);
+
         try {
             app(CancelReservation::class)->execute($reservation);
         } catch (\DomainException $e) {
@@ -106,5 +195,94 @@ class ReservationController extends Controller
         return redirect()
             ->route('tenant.reservations.index')
             ->with('success', 'Reservation cancelled.');
+    }
+
+    public function bulkAction(Request $request): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('manage-reservations'), 403);
+
+        $validated = $request->validate([
+            'action' => ['required', 'string', 'in:cancel,delete'],
+            'reservation_ids' => ['required', 'array', 'min:1'],
+            'reservation_ids.*' => ['required', 'uuid', 'exists:reservations,id'],
+        ]);
+
+        $reservations = Reservation::query()
+            ->whereIn('id', $validated['reservation_ids'])
+            ->get()
+            ->keyBy('id');
+
+        $success = 0;
+        $errors = [];
+
+        foreach ($validated['reservation_ids'] as $reservationId) {
+            /** @var Reservation|null $reservation */
+            $reservation = $reservations->get($reservationId);
+
+            if ($reservation === null) {
+                continue;
+            }
+
+            try {
+                if ($validated['action'] === 'cancel') {
+                    app(CancelReservation::class)->execute($reservation);
+                } else {
+                    $this->deleteReservationPermanently($reservation);
+                }
+
+                $success++;
+            } catch (\DomainException $e) {
+                $errors[] = "{$reservation->booking_ref}: {$e->getMessage()}";
+            }
+        }
+
+        if ($success === 0) {
+            return back()->with('error', $errors[0] ?? 'No reservations were updated.');
+        }
+
+        $actionLabel = $validated['action'] === 'cancel' ? 'cancelled' : 'deleted permanently';
+        $message = "{$success} reservation(s) {$actionLabel}.";
+
+        if ($errors !== []) {
+            $message .= ' Some failed: '.implode(' | ', array_slice($errors, 0, 3));
+        }
+
+        return redirect()
+            ->route('tenant.reservations.index')
+            ->with('success', $message);
+    }
+
+    private function deleteReservationPermanently(Reservation $reservation): void
+    {
+        DB::transaction(function () use ($reservation) {
+            $reservation->loadMissing(['room', 'folio.transactions']);
+
+            throw_if(
+                in_array($reservation->status, ['checked_in', 'checked_out'], true),
+                \DomainException::class,
+                'Checked-in or checked-out reservations cannot be permanently deleted.'
+            );
+
+            $folio = $reservation->folio;
+
+            if ($folio !== null) {
+                throw_if(
+                    $folio->transactions()->exists(),
+                    \DomainException::class,
+                    'Reservation has folio transactions and cannot be permanently deleted.'
+                );
+
+                $folio->forceDelete();
+            }
+
+            if (
+                $reservation->room !== null
+                && in_array($reservation->room->status, ['blocked', 'occupied'], true)
+            ) {
+                $reservation->room->update(['status' => 'vacant_clean']);
+            }
+
+            $reservation->forceDelete();
+        });
     }
 }

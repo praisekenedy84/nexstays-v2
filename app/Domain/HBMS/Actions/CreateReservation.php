@@ -4,58 +4,78 @@ declare(strict_types=1);
 
 namespace App\Domain\HBMS\Actions;
 
-use App\Domain\HBMS\Models\RatePlanPrice;
 use App\Domain\HBMS\Models\Reservation;
-use App\Domain\HBMS\Models\RoomType;
+use App\Domain\HBMS\Models\Room;
+use App\Domain\Shared\Services\TextifySmsService;
 use App\Domain\HBMS\Support\BookingReferenceGenerator;
+use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class CreateReservation
 {
+    public function __construct(
+        private readonly TextifySmsService $smsService
+    ) {}
+
     public function execute(array $data): Reservation
     {
-        return DB::transaction(function () use ($data) {
-            $roomType = RoomType::query()->findOrFail($data['room_type_id']);
-            $checkInDate = $data['check_in_date'];
+        $reservation = DB::transaction(function () use ($data) {
+            $room = Room::query()
+                ->with('roomType')
+                ->whereKey($data['room_id'])
+                ->lockForUpdate()
+                ->firstOrFail();
 
-            return Reservation::query()->create([
+            throw_if(
+                in_array($room->status, ['out_of_order', 'blocked'], true),
+                DomainException::class,
+                "Room {$room->room_number} is not available for booking."
+            );
+
+            $hasOverlap = Reservation::query()
+                ->where('room_id', $room->id)
+                ->whereIn('status', ['inquiry', 'confirmed', 'checked_in'])
+                ->where('check_in_date', '<', $data['check_out_date'])
+                ->where('check_out_date', '>', $data['check_in_date'])
+                ->exists();
+
+            throw_if(
+                $hasOverlap,
+                DomainException::class,
+                "Room {$room->room_number} is already reserved for selected dates."
+            );
+
+            $reservation = Reservation::query()->create([
                 'booking_ref' => BookingReferenceGenerator::generate(),
                 'guest_id' => $data['guest_id'],
-                'room_id' => $data['room_id'] ?? null,
-                'room_type_id' => $roomType->id,
+                'room_id' => $room->id,
+                'room_type_id' => $room->room_type_id,
                 'status' => $data['status'] ?? 'confirmed',
-                'check_in_date' => $checkInDate,
+                'check_in_date' => $data['check_in_date'],
                 'check_out_date' => $data['check_out_date'],
                 'adults' => $data['adults'],
                 'children' => $data['children'] ?? 0,
                 'rate_plan_id' => $data['rate_plan_id'] ?? null,
-                'daily_rate' => $this->resolveDailyRate($data, $roomType, $checkInDate),
+                'daily_rate' => (string) ($room->daily_rate ?? $room->roomType?->base_rate ?? 0),
                 'source' => $data['source'] ?? null,
                 'ota_ref' => $data['ota_ref'] ?? null,
                 'special_requests' => $data['special_requests'] ?? null,
                 'deposit_amount' => $data['deposit_amount'] ?? 0,
             ]);
-        });
-    }
 
-    private function resolveDailyRate(array $data, RoomType $roomType, string $checkInDate): string
-    {
-        if (! empty($data['daily_rate'])) {
-            return (string) $data['daily_rate'];
-        }
-
-        if (! empty($data['rate_plan_id'])) {
-            $price = RatePlanPrice::query()
-                ->where('rate_plan_id', $data['rate_plan_id'])
-                ->where('room_type_id', $roomType->id)
-                ->whereDate('date', $checkInDate)
-                ->value('price');
-
-            if ($price !== null) {
-                return (string) $price;
+            if ($reservation->status === 'inquiry') {
+                $room->update(['status' => 'blocked']);
             }
-        }
 
-        return (string) $roomType->base_rate;
+            if ($reservation->status === 'confirmed') {
+                $room->update(['status' => 'occupied']);
+            }
+
+            return $reservation;
+        });
+
+        $this->smsService->sendReservationCreated($reservation);
+
+        return $reservation;
     }
 }

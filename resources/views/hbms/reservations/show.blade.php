@@ -1,16 +1,28 @@
+@php
+    $paymentMode = app(\App\Domain\HBMS\Services\ReservationSettingsService::class)->all()['payment_mode'] ?? 'prepaid';
+    $today = now()->startOfDay();
+    $checkInDate = $reservation->check_in_date->copy()->startOfDay();
+    $checkOutDate = $reservation->check_out_date->copy()->startOfDay();
+    $stayedDays = $reservation->status === 'checked_out'
+        ? $checkInDate->diffInDays($checkOutDate)
+        : ($reservation->status === 'checked_in' ? $checkInDate->diffInDays($today) : 0);
+    $stayedDays = max(0, $stayedDays);
+    $stayedAmount = $stayedDays * (float) $reservation->daily_rate;
+@endphp
 <x-layouts.app active-nav="reservations" :title="$reservation->booking_ref" subtitle="Reservation detail">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('tenant.reservations.index') }}" class="text-sm text-primary hover:underline">← Reservations</a>
         <div class="flex flex-wrap gap-2">
+            <a href="{{ route('tenant.reservations.ticket', $reservation) }}" class="btn-outline">Download ticket</a>
             @can('manage-reservations')
                 @if (in_array($reservation->status, ['inquiry', 'confirmed'], true))
                     <a href="{{ route('tenant.reservations.edit', $reservation) }}" class="btn-outline">Edit</a>
                 @endif
                 @if (in_array($reservation->status, ['inquiry', 'confirmed'], true))
-                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" onsubmit="return confirm('Cancel this reservation?')">
+                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" onsubmit="return confirm('Delete this reservation?')">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn-outline text-red-600 hover:border-red-200 hover:bg-red-50">Cancel booking</button>
+                        <button type="submit" class="btn-outline text-red-600 hover:border-red-200 hover:bg-red-50">Delete reservation</button>
                     </form>
                 @endif
             @endcan
@@ -51,13 +63,39 @@
                     <dd class="mt-1 text-ink">{{ $reservation->adults }} adults, {{ $reservation->children }} children</dd>
                 </div>
                 <div>
+                    <dt class="text-xs font-medium uppercase text-ink-muted">Payment mode</dt>
+                    <dd class="mt-1 font-medium text-ink">{{ strtoupper($paymentMode) }}</dd>
+                </div>
+                <div>
                     <dt class="text-xs font-medium uppercase text-ink-muted">Daily rate</dt>
                     <dd class="mt-1 font-medium text-ink">@money($reservation->daily_rate)</dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium uppercase text-ink-muted">Total stay price</dt>
+                    <dd class="mt-1 font-medium text-ink">
+                        {{ $reservation->total_nights }} night(s) · @money($reservation->total_amount)
+                    </dd>
+                </div>
+                <div>
+                    <dt class="text-xs font-medium uppercase text-ink-muted">Spent so far</dt>
+                    <dd class="mt-1 font-medium text-ink">
+                        {{ $stayedDays }} day(s) · @money($stayedAmount)
+                    </dd>
                 </div>
                 @if ($reservation->special_requests)
                     <div class="sm:col-span-2">
                         <dt class="text-xs font-medium uppercase text-ink-muted">Special requests</dt>
                         <dd class="mt-1 text-ink">{{ $reservation->special_requests }}</dd>
+                    </div>
+                @endif
+                @if ($reservation->status === 'cancelled')
+                    <div class="sm:col-span-2">
+                        <dt class="text-xs font-medium uppercase text-ink-muted">Cancellation settlement</dt>
+                        <dd class="mt-1 text-ink">
+                            Policy: {{ str_replace('_', ' ', (string) $reservation->cancellation_policy) }}
+                            · Charged: @money($reservation->cancellation_charge_amount ?? 0)
+                            · Refund: @money($reservation->cancellation_refund_amount ?? 0)
+                        </dd>
                     </div>
                 @endif
             </dl>

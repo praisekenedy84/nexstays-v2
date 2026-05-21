@@ -58,6 +58,11 @@ class Order extends Model
         return $this->hasMany(OrderItem::class);
     }
 
+    public function statusLogs(): HasMany
+    {
+        return $this->hasMany(OrderStatusLog::class)->latest('changed_at');
+    }
+
     public function isOpen(): bool
     {
         return ! in_array($this->status, ['closed', 'voided'], true);

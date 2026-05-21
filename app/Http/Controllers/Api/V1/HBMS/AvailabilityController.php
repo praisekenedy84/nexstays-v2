@@ -30,7 +30,7 @@ class AvailabilityController extends Controller
         $availability = $roomTypes->map(function (RoomType $roomType) use ($checkIn, $checkOut) {
             $totalRooms = Room::query()
                 ->where('room_type_id', $roomType->id)
-                ->whereIn('status', ['vacant_clean', 'vacant_dirty'])
+                ->whereNotIn('status', ['out_of_order', 'blocked'])
                 ->count();
 
             $blocked = Reservation::query()

@@ -18,11 +18,11 @@
                     <div class="grid grid-cols-2 gap-3">
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-ink-muted">Check in</label>
-                            <input type="date" name="check_in" value="{{ $checkIn }}" required class="input-field">
+                            <input id="check_in" type="date" name="check_in" value="{{ $checkIn }}" required class="input-field">
                         </div>
                         <div>
                             <label class="mb-1.5 block text-xs font-medium text-ink-muted">Check out</label>
-                            <input type="date" name="check_out" value="{{ $checkOut }}" required class="input-field">
+                            <input id="check_out" type="date" name="check_out" value="{{ $checkOut }}" required class="input-field">
                         </div>
                     </div>
 
@@ -37,6 +37,15 @@
                             <option value="all">All room types</option>
                             @foreach ($roomTypes as $type)
                                 <option value="{{ $type->id }}" @selected($roomTypeFilter === $type->id)>{{ $type->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div class="pt-4">
+                        <label class="mb-1.5 block text-xs font-medium text-ink-muted">Amenity</label>
+                        <select name="amenity" class="input-field">
+                            <option value="">Any amenity</option>
+                            @foreach ($amenityOptions as $amenity)
+                                <option value="{{ $amenity }}" @selected($amenityFilter === $amenity)>{{ $amenity }}</option>
                             @endforeach
                         </select>
                     </div>
@@ -69,15 +78,15 @@
 
         <section>
             <div class="mb-5">
-                <h2 class="text-2xl font-bold text-ink">Available room types</h2>
-                <p class="text-sm text-ink-muted">{{ $availability->count() }} type(s) with inventory</p>
+                <h2 class="text-2xl font-bold text-ink">Available rooms</h2>
+                <p class="text-sm text-ink-muted">{{ $availability->count() }} room(s) available</p>
             </div>
 
             <div class="mb-6 flex flex-wrap gap-2">
-                <a href="{{ route('tenant.availability', request()->only(['check_in', 'check_out', 'adults', 'children'])) }}" @class(['filter-pill', 'filter-pill-active' => ! $roomTypeFilter || $roomTypeFilter === 'all'])>All</a>
+                <a href="{{ route('tenant.availability', request()->only(['check_in', 'check_out', 'adults', 'children', 'amenity'])) }}" @class(['filter-pill', 'filter-pill-active' => ! $roomTypeFilter || $roomTypeFilter === 'all'])>All</a>
                 @foreach ($roomTypes as $type)
                     <a
-                        href="{{ route('tenant.availability', array_merge(request()->only(['check_in', 'check_out', 'adults', 'children']), ['room_type' => $type->id])) }}"
+                        href="{{ route('tenant.availability', array_merge(request()->only(['check_in', 'check_out', 'adults', 'children', 'amenity']), ['room_type' => $type->id])) }}"
                         @class(['filter-pill', 'filter-pill-active' => $roomTypeFilter === $type->id])
                     >{{ $type->name }}</a>
                 @endforeach
@@ -89,10 +98,9 @@
                         :name="$row['name']"
                         :code="$row['code']"
                         :price="MoneyFormatter::perNight($row['base_rate'])"
-                        :image="$placeholderImage"
+                        :image="$row['photo_url'] ?? $placeholderImage"
                         :amenities="collect($row['amenities'])->map(fn ($a) => ucfirst(str_replace('_', ' ', $a)))->all()"
                         :hot="$row['hot']"
-                        :available-count="$row['available_rooms']"
                     />
                 @empty
                     <div class="card p-10 text-center">
@@ -105,4 +113,47 @@
             </div>
         </section>
     </div>
+<script>
+    (() => {
+        const checkIn = document.getElementById('check_in');
+        const checkOut = document.getElementById('check_out');
+
+        if (!checkIn || !checkOut) {
+            return;
+        }
+
+        const nextDay = (isoDate) => {
+            const date = new Date(`${isoDate}T00:00:00`);
+
+            if (Number.isNaN(date.getTime())) {
+                return null;
+            }
+
+            date.setDate(date.getDate() + 1);
+            const year = date.getFullYear();
+            const month = String(date.getMonth() + 1).padStart(2, '0');
+            const day = String(date.getDate()).padStart(2, '0');
+
+            return `${year}-${month}-${day}`;
+        };
+
+        const syncCheckOutMin = () => {
+            const minCheckOut = nextDay(checkIn.value);
+
+            if (!minCheckOut) {
+                checkOut.removeAttribute('min');
+                return;
+            }
+
+            checkOut.min = minCheckOut;
+
+            if (!checkOut.value || checkOut.value < minCheckOut) {
+                checkOut.value = minCheckOut;
+            }
+        };
+
+        syncCheckOutMin();
+        checkIn.addEventListener('change', syncCheckOutMin);
+    })();
+</script>
 </x-layouts.app>

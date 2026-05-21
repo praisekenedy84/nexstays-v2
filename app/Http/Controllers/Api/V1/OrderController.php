@@ -15,6 +15,7 @@ use App\Http\Requests\Api\V1\Orders\AddOrderItemsRequest;
 use App\Http\Requests\Api\V1\Orders\CreateOrderRequest;
 use App\Http\Requests\Api\V1\Orders\RecordOrderCashPaymentRequest;
 use App\Http\Requests\Api\V1\Orders\PostOrderToFolioRequest;
+use App\Http\Requests\Api\V1\Orders\UpdateOrderItemStatusRequest;
 use App\Http\Resources\Api\V1\OrderResource;
 use Brick\Money\Money;
 use Illuminate\Http\JsonResponse;
@@ -60,7 +61,7 @@ class OrderController extends Controller
     public function show(Request $request, Order $order): JsonResponse
     {
         abort_unless($request->user()?->can('view-orders'), 403);
-        $order->load(['items.menuItem', 'table', 'outlet']);
+        $order->load(['items.menuItem', 'table', 'outlet', 'statusLogs']);
 
         return $this->respond(OrderResource::make($order));
     }
@@ -102,5 +103,18 @@ class OrderController extends Controller
             'payment_id' => $payment->id,
             'order' => OrderResource::make($order->fresh(['items.menuItem'])),
         ]);
+    }
+
+    public function updateItemStatus(UpdateOrderItemStatusRequest $request, Order $order): JsonResponse
+    {
+        $item = $order->items()->findOrFail($request->validated('order_item_id'));
+        $order = $this->orderService->updateItemStatus(
+            $order,
+            $item,
+            $request->validated('status'),
+            $request->validated('reason')
+        );
+
+        return $this->respond(OrderResource::make($order->load('statusLogs')));
     }
 }

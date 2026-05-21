@@ -16,7 +16,7 @@ class CheckInGuestTest extends TenantTestCase
         $roomType = RoomType::factory()->create();
         $room = Room::factory()->create([
             'room_type_id' => $roomType->id,
-            'status' => 'vacant_clean',
+            'status' => 'blocked',
         ]);
         $reservation = Reservation::factory()->create([
             'room_type_id' => $roomType->id,
