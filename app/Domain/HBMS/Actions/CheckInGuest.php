@@ -9,13 +9,15 @@ use App\Domain\HBMS\Models\Folio;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
 use App\Domain\Shared\Services\FolioService;
+use App\Domain\Shared\Services\NotificationService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class CheckInGuest
 {
     public function __construct(
-        private readonly FolioService $folioService
+        private readonly FolioService $folioService,
+        private readonly NotificationService $notificationService,
     ) {}
 
     public function execute(Reservation $reservation, array $options = []): Folio
@@ -44,8 +46,9 @@ class CheckInGuest
             );
 
             $reservation->update([
-                'status' => 'checked_in',
-                'room_id' => $room->id,
+                'status'        => 'checked_in',
+                'room_id'       => $room->id,
+                'checked_in_at' => now(),
             ]);
 
             $room->update(['status' => 'occupied']);
@@ -53,6 +56,14 @@ class CheckInGuest
             $folio = $this->folioService->openFolio($reservation->fresh());
 
             GuestCheckedIn::dispatch($reservation, $room, $folio);
+
+            $guest = $reservation->guest;
+            $this->notificationService->notify(
+                type:  'check_in',
+                title: 'Check-in: '.($guest ? "{$guest->first_name} {$guest->last_name}" : $reservation->booking_ref),
+                body:  "Room {$room->room_number} · {$reservation->booking_ref} · out {$reservation->check_out_date->format('d M')}",
+                data:  ['booking_ref' => $reservation->booking_ref, 'room_number' => $room->room_number],
+            );
 
             return $folio;
         });

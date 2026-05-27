@@ -1,5 +1,6 @@
 @php
     $isEdit = $item->exists;
+    $existingPhoto = $item->photo ?? null;
 @endphp
 
 <x-layouts.app active-nav="menu" :title="$isEdit ? 'Edit menu item' : 'New menu item'">
@@ -7,7 +8,10 @@
         <a href="{{ route('tenant.menu-items.index') }}" class="text-sm text-primary hover:underline">← Menu</a>
     </div>
 
-    <form method="POST" action="{{ $isEdit ? route('tenant.menu-items.update', $item) : route('tenant.menu-items.store') }}" class="card max-w-xl space-y-4 p-6">
+    <form method="POST"
+          enctype="multipart/form-data"
+          action="{{ $isEdit ? route('tenant.menu-items.update', $item) : route('tenant.menu-items.store') }}"
+          class="card max-w-xl space-y-4 p-6">
         @csrf
         @if ($isEdit)
             @method('PUT')
@@ -48,6 +52,26 @@
                 <label for="cost" class="mb-1.5 block text-xs font-medium text-ink-muted">Cost (optional)</label>
                 <input id="cost" type="number" step="0.01" min="0" name="cost" value="{{ old('cost', $item->cost) }}" class="input-field">
             </div>
+        </div>
+
+        {{-- Photo --}}
+        <div>
+            <label class="mb-1.5 block text-xs font-medium text-ink-muted">Photo</label>
+            @if ($existingPhoto)
+                <div class="mb-3 flex items-start gap-4">
+                    <img src="{{ \App\Domain\Shared\Models\MenuItem::photoUrl($existingPhoto) }}"
+                         alt="{{ $item->name }}"
+                         class="h-24 w-24 rounded-xl border border-slate-200 object-cover">
+                    <label class="flex items-center gap-2 text-sm text-ink">
+                        <input type="checkbox" name="remove_photo" value="1"
+                               @checked(old('remove_photo'))
+                               class="rounded border-slate-300 text-rose-600">
+                        Remove current photo
+                    </label>
+                </div>
+            @endif
+            <input type="file" name="photo" accept=".jpg,.jpeg,.png,.webp" class="input-field">
+            <p class="mt-1 text-xs text-ink-subtle">JPG, PNG or WebP — max 2 MB. {{ $existingPhoto ? 'Upload a new one to replace.' : '' }}</p>
         </div>
 
         <label class="flex items-center gap-2 text-sm text-ink">

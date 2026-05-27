@@ -5,23 +5,31 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Web\RoleController;
 use App\Http\Requests\Web\StoreUserRequest;
 use App\Http\Requests\Web\UpdateUserRequest;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 use Spatie\Permission\Models\Role;
 
 class UserController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
+        $sort   = in_array($request->query('sort'), ['name', 'email', 'created_at']) ? $request->query('sort') : 'name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
+
         $users = User::query()
             ->with('roles')
-            ->orderBy('name')
-            ->paginate(25);
+            ->when($search, fn ($q) => $q->where(fn ($inner) => $inner->where('name', 'ilike', "%{$search}%")->orWhere('email', 'ilike', "%{$search}%")))
+            ->orderBy($sort, $dir)
+            ->paginate(25)
+            ->withQueryString();
 
-        return view('hbms.users.index', compact('users'));
+        return view('hbms.users.index', compact('users', 'sort', 'dir', 'search'));
     }
 
     public function create(): View
@@ -42,6 +50,18 @@ class UserController extends Controller
         $user->syncRoles([$request->validated('role')]);
 
         return redirect()->route('tenant.users.index')->with('success', 'Staff member created.');
+    }
+
+    public function show(User $user): View
+    {
+        $user->loadMissing('roles');
+
+        return view('hbms.users.show', [
+            'user'             => $user,
+            'userRole'         => $user->roles->first(),
+            'userPermissions'  => $user->getAllPermissions()->pluck('name')->flip()->all(),
+            'permissionGroups' => RoleController::PERMISSION_GROUPS,
+        ]);
     }
 
     public function edit(User $user): View

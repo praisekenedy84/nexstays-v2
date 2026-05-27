@@ -5,6 +5,8 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Domain\HBMS\Actions\CancelReservation;
+use App\Domain\HBMS\Actions\CheckInGuest;
+use App\Domain\HBMS\Actions\CheckOutGuest;
 use App\Domain\HBMS\Actions\CreateReservation;
 use App\Domain\HBMS\Actions\UpdateReservation;
 use App\Domain\HBMS\Models\Guest;
@@ -15,6 +17,8 @@ use App\Domain\HBMS\Services\ReservationSettingsService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\HBMS\CreateReservationRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
+use chillerlan\QRCode\QRCode;
+use chillerlan\QRCode\QROptions;
 use App\Http\Requests\Api\V1\HBMS\UpdateReservationRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -29,15 +33,20 @@ class ReservationController extends Controller
     public function index(Request $request): View
     {
         $status = $request->input('status');
+        $sort   = in_array($request->query('sort'), ['booking_ref', 'check_in_date', 'check_out_date', 'created_at']) ? $request->query('sort') : 'check_in_date';
+        $dir    = $request->query('direction') === 'asc' ? 'asc' : 'desc';
+        $search = trim((string) $request->query('search', ''));
 
         $reservations = Reservation::query()
             ->with(['guest', 'room', 'roomType'])
             ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
-            ->when(
-                $request->filled('check_in_date'),
-                fn ($q) => $q->whereDate('check_in_date', $request->input('check_in_date'))
-            )
-            ->latest('check_in_date')
+            ->when($request->filled('check_in_date'), fn ($q) => $q->whereDate('check_in_date', $request->input('check_in_date')))
+            ->when($search, fn ($q) => $q->where(fn ($inner) => $inner
+                ->where('booking_ref', 'ilike', "%{$search}%")
+                ->orWhereHas('guest', fn ($gq) => $gq
+                    ->where('first_name', 'ilike', "%{$search}%")
+                    ->orWhere('last_name', 'ilike', "%{$search}%"))))
+            ->orderBy($sort, $dir)
             ->paginate(20)
             ->withQueryString();
 
@@ -46,7 +55,7 @@ class ReservationController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        return view('hbms.reservations.index', compact('reservations', 'status', 'statusCounts'));
+        return view('hbms.reservations.index', compact('reservations', 'status', 'statusCounts', 'sort', 'dir', 'search'));
     }
 
     public function create(): View
@@ -134,6 +143,10 @@ class ReservationController extends Controller
         $reservation->loadMissing(['guest', 'room.roomType', 'roomType', 'ratePlan']);
 
         $paymentMode = app(ReservationSettingsService::class)->all()['payment_mode'] ?? 'prepaid';
+
+        $qrOptions  = new QROptions(['outputType' => 'svg', 'imageBase64' => false]);
+        $qrSvgB64  = base64_encode((new QRCode($qrOptions))->render($reservation->booking_ref));
+
         $filename = sprintf(
             'reservation-ticket-%s.pdf',
             Str::of($reservation->booking_ref)->slug()->value()
@@ -143,8 +156,9 @@ class ReservationController extends Controller
             'reservation' => $reservation,
             'paymentMode' => $paymentMode,
             'generatedAt' => now(),
+            'qrSvgB64'    => $qrSvgB64,
         ])
-            ->setPaper('a4')
+            ->setPaper('a5')
             ->download($filename);
     }
 
@@ -195,6 +209,55 @@ class ReservationController extends Controller
         return redirect()
             ->route('tenant.reservations.index')
             ->with('success', 'Reservation cancelled.');
+    }
+
+    public function checkIn(Reservation $reservation): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('check-in-guests'), 403);
+
+        try {
+            app(CheckInGuest::class)->execute($reservation);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('tenant.reservations.show', $reservation)
+            ->with('success', "Guest checked in — {$reservation->booking_ref}.");
+    }
+
+    public function checkOut(Reservation $reservation): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('check-out-guests'), 403);
+
+        $reservation->loadMissing('folio');
+
+        try {
+            app(CheckOutGuest::class)->execute($reservation);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('tenant.reservations.show', $reservation)
+            ->with('success', "Guest checked out — {$reservation->booking_ref}.");
+    }
+
+    public function noShow(Reservation $reservation): RedirectResponse
+    {
+        abort_unless(auth()->user()?->can('manage-reservations'), 403);
+
+        if (! in_array($reservation->status, ['confirmed', 'inquiry'], true)) {
+            return back()->with('error', 'Only confirmed or inquiry reservations can be marked as no-show.');
+        }
+
+        $reservation->update(['status' => 'no_show']);
+
+        if ($reservation->room !== null) {
+            $reservation->room->update(['status' => 'vacant_clean']);
+        }
+
+        return back()->with('success', "Marked as no-show — {$reservation->booking_ref}.");
     }
 
     public function bulkAction(Request $request): RedirectResponse

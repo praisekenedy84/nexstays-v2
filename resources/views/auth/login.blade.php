@@ -29,8 +29,15 @@
         <form method="POST" action="{{ route('tenant.login.store') }}" class="space-y-4">
             @csrf
             <div>
+                <label for="property_code" class="mb-1.5 block text-xs font-medium text-ink-muted">Property code</label>
+                <input id="property_code" type="text" name="property_code" value="{{ old('property_code') }}"
+                    required autofocus autocomplete="off" spellcheck="false"
+                    placeholder="e.g. demo"
+                    class="input-field">
+            </div>
+            <div>
                 <label for="email" class="mb-1.5 block text-xs font-medium text-ink-muted">Email</label>
-                <input id="email" type="email" name="email" value="{{ old('email') }}" required autofocus class="input-field">
+                <input id="email" type="email" name="email" value="{{ old('email') }}" required class="input-field">
             </div>
             <div>
                 <label for="password" class="mb-1.5 block text-xs font-medium text-ink-muted">Password</label>
@@ -43,9 +50,14 @@
             <button type="submit" class="btn-primary w-full">Sign in</button>
         </form>
 
-        <p class="mt-6 text-center text-xs text-ink-subtle">
-            Demo: <code class="rounded bg-slate-100 px-1">{{ config('nexstay.demo.admin_email') }}</code>
-        </p>
+        @if (config('nexstay.demo.tenant_id'))
+            <div class="mt-6 rounded-lg bg-slate-50 px-4 py-3 text-center text-xs text-ink-muted">
+                <span class="font-medium">Demo credentials</span><br>
+                Code: <code class="rounded bg-white px-1">{{ config('nexstay.demo.tenant_id') }}</code>
+                &nbsp;·&nbsp; Email: <code class="rounded bg-white px-1">{{ config('nexstay.demo.admin_email') }}</code>
+                &nbsp;·&nbsp; Password: <code class="rounded bg-white px-1">{{ config('nexstay.demo.password') }}</code>
+            </div>
+        @endif
     </div>
 </body>
 </html>

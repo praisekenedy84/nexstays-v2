@@ -14,15 +14,47 @@
         <a href="{{ route('tenant.reservations.index') }}" class="text-sm text-primary hover:underline">← Reservations</a>
         <div class="flex flex-wrap gap-2">
             <a href="{{ route('tenant.reservations.ticket', $reservation) }}" class="btn-outline">Download ticket</a>
+
+            @can('check-in-guests')
+                @if ($reservation->status === 'confirmed')
+                    <form method="POST" action="{{ route('tenant.reservations.check-in', $reservation) }}"
+                          onsubmit="return confirm('Check in guest for {{ $reservation->booking_ref }}?')">
+                        @csrf
+                        <button type="submit"
+                            class="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
+                            @if (! $reservation->room_id) title="No room assigned — edit reservation first" disabled @endif
+                        >
+                            Check in guest
+                        </button>
+                    </form>
+                @endif
+            @endcan
+
+            @can('check-out-guests')
+                @if ($reservation->status === 'checked_in')
+                    <form method="POST" action="{{ route('tenant.reservations.check-out', $reservation) }}"
+                          onsubmit="return confirm('Check out guest?\n\nMake sure all charges are settled (folio balance = 0) before proceeding.')">
+                        @csrf
+                        <button type="submit"
+                            class="rounded-lg bg-sky-600 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-700">
+                            Check out guest
+                        </button>
+                    </form>
+                @endif
+            @endcan
+
             @can('manage-reservations')
                 @if (in_array($reservation->status, ['inquiry', 'confirmed'], true))
                     <a href="{{ route('tenant.reservations.edit', $reservation) }}" class="btn-outline">Edit</a>
-                @endif
-                @if (in_array($reservation->status, ['inquiry', 'confirmed'], true))
+                    <form method="POST" action="{{ route('tenant.reservations.no-show', $reservation) }}"
+                          onsubmit="return confirm('Mark {{ $reservation->booking_ref }} as no-show?')">
+                        @csrf
+                        <button type="submit" class="btn-outline text-amber-600 hover:border-amber-200 hover:bg-amber-50">No show</button>
+                    </form>
                     <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" onsubmit="return confirm('Delete this reservation?')">
                         @csrf
                         @method('DELETE')
-                        <button type="submit" class="btn-outline text-red-600 hover:border-red-200 hover:bg-red-50">Delete reservation</button>
+                        <button type="submit" class="btn-outline text-red-600 hover:border-red-200 hover:bg-red-50">Delete</button>
                     </form>
                 @endif
             @endcan
@@ -99,6 +131,55 @@
                     </div>
                 @endif
             </dl>
+
+            {{-- Timeline --}}
+            <div class="border-t border-slate-100 pt-4">
+                <p class="mb-3 text-xs font-medium uppercase tracking-wide text-ink-muted">Timeline</p>
+                <ol class="space-y-2">
+                    <li class="flex items-start gap-3 text-sm">
+                        <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-500">1</span>
+                        <div>
+                            <p class="font-medium text-ink">Reservation created</p>
+                            <p class="text-xs text-ink-muted">{{ $reservation->created_at->format('d M Y, H:i') }} &middot; {{ $reservation->created_at->diffForHumans() }}</p>
+                        </div>
+                    </li>
+                    @if ($reservation->checked_in_at)
+                        <li class="flex items-start gap-3 text-sm">
+                            <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-emerald-100 text-[10px] font-bold text-emerald-600">2</span>
+                            <div>
+                                <p class="font-medium text-ink">Checked in</p>
+                                <p class="text-xs text-ink-muted">{{ $reservation->checked_in_at->format('d M Y, H:i') }} &middot; {{ $reservation->checked_in_at->diffForHumans() }}</p>
+                            </div>
+                        </li>
+                    @elseif (in_array($reservation->status, ['confirmed', 'inquiry'], true))
+                        <li class="flex items-start gap-3 text-sm opacity-40">
+                            <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-slate-100 text-[10px] font-bold text-slate-400">2</span>
+                            <div>
+                                <p class="font-medium text-ink-muted">Check-in pending</p>
+                                <p class="text-xs text-ink-subtle">Expected {{ $reservation->check_in_date->format('d M Y') }}</p>
+                            </div>
+                        </li>
+                    @endif
+                    @if ($reservation->checked_out_at)
+                        <li class="flex items-start gap-3 text-sm">
+                            <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-sky-100 text-[10px] font-bold text-sky-600">3</span>
+                            <div>
+                                <p class="font-medium text-ink">Checked out</p>
+                                <p class="text-xs text-ink-muted">{{ $reservation->checked_out_at->format('d M Y, H:i') }} &middot; {{ $reservation->checked_out_at->diffForHumans() }}</p>
+                            </div>
+                        </li>
+                    @endif
+                    @if ($reservation->cancelled_at)
+                        <li class="flex items-start gap-3 text-sm">
+                            <span class="mt-1 flex size-5 shrink-0 items-center justify-center rounded-full bg-rose-100 text-[10px] font-bold text-rose-500">✕</span>
+                            <div>
+                                <p class="font-medium text-ink">Cancelled</p>
+                                <p class="text-xs text-ink-muted">{{ $reservation->cancelled_at->format('d M Y, H:i') }} &middot; {{ $reservation->cancelled_at->diffForHumans() }}</p>
+                            </div>
+                        </li>
+                    @endif
+                </ol>
+            </div>
         </section>
 
         @if ($reservation->folio)

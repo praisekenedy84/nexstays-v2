@@ -119,6 +119,8 @@ class TenancyServiceProvider extends StanclTenancyServiceProvider
 
     protected function makeTenancyMiddlewareHighestPriority(): void
     {
+        // InitializeTenancyBySession is NOT here — it needs StartSession to run first.
+        // Its position in the priority list is set in bootstrap/app.php.
         $tenancyMiddleware = [
             Middleware\PreventAccessFromCentralDomains::class,
             Middleware\InitializeTenancyByDomain::class,
@@ -126,6 +128,7 @@ class TenancyServiceProvider extends StanclTenancyServiceProvider
             Middleware\InitializeTenancyByDomainOrSubdomain::class,
             Middleware\InitializeTenancyByPath::class,
             Middleware\InitializeTenancyByRequestData::class,
+            \App\Http\Middleware\InitializeTenancyByToken::class,
         ];
 
         foreach (array_reverse($tenancyMiddleware) as $middleware) {

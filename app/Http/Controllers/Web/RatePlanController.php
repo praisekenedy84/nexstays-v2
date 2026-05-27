@@ -9,15 +9,24 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreRatePlanRequest;
 use App\Http\Requests\Web\UpdateRatePlanRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class RatePlanController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $ratePlans = RatePlan::query()->orderBy('name')->paginate(20);
+        $sort   = in_array($request->query('sort'), ['name', 'created_at']) ? $request->query('sort') : 'name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
 
-        return view('hbms.rate-plans.index', compact('ratePlans'));
+        $ratePlans = RatePlan::query()
+            ->when($search, fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('hbms.rate-plans.index', compact('ratePlans', 'sort', 'dir', 'search'));
     }
 
     public function create(): View

@@ -6,13 +6,15 @@ namespace App\Domain\HBMS\Actions;
 
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\Shared\Services\FolioService;
+use App\Domain\Shared\Services\NotificationService;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
 class CheckOutGuest
 {
     public function __construct(
-        private readonly FolioService $folioService
+        private readonly FolioService $folioService,
+        private readonly NotificationService $notificationService,
     ) {}
 
     public function execute(Reservation $reservation): Reservation
@@ -40,21 +42,30 @@ class CheckOutGuest
                 'Folio balance must be zero before check-out.'
             );
 
-            $reservation->update(['status' => 'checked_out']);
+            $reservation->update(['status' => 'checked_out', 'checked_out_at' => now()]);
 
             if ($reservation->room !== null) {
                 $reservation->room->update(['status' => 'vacant_dirty']);
             }
 
-            $folio->update(['status' => 'closed']);
-
-            return $reservation->fresh([
-                'guest',
-                'room',
-                'roomType',
-                'ratePlan',
-                'folio',
+            $settled = (string) $folio->payments()->sum('amount');
+            $folio->update([
+                'status'         => 'closed',
+                'settled_amount' => $settled,
             ]);
+
+            $fresh = $reservation->fresh(['guest', 'room', 'roomType', 'ratePlan', 'folio']);
+
+            $guest = $fresh->guest;
+            $room  = $fresh->room;
+            $this->notificationService->notify(
+                type:  'check_out',
+                title: 'Check-out: '.($guest ? "{$guest->first_name} {$guest->last_name}" : $reservation->booking_ref),
+                body:  ($room ? "Room {$room->room_number} · " : '')."{$reservation->booking_ref} · settled",
+                data:  ['booking_ref' => $reservation->booking_ref],
+            );
+
+            return $fresh;
         });
     }
 }

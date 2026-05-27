@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Shared\Models;
 
 use App\Domain\HBMS\Models\Folio;
+use App\Domain\Till\Models\Payment;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
@@ -56,6 +57,11 @@ class Order extends Model
     public function items(): HasMany
     {
         return $this->hasMany(OrderItem::class);
+    }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(Payment::class);
     }
 
     public function statusLogs(): HasMany

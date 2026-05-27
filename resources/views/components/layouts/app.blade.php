@@ -14,6 +14,16 @@
 
     <title>{{ $title ? "{$title} — NexStay" : 'NexStay' }}</title>
 
+    {{-- Apply dark class before CSS renders to prevent flash of wrong theme --}}
+    <script>
+        (function () {
+            var theme = localStorage.getItem('nexstay-theme');
+            if (theme === 'dark' || (!theme && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
 
@@ -21,6 +31,25 @@
     @stack('head')
 </head>
 <body class="min-h-screen">
+    {{-- Impersonation banner --}}
+    @if (session('impersonating'))
+        @php $imp = session('impersonating'); @endphp
+        <div class="flex items-center justify-between bg-amber-400 px-5 py-2 text-xs font-medium text-amber-950">
+            <span>
+                Viewing as <strong>{{ $imp['user_name'] }}</strong> ({{ $imp['user_email'] }})
+                at <strong>{{ $imp['tenant_name'] }}</strong>
+                &nbsp;·&nbsp; Platform admin: {{ $imp['platform_admin'] }}
+            </span>
+            <form method="POST" action="{{ route('platform.impersonate.stop') }}">
+                @csrf
+                <button type="submit"
+                    class="rounded-lg bg-amber-900/20 px-3 py-1 font-semibold transition hover:bg-amber-900/30">
+                    Exit &rarr;
+                </button>
+            </form>
+        </div>
+    @endif
+
     <div class="flex min-h-screen">
         <x-layout.sidebar :active="$activeNav" />
 
@@ -42,5 +71,23 @@
         </div>
     </div>
     @stack('scripts')
+    <script>
+    // Refresh CSRF token every 10 minutes so long-open forms don't get 419
+    (function () {
+        const REFRESH_MS = 10 * 60 * 1000;
+        async function refreshCsrf() {
+            try {
+                const res  = await fetch('/csrf-token', { headers: { Accept: 'application/json' } });
+                if (!res.ok) return;
+                const data = await res.json();
+                const token = data.token;
+                if (!token) return;
+                document.querySelectorAll('meta[name="csrf-token"]').forEach(m => m.content = token);
+                document.querySelectorAll('input[name="_token"]').forEach(i => i.value = token);
+            } catch (_) {}
+        }
+        setInterval(refreshCsrf, REFRESH_MS);
+    })();
+    </script>
 </body>
 </html>

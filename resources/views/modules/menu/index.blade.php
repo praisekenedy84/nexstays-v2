@@ -10,6 +10,7 @@
                     @endforeach
                 </select>
             </div>
+            <x-ui.search-bar :value="$search" placeholder="Item name…" />
         </form>
         @can('manage-menu')
             <a href="{{ route('tenant.menu-items.create', ['outlet_id' => $outletId]) }}" class="btn-primary">Add item</a>
@@ -20,11 +21,12 @@
         <table class="w-full text-left text-sm">
             <thead class="bg-slate-50 text-xs uppercase text-ink-muted">
                 <tr>
-                    <th class="px-5 py-3">Item</th>
-                    <th class="px-5 py-3">Category</th>
-                    <th class="px-5 py-3">Outlet</th>
-                    <th class="px-5 py-3 text-right">Price</th>
-                    <th class="px-5 py-3">Available</th>
+                    <th class="px-5 py-3 w-12"></th>
+                    <x-ui.sort-th column="name" label="Item" :sort="$sort" :dir="$dir" />
+                    <th class="px-5 py-3 text-left">Category</th>
+                    <th class="px-5 py-3 text-left">Outlet</th>
+                    <x-ui.sort-th column="price" label="Price" :sort="$sort" :dir="$dir" class="text-right" />
+                    <th class="px-5 py-3 text-left">Available</th>
                     @can('manage-menu')
                         <th class="px-5 py-3 text-right">Actions</th>
                     @endcan
@@ -33,6 +35,17 @@
             <tbody class="divide-y divide-slate-100">
                 @forelse ($items as $item)
                     <tr>
+                        <td class="pl-5 py-3">
+                            @php $photoUrl = \App\Domain\Shared\Models\MenuItem::photoUrl($item->photo); @endphp
+                            @if ($photoUrl)
+                                <img src="{{ $photoUrl }}" alt="{{ $item->name }}"
+                                     class="size-10 rounded-lg object-cover border border-slate-100">
+                            @else
+                                <div class="size-10 rounded-lg border border-dashed border-slate-200 bg-slate-50 flex items-center justify-center">
+                                    <span class="text-[10px] text-slate-400">No img</span>
+                                </div>
+                            @endif
+                        </td>
                         <td class="px-5 py-4 font-medium">{{ $item->name }}</td>
                         <td class="px-5 py-4 text-ink-muted">{{ $item->category?->name }}</td>
                         <td class="px-5 py-4 text-ink-muted">{{ $item->category?->outlet?->name }}</td>
@@ -57,7 +70,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-5 py-12 text-center text-ink-muted">No menu items.</td>
+                        <td colspan="7" class="px-5 py-12 text-center text-ink-muted">No menu items.</td>
                     </tr>
                 @endforelse
             </tbody>

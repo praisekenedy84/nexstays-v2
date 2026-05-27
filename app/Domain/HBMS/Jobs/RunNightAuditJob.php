@@ -9,6 +9,8 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use App\Domain\Shared\Services\DivisionSalesService;
+use App\Domain\Shared\Services\NotificationService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 
@@ -31,7 +33,18 @@ class RunNightAuditJob implements ShouldQueue
 
         try {
             Log::info('Night audit started for tenant', ['tenant' => tenant('id')]);
-            // Room charges, no-show processing, and reports are implemented in a follow-up pass.
+
+            // Snapshot yesterday's division sales for trending
+            app(DivisionSalesService::class)->takeSnapshot(now()->subDay());
+
+            app(NotificationService::class)->notify(
+                type:  'night_audit',
+                title: 'Night audit completed',
+                body:  'Daily snapshot written for '.now()->subDay()->format('d M Y').'.',
+                data:  ['date' => now()->subDay()->toDateString()],
+            );
+
+            Log::info('Night audit completed.', ['tenant' => tenant('id')]);
         } finally {
             $lock->release();
         }

@@ -49,7 +49,7 @@ class NexstayInstallDemoCommand extends Command
             ]);
         }
 
-        $baseUrl = "http://{$domain}.localhost:8000";
+        $appUrl = rtrim(config('app.url', 'http://localhost:8000'), '/');
         $password = config('nexstay.demo.password');
 
         $this->newLine();
@@ -62,8 +62,10 @@ class NexstayInstallDemoCommand extends Command
                 ['Housekeeper', config('nexstay.demo.housekeeper_email'), $password],
             ]
         );
-        $this->line("  API base: {$baseUrl}/api/v1");
-        $this->line("  Login:    POST {$baseUrl}/api/v1/auth/login");
+        $this->line("  Web login: {$appUrl}/login  (property code: {$tenantId})");
+        $this->line("  API base:  {$appUrl}/api/v1");
+        $this->line("  API login: POST {$appUrl}/api/v1/auth/login");
+        $this->line('             Body: { "property_code": "'.$tenantId.'", "email": "...", "password": "..." }');
         $this->newLine();
 
         return self::SUCCESS;

@@ -6,8 +6,10 @@ namespace App\Http\Controllers\Web;
 
 use App\Domain\Shared\Services\ReportingService;
 use App\Http\Controllers\Controller;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 use Illuminate\View\View;
 
@@ -103,6 +105,17 @@ class RoomPaymentsAccountingReportController extends Controller
         }, $filename, [
             'Content-Type' => 'application/vnd.ms-excel; charset=UTF-8',
         ]);
+    }
+
+    public function exportPdf(Request $request): Response
+    {
+        [$from, $to] = $this->resolveRange($request);
+        $report      = $this->reporting->roomPaymentsAccounting($from, $to);
+        $filename    = sprintf('room-payments-accounting-%s-to-%s.pdf', $report['from'], $report['to']);
+
+        return Pdf::loadView('modules.reports.pdf.room-payments-accounting', compact('report'))
+            ->setPaper('a4', 'landscape')
+            ->download($filename);
     }
 
     /**

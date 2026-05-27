@@ -1,4 +1,20 @@
 import './bootstrap';
+import { createIcons, icons } from 'lucide';
+
+const renderLucideIcons = () => {
+    createIcons({
+        icons,
+        attrs: {
+            'stroke-width': '1.8',
+        },
+    });
+};
+
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', renderLucideIcons);
+} else {
+    renderLucideIcons();
+}
 
 document.querySelectorAll('[data-stepper]').forEach((stepper) => {
     const input = stepper.querySelector('[data-stepper-value]');
@@ -26,3 +42,18 @@ document.querySelectorAll('[data-filter-tabs]').forEach((group) => {
         });
     });
 });
+
+window.refreshLucideIcons = renderLucideIcons;
+
+// Dark / light mode toggle
+(function () {
+    const btn = document.getElementById('theme-toggle');
+    if (!btn) return;
+
+    btn.addEventListener('click', function () {
+        const isDark = document.documentElement.classList.toggle('dark');
+        localStorage.setItem('nexstay-theme', isDark ? 'dark' : 'light');
+        // Re-render icons so the moon/sun swap picks up the new visibility classes
+        window.refreshLucideIcons?.();
+    });
+})();

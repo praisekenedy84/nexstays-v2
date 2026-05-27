@@ -1,9 +1,6 @@
 <x-layouts.app active-nav="guests" title="Guests" subtitle="Guest profiles — matches /api/v1/guests">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-4">
-        <form method="GET" class="flex max-w-md flex-1 gap-2">
-            <input type="search" name="search" value="{{ $search }}" placeholder="Name, email, phone…" class="input-field flex-1">
-            <button type="submit" class="btn-primary">Search</button>
-        </form>
+        <x-ui.search-bar :value="$search" placeholder="Name, email, phone…" />
         @can('manage-guests')
             <a href="{{ route('tenant.guests.create') }}" class="btn-primary">Add guest</a>
         @endcan
@@ -14,10 +11,10 @@
             <table class="w-full min-w-[640px] text-left text-sm">
                 <thead class="border-b border-slate-100 bg-slate-50/80 text-xs font-medium uppercase tracking-wide text-ink-muted">
                     <tr>
-                        <th class="px-5 py-3">Name</th>
-                        <th class="px-5 py-3">Email</th>
+                        <x-ui.sort-th column="last_name" label="Name" :sort="$sort" :dir="$dir" />
+                        <x-ui.sort-th column="email" label="Email" :sort="$sort" :dir="$dir" />
                         <th class="px-5 py-3">Phone</th>
-                        <th class="px-5 py-3">Nationality</th>
+                        <x-ui.sort-th column="nationality" label="Nationality" :sort="$sort" :dir="$dir" />
                         <th class="px-5 py-3">VIP</th>
                         @can('manage-guests')
                             <th class="px-5 py-3 text-right">Actions</th>

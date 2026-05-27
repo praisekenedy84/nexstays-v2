@@ -38,9 +38,23 @@
             href="{{ route('api.v1.health') }}"
             target="_blank"
             rel="noopener"
-            class="hidden rounded-lg px-2 py-1 text-xs font-medium text-ink-muted ring-1 ring-slate-200 hover:text-ink lg:inline"
+            class="hidden rounded-lg px-2 py-1 text-xs font-medium text-ink-muted ring-1 ring-slate-200 hover:text-ink dark:ring-slate-700 lg:inline"
             title="Tenant API health"
         >API</a>
+
+        {{-- Dark / light mode toggle --}}
+        <button
+            id="theme-toggle"
+            type="button"
+            class="rounded-lg p-2 text-ink-muted transition hover:bg-slate-100 hover:text-ink dark:hover:bg-slate-700/50"
+            title="Toggle dark mode"
+            aria-label="Toggle dark mode"
+        >
+            <x-icon name="moon" class="size-5 dark:hidden" />
+            <x-icon name="sun" class="size-5 hidden dark:block" />
+        </button>
+
+        <x-layout.notification-bell />
 
         <div class="flex items-center gap-3 rounded-2xl py-1.5 pr-2 pl-1.5">
             <span class="flex size-10 items-center justify-center rounded-full bg-primary-soft text-sm font-bold text-primary">

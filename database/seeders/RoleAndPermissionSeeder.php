@@ -33,6 +33,7 @@ class RoleAndPermissionSeeder extends Seeder
         'post-folio-charges',
         'view-availability',
         'manage-users',
+        'manage-roles',
         'view-reports',
         'view-outlets',
         'view-menu',
@@ -150,6 +151,7 @@ class RoleAndPermissionSeeder extends Seeder
             'view-purchases', 'view-expenditures', 'manage-expenditures', 'view-debts',
             'manage-rate-plans', 'manage-room-types', 'view-rooms',
         ]);
+
 
         Role::findByName('guest', self::GUARD)->syncPermissions([
             'view-availability',

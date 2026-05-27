@@ -10,15 +10,25 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreMenuCategoryRequest;
 use App\Http\Requests\Web\UpdateMenuCategoryRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class MenuCategoryController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $categories = MenuCategory::query()->with('outlet')->orderBy('name')->paginate(30);
+        $sort   = in_array($request->query('sort'), ['name', 'display_order']) ? $request->query('sort') : 'name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
 
-        return view('modules.menu.categories.index', compact('categories'));
+        $categories = MenuCategory::query()
+            ->with('outlet')
+            ->when($search, fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
+            ->paginate(30)
+            ->withQueryString();
+
+        return view('modules.menu.categories.index', compact('categories', 'sort', 'dir', 'search'));
     }
 
     public function create(): View

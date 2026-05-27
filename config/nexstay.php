@@ -16,7 +16,7 @@ return [
         'default_rates' => [
             '_default' => env('NEXSTAY_DEFAULT_VAT_RATE', '0.18'),
             '_code' => env('NEXSTAY_DEFAULT_TAX_CODE', 'A'),
-            '_inclusive' => filter_var(env('NEXSTAY_TAX_INCLUSIVE', false), FILTER_VALIDATE_BOOLEAN),
+            '_inclusive' => filter_var(env('NEXSTAY_TAX_INCLUSIVE', true), FILTER_VALIDATE_BOOLEAN),
             'room_charge' => env('NEXSTAY_ROOM_VAT_RATE', '0.18'),
             'restaurant' => env('NEXSTAY_FB_VAT_RATE', '0.18'),
             'bar' => env('NEXSTAY_BAR_VAT_RATE', '0.18'),
@@ -68,6 +68,13 @@ return [
             'permission' => null,
         ],
         [
+            'id' => 'notifications',
+            'label' => 'Notifications',
+            'route' => 'tenant.notifications.index',
+            'icon' => 'bell',
+            'permission' => null,
+        ],
+        [
             'id' => 'front-office',
             'label' => 'Front office',
             'icon' => 'bed',
@@ -91,6 +98,8 @@ return [
                 ['id' => 'restaurant', 'label' => 'Restaurant', 'route' => 'tenant.restaurant.index', 'permission' => 'view-orders'],
                 ['id' => 'bar', 'label' => 'Bar', 'route' => 'tenant.bar.index', 'permission' => 'view-orders'],
                 ['id' => 'lounge', 'label' => 'Lounge', 'route' => 'tenant.lounge.index', 'permission' => 'view-orders'],
+                ['id' => 'shift-mine', 'label' => 'My shift', 'route' => 'tenant.shift.mine', 'permission' => 'view-orders'],
+                ['id' => 'shift-all', 'label' => 'Staff shift', 'route' => 'tenant.shift.all', 'permission' => 'view-fb-reports'],
                 ['id' => 'outlets', 'label' => 'Outlets', 'route' => 'tenant.outlets.index', 'permission' => 'view-outlets'],
                 ['id' => 'menu-categories', 'label' => 'Menu categories', 'route' => 'tenant.menu-categories.index', 'permission' => 'view-menu'],
                 ['id' => 'menu', 'label' => 'Menu items', 'route' => 'tenant.menu-items.index', 'permission' => 'view-menu'],
@@ -122,9 +131,12 @@ return [
             'icon' => 'document',
             'children' => [
                 ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reservations'],
+                ['id' => 'occupancy-report', 'label' => 'Occupancy', 'route' => 'tenant.reports.occupancy', 'permission' => 'view-reservations'],
                 ['id' => 'room-reservation-reports', 'label' => 'Room reservations finance', 'route' => 'tenant.reports.room-reservations', 'permission' => 'view-reservations'],
                 ['id' => 'room-payments-accounting-reports', 'label' => 'Room payments & accounting', 'route' => 'tenant.reports.room-payments-accounting', 'permission' => 'view-reservations'],
+                ['id' => 'payment-summary-report', 'label' => 'Payment collection', 'route' => 'tenant.reports.payment-summary', 'permission' => 'view-reports'],
                 ['id' => 'fb-reports', 'label' => 'F&B revenue split', 'route' => 'tenant.reports.fb-revenue', 'permission' => 'view-fb-reports'],
+                ['id' => 'fb-profitability-reports', 'label' => 'F&B profitability', 'route' => 'tenant.reports.fb-profitability', 'permission' => 'view-fb-reports'],
             ],
         ],
         [
@@ -133,6 +145,10 @@ return [
             'icon' => 'users-cog',
             'children' => [
                 ['id' => 'users', 'label' => 'Staff', 'route' => 'tenant.users.index', 'permission' => 'manage-users'],
+                ['id' => 'roles', 'label' => 'Roles & permissions', 'route' => 'tenant.roles.index', 'permission' => 'manage-roles'],
+                ['id' => 'finance-settings', 'label' => 'Finance & tax', 'route' => 'tenant.finance.settings.edit', 'permission' => 'manage-roles'],
+                ['id' => 'payment-methods', 'label' => 'Payment methods', 'route' => 'tenant.finance.payment-methods.edit', 'permission' => 'manage-roles'],
+                ['id' => 'fb-settings', 'label' => 'F&B settlement', 'route' => 'tenant.finance.fb-settings.edit', 'permission' => 'manage-roles'],
             ],
         ],
     ],

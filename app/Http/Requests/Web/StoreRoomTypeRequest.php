@@ -26,6 +26,8 @@ class StoreRoomTypeRequest extends FormRequest
             'max_adults' => ['required', 'integer', 'min:1', 'max:10'],
             'max_children' => ['required', 'integer', 'min:0', 'max:10'],
             'base_rate' => ['required', 'numeric', 'min:0'],
+            'photos' => ['nullable', 'array', 'max:8'],
+            'photos.*' => ['image', 'mimes:jpg,jpeg,png,webp', 'max:5120'],
         ];
     }
 }

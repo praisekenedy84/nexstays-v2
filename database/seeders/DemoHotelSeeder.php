@@ -22,7 +22,7 @@ class DemoHotelSeeder extends Seeder
 
         $password = config('nexstay.demo.password');
 
-        $admin = User::query()->updateOrCreate(
+        $admin = User::withTrashed()->updateOrCreate(
             ['email' => config('nexstay.demo.admin_email')],
             [
                 'name' => 'Demo Admin',
@@ -30,9 +30,12 @@ class DemoHotelSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+        if ($admin->trashed()) {
+            $admin->restore();
+        }
         $admin->syncRoles(['general_manager', 'super_admin']);
 
-        $frontDesk = User::query()->updateOrCreate(
+        $frontDesk = User::withTrashed()->updateOrCreate(
             ['email' => config('nexstay.demo.front_desk_email')],
             [
                 'name' => 'Demo Front Desk',
@@ -40,9 +43,12 @@ class DemoHotelSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+        if ($frontDesk->trashed()) {
+            $frontDesk->restore();
+        }
         $frontDesk->syncRoles(['front_desk']);
 
-        $housekeeper = User::query()->updateOrCreate(
+        $housekeeper = User::withTrashed()->updateOrCreate(
             ['email' => config('nexstay.demo.housekeeper_email')],
             [
                 'name' => 'Demo Housekeeper',
@@ -50,9 +56,12 @@ class DemoHotelSeeder extends Seeder
                 'email_verified_at' => now(),
             ]
         );
+        if ($housekeeper->trashed()) {
+            $housekeeper->restore();
+        }
         $housekeeper->syncRoles(['housekeeper']);
 
-        $standard = RoomType::query()->updateOrCreate(
+        $standard = RoomType::withTrashed()->updateOrCreate(
             ['code' => 'STD'],
             [
                 'name' => 'Standard Room',
@@ -63,8 +72,11 @@ class DemoHotelSeeder extends Seeder
                 'amenities' => ['wifi', 'ac', 'tv'],
             ]
         );
+        if ($standard->trashed()) {
+            $standard->restore();
+        }
 
-        $deluxe = RoomType::query()->updateOrCreate(
+        $deluxe = RoomType::withTrashed()->updateOrCreate(
             ['code' => 'DLX'],
             [
                 'name' => 'Deluxe Room',
@@ -75,8 +87,11 @@ class DemoHotelSeeder extends Seeder
                 'amenities' => ['wifi', 'ac', 'tv', 'minibar'],
             ]
         );
+        if ($deluxe->trashed()) {
+            $deluxe->restore();
+        }
 
-        $rack = RatePlan::query()->updateOrCreate(
+        $rack = RatePlan::withTrashed()->updateOrCreate(
             ['code' => 'RACK'],
             [
                 'name' => 'Rack Rate',
@@ -85,6 +100,9 @@ class DemoHotelSeeder extends Seeder
                 'is_active' => true,
             ]
         );
+        if ($rack->trashed()) {
+            $rack->restore();
+        }
 
         foreach ([$standard, $deluxe] as $roomType) {
             RatePlanPrice::query()->updateOrCreate(
@@ -106,13 +124,16 @@ class DemoHotelSeeder extends Seeder
         ];
 
         foreach ($rooms as $roomData) {
-            Room::query()->updateOrCreate(
+            $room = Room::withTrashed()->updateOrCreate(
                 ['room_number' => $roomData['room_number']],
                 $roomData
             );
+            if ($room->trashed()) {
+                $room->restore();
+            }
         }
 
-        $guestA = Guest::query()->updateOrCreate(
+        $guestA = Guest::withTrashed()->updateOrCreate(
             ['email' => 'amina.hassan@example.com'],
             [
                 'first_name' => 'Amina',
@@ -122,8 +143,11 @@ class DemoHotelSeeder extends Seeder
                 'vip_level' => 1,
             ]
         );
+        if ($guestA->trashed()) {
+            $guestA->restore();
+        }
 
-        $guestB = Guest::query()->updateOrCreate(
+        $guestB = Guest::withTrashed()->updateOrCreate(
             ['email' => 'james.okello@example.com'],
             [
                 'first_name' => 'James',
@@ -132,10 +156,13 @@ class DemoHotelSeeder extends Seeder
                 'nationality' => 'KE',
             ]
         );
+        if ($guestB->trashed()) {
+            $guestB->restore();
+        }
 
         $room103 = Room::query()->where('room_number', '103')->first();
 
-        Reservation::query()->updateOrCreate(
+        $reservationA = Reservation::withTrashed()->updateOrCreate(
             ['booking_ref' => 'NX-DEMO-ARRIVAL'],
             [
                 'guest_id' => $guestA->id,
@@ -151,8 +178,11 @@ class DemoHotelSeeder extends Seeder
                 'source' => 'walk_in',
             ]
         );
+        if ($reservationA->trashed()) {
+            $reservationA->restore();
+        }
 
-        Reservation::query()->updateOrCreate(
+        $reservationB = Reservation::withTrashed()->updateOrCreate(
             ['booking_ref' => 'NX-DEMO-INQUIRY'],
             [
                 'guest_id' => $guestB->id,
@@ -166,5 +196,10 @@ class DemoHotelSeeder extends Seeder
                 'source' => 'phone',
             ]
         );
+        if ($reservationB->trashed()) {
+            $reservationB->restore();
+        }
+
+        unset($reservationA, $reservationB);
     }
 }

@@ -1,9 +1,18 @@
 <x-layouts.app active-nav="room-reservation-reports" title="Room reservations finance" subtitle="Finance and accounting view for room bookings">
-    <form method="GET" class="mb-6 flex flex-wrap gap-3">
-        <input type="date" name="from" value="{{ $from->format('Y-m-d') }}" class="input-field w-auto">
-        <input type="date" name="to" value="{{ $to->format('Y-m-d') }}" class="input-field w-auto">
-        <button type="submit" class="btn-primary">Update</button>
-        <a href="{{ route('tenant.reports') }}" class="btn-outline">All reports</a>
+    <form method="GET">
+        <x-ui.date-range-filter :from="$from->format('Y-m-d')" :to="$to->format('Y-m-d')">
+            @php $ep = ['from' => $from->format('Y-m-d'), 'to' => $to->format('Y-m-d')]; @endphp
+            <div class="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
+                <a href="{{ route('tenant.reports.room-reservations.export', $ep) }}"
+                   class="px-3 py-2 text-sm font-medium text-ink transition hover:bg-sky-50 hover:text-sky-700 dark:hover:bg-sky-900/20">CSV</a>
+                <span class="w-px bg-slate-200 dark:bg-slate-700"></span>
+                <a href="{{ route('tenant.reports.room-reservations.export-excel', $ep) }}"
+                   class="px-3 py-2 text-sm font-medium text-ink transition hover:bg-emerald-50 hover:text-emerald-700 dark:hover:bg-emerald-900/20">Excel</a>
+                <span class="w-px bg-slate-200 dark:bg-slate-700"></span>
+                <a href="{{ route('tenant.reports.room-reservations.export-pdf', $ep) }}"
+                   class="px-3 py-2 text-sm font-medium text-ink transition hover:bg-rose-50 hover:text-rose-700 dark:hover:bg-rose-900/20">PDF</a>
+            </div>
+        </x-ui.date-range-filter>
     </form>
 
     <div class="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

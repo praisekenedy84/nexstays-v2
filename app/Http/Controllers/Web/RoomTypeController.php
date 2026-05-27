@@ -9,15 +9,27 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreRoomTypeRequest;
 use App\Http\Requests\Web\UpdateRoomTypeRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 
 class RoomTypeController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $roomTypes = RoomType::query()->withCount('rooms')->orderBy('name')->paginate(20);
+        $sort   = in_array($request->query('sort'), ['name', 'base_rate', 'rooms_count']) ? $request->query('sort') : 'name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
 
-        return view('hbms.room-types.index', compact('roomTypes'));
+        $roomTypes = RoomType::query()
+            ->withCount('rooms')
+            ->when($search, fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('hbms.room-types.index', compact('roomTypes', 'sort', 'dir', 'search'));
     }
 
     public function create(): View
@@ -27,7 +39,10 @@ class RoomTypeController extends Controller
 
     public function store(StoreRoomTypeRequest $request): RedirectResponse
     {
-        RoomType::query()->create($request->validated());
+        $validated = $request->validated();
+        $validated['photos'] = $this->storePhotos($request->file('photos', []));
+
+        RoomType::query()->create($validated);
 
         return redirect()->route('tenant.room-types.index')->with('success', 'Room type created.');
     }
@@ -39,7 +54,22 @@ class RoomTypeController extends Controller
 
     public function update(UpdateRoomTypeRequest $request, RoomType $roomType): RedirectResponse
     {
-        $roomType->update($request->validated());
+        $validated = $request->validated();
+        $disk = RoomType::photosDisk();
+
+        $existingPhotos = collect($roomType->photos ?? []);
+        $removePhotos = collect($request->input('remove_photos', []))
+            ->filter(fn ($path) => is_string($path) && $existingPhotos->contains($path))
+            ->values();
+
+        $removePhotos->each(fn (string $path) => Storage::disk($disk)->delete($path));
+
+        $keptPhotos = $existingPhotos->reject(fn (string $path) => $removePhotos->contains($path))->values()->all();
+        $uploadedPhotos = $this->storePhotos($request->file('photos', []));
+
+        $validated['photos'] = array_values(array_merge($keptPhotos, $uploadedPhotos));
+
+        $roomType->update($validated);
 
         return redirect()->route('tenant.room-types.index')->with('success', 'Room type updated.');
     }
@@ -49,8 +79,27 @@ class RoomTypeController extends Controller
         abort_unless(auth()->user()?->can('manage-room-types'), 403);
         abort_if($roomType->rooms()->exists(), 403, 'Remove or reassign rooms before deleting this type.');
 
+        collect($roomType->photos ?? [])->each(
+            fn (string $path) => Storage::disk(RoomType::photosDisk())->delete($path)
+        );
+
         $roomType->delete();
 
         return redirect()->route('tenant.room-types.index')->with('success', 'Room type removed.');
+    }
+
+    /**
+     * @param array<int, UploadedFile> $photos
+     * @return array<int, string>
+     */
+    private function storePhotos(array $photos): array
+    {
+        $disk = RoomType::photosDisk();
+
+        return collect($photos)
+            ->filter(fn ($file): bool => $file instanceof UploadedFile)
+            ->map(fn (UploadedFile $file): string => $file->store('room-types/photos', $disk))
+            ->values()
+            ->all();
     }
 }

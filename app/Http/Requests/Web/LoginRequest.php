@@ -19,6 +19,7 @@ class LoginRequest extends FormRequest
     public function rules(): array
     {
         return [
+            'property_code' => ['required', 'string', 'max:100'],
             'email' => ['required', 'email'],
             'password' => ['required', 'string'],
             'remember' => ['sometimes', 'boolean'],

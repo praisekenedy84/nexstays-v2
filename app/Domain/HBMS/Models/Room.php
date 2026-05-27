@@ -60,7 +60,7 @@ class Room extends Model
 
         if (in_array($disk, ['local', 'public'], true)) {
             if (function_exists('tenant') && tenant() !== null) {
-                return url('/tenancy/assets/'.ltrim($path, '/'));
+                return route('tenant.assets', ['tenantId' => tenant('id'), 'path' => ltrim($path, '/')]);
             }
 
             return url('/storage/'.ltrim($path, '/'));

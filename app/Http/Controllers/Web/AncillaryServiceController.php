@@ -11,15 +11,24 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\PostAncillaryChargeRequest;
 use App\Http\Requests\Web\StoreAncillaryServiceRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class AncillaryServiceController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $services = AncillaryService::query()->orderBy('sort_order')->orderBy('name')->get();
+        $sort   = in_array($request->query('sort'), ['name', 'default_price', 'sort_order']) ? $request->query('sort') : 'sort_order';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
 
-        return view('modules.ancillary.index', compact('services'));
+        $services = AncillaryService::query()
+            ->when($search, fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
+            ->paginate(25)
+            ->withQueryString();
+
+        return view('modules.ancillary.index', compact('services', 'sort', 'dir', 'search'));
     }
 
     public function create(): View

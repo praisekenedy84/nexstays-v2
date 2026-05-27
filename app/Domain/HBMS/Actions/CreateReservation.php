@@ -6,6 +6,7 @@ namespace App\Domain\HBMS\Actions;
 
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
+use App\Domain\Shared\Services\NotificationService;
 use App\Domain\Shared\Services\TextifySmsService;
 use App\Domain\HBMS\Support\BookingReferenceGenerator;
 use DomainException;
@@ -14,7 +15,8 @@ use Illuminate\Support\Facades\DB;
 class CreateReservation
 {
     public function __construct(
-        private readonly TextifySmsService $smsService
+        private readonly TextifySmsService $smsService,
+        private readonly NotificationService $notificationService,
     ) {}
 
     public function execute(array $data): Reservation
@@ -75,6 +77,15 @@ class CreateReservation
         });
 
         $this->smsService->sendReservationCreated($reservation);
+
+        $guest = $reservation->guest;
+        $this->notificationService->notify(
+            type:  'reservation_created',
+            title: "New reservation {$reservation->booking_ref}",
+            body:  ($guest ? "{$guest->first_name} {$guest->last_name}" : 'Guest')
+                   ." · {$reservation->check_in_date->format('d M')} – {$reservation->check_out_date->format('d M')}",
+            data:  ['booking_ref' => $reservation->booking_ref, 'reservation_id' => $reservation->id],
+        );
 
         return $reservation;
     }

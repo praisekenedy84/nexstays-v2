@@ -74,13 +74,6 @@ final class HbmsNavigation
 
     public static function tenantHomeUrl(): string
     {
-        $demo = config('nexstay.demo.domain', 'demo');
-        $appUrl = config('app.url', 'http://localhost:8000');
-        $parsed = parse_url($appUrl);
-        $scheme = $parsed['scheme'] ?? 'http';
-        $host = $parsed['host'] ?? 'localhost';
-        $port = isset($parsed['port']) ? ':'.$parsed['port'] : '';
-
-        return sprintf('%s://%s.%s%s/dashboard', $scheme, $demo, $host, $port);
+        return config('app.url', 'http://localhost:8000').'/login';
     }
 }

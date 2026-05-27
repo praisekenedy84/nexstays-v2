@@ -60,8 +60,13 @@ class TextifySmsService
     private function sendSms(string $receiver, string $content, string $reservationId, string $event): void
     {
         $apiKey = (string) config('services.textify.api_key');
-        $senderName = (string) config('services.textify.sender_name');
         $baseUrl = rtrim((string) config('services.textify.base_url', 'https://portal.textify.africa/api'), '/');
+
+        // Per-tenant sender name takes priority; fall back to global config.
+        $senderName = (string) (
+            (tenancy()->initialized ? tenancy()->tenant->sms_sender_name : null)
+            ?? config('services.textify.sender_name')
+        );
 
         if ($apiKey === '' || $senderName === '') {
             return;

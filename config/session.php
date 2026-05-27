@@ -32,7 +32,7 @@ return [
     |
     */
 
-    'lifetime' => env('SESSION_LIFETIME', 120),
+    'lifetime' => env('SESSION_LIFETIME', 480),
 
     'expire_on_close' => env('SESSION_EXPIRE_ON_CLOSE', false),
 
@@ -157,7 +157,34 @@ return [
     |
     */
 
-    'domain' => env('SESSION_DOMAIN'),
+    /*
+    |--------------------------------------------------------------------------
+    | Session Cookie Domain
+    |--------------------------------------------------------------------------
+    |
+    | Localhost/IP hosts should not set an explicit cookie domain. Browsers can
+    | reject those cookies, which breaks CSRF/session persistence and causes 419.
+    |
+    */
+    'domain' => (static function (): ?string {
+        $domain = env('SESSION_DOMAIN');
+
+        if (! is_string($domain)) {
+            return null;
+        }
+
+        $domain = trim($domain);
+
+        if ($domain === '' || strtolower($domain) === 'null') {
+            return null;
+        }
+
+        if (in_array(strtolower($domain), ['localhost', '127.0.0.1', '::1'], true)) {
+            return null;
+        }
+
+        return $domain;
+    })(),
 
     /*
     |--------------------------------------------------------------------------

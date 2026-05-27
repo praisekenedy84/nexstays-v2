@@ -1,10 +1,22 @@
 <x-layouts.app active-nav="rate-plans" title="Rate plans">
-    @can('manage-rate-plans')<div class="mb-4 flex justify-end"><a href="{{ route('tenant.rate-plans.create') }}" class="btn-primary">Add rate plan</a></div>@endcan
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <x-ui.search-bar :value="$search" placeholder="Rate plan name…" />
+        @can('manage-rate-plans')
+            <a href="{{ route('tenant.rate-plans.create') }}" class="btn-primary">Add rate plan</a>
+        @endcan
+    </div>
     <div class="card overflow-hidden">
         <table class="w-full text-sm">
-            <thead class="bg-slate-50 text-xs uppercase text-ink-muted"><tr><th class="px-5 py-3">Name</th><th class="px-5 py-3">Code</th><th class="px-5 py-3">Active</th><th></th></tr></thead>
+            <thead class="bg-slate-50 text-xs uppercase text-ink-muted">
+                <tr>
+                    <x-ui.sort-th column="name" label="Name" :sort="$sort" :dir="$dir" />
+                    <th class="px-5 py-3 text-left">Code</th>
+                    <th class="px-5 py-3 text-left">Active</th>
+                    <th></th>
+                </tr>
+            </thead>
             <tbody class="divide-y divide-slate-100">
-                @foreach ($ratePlans as $plan)
+                @forelse ($ratePlans as $plan)
                     <tr>
                         <td class="px-5 py-4 font-medium">{{ $plan->name }}</td>
                         <td class="px-5 py-4 font-mono text-xs">{{ $plan->code }}</td>
@@ -16,7 +28,9 @@
                             @endcan
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr><td colspan="4" class="px-5 py-12 text-center text-ink-muted">No rate plans found.</td></tr>
+                @endforelse
             </tbody>
         </table>
         <div class="border-t px-5 py-3">{{ $ratePlans->links() }}</div>

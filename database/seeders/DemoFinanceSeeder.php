@@ -23,7 +23,7 @@ class DemoFinanceSeeder extends Seeder
         ];
 
         foreach ($services as $i => $service) {
-            AncillaryService::query()->firstOrCreate(
+            $ancillary = AncillaryService::withTrashed()->updateOrCreate(
                 ['name' => $service['name']],
                 [
                     ...$service,
@@ -32,10 +32,13 @@ class DemoFinanceSeeder extends Seeder
                     'sort_order' => $i,
                 ]
             );
+            if ($ancillary->trashed()) {
+                $ancillary->restore();
+            }
         }
 
         if ($admin) {
-            Expenditure::query()->firstOrCreate(
+            $expenditure = Expenditure::withTrashed()->updateOrCreate(
                 ['description' => 'Generator diesel — May'],
                 [
                     'category' => 'utilities',
@@ -45,6 +48,9 @@ class DemoFinanceSeeder extends Seeder
                     'recorded_by' => $admin->id,
                 ]
             );
+            if ($expenditure->trashed()) {
+                $expenditure->restore();
+            }
         }
     }
 }

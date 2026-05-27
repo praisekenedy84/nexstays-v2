@@ -18,16 +18,20 @@ class PurchaseOrder extends Model
     use SoftDeletes;
 
     protected $fillable = [
-        'po_number', 'outlet_id', 'department', 'supplier_name', 'status',
-        'total_amount', 'currency', 'ordered_at', 'received_at', 'notes', 'created_by',
+        'po_number', 'outlet_id', 'department', 'supplier_name', 'supplier_reference',
+        'status', 'total_amount', 'received_total', 'currency',
+        'ordered_at', 'delivery_date_expected', 'payment_terms', 'received_at',
+        'notes', 'created_by',
     ];
 
     protected function casts(): array
     {
         return [
-            'total_amount' => 'decimal:2',
-            'ordered_at' => 'datetime',
-            'received_at' => 'datetime',
+            'total_amount'           => 'decimal:2',
+            'received_total'         => 'decimal:2',
+            'ordered_at'             => 'datetime',
+            'received_at'            => 'datetime',
+            'delivery_date_expected' => 'date',
         ];
     }
 
@@ -49,5 +53,23 @@ class PurchaseOrder extends Model
     public function isReceivable(): bool
     {
         return in_array($this->status, ['draft', 'ordered'], true);
+    }
+
+    public function costVariance(): float
+    {
+        if (! $this->received_total || ! $this->total_amount) {
+            return 0.0;
+        }
+
+        return (float) $this->received_total - (float) $this->total_amount;
+    }
+
+    public function costVariancePct(): ?float
+    {
+        if (! $this->total_amount || (float) $this->total_amount === 0.0) {
+            return null;
+        }
+
+        return ($this->costVariance() / (float) $this->total_amount) * 100;
     }
 }

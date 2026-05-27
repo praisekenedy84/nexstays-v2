@@ -1,9 +1,10 @@
 <x-layouts.app active-nav="inventory" title="Inventory" subtitle="Stock items & recipe consumption">
-    @can('manage-inventory')
-        <div class="mb-4 flex justify-end">
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <x-ui.search-bar :value="$search" placeholder="Item name…" />
+        @can('manage-inventory')
             <a href="{{ route('tenant.stock-items.create') }}" class="btn-primary">Add stock item</a>
-        </div>
-    @endcan
+        @endcan
+    </div>
 
     @if ($lowStock > 0)
         <div class="mb-4 rounded-xl bg-amber-50 px-4 py-3 text-sm text-amber-800">
@@ -15,10 +16,10 @@
         <table class="w-full text-left text-sm">
             <thead class="bg-slate-50 text-xs uppercase text-ink-muted">
                 <tr>
-                    <th class="px-5 py-3">Item</th>
-                    <th class="px-5 py-3">Outlet</th>
-                    <th class="px-5 py-3">Stock</th>
-                    <th class="px-5 py-3">Reorder</th>
+                    <x-ui.sort-th column="name" label="Item" :sort="$sort" :dir="$dir" />
+                    <th class="px-5 py-3 text-left">Outlet</th>
+                    <x-ui.sort-th column="current_stock" label="Stock" :sort="$sort" :dir="$dir" />
+                    <x-ui.sort-th column="reorder_level" label="Reorder" :sort="$sort" :dir="$dir" />
                     @can('manage-inventory')
                         <th class="px-5 py-3 text-right">Actions</th>
                     @endcan

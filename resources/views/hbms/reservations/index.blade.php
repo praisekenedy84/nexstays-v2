@@ -1,10 +1,13 @@
 <x-layouts.app active-nav="reservations" title="Reservations" subtitle="Booking lifecycle — inquiry → confirmed → checked in → checked out">
-    @can('manage-reservations')
-        <div class="mb-4 flex justify-end gap-2">
-            <a href="{{ route('tenant.reservations.settings.edit') }}" class="btn-outline">Reservation settings</a>
-            <a href="{{ route('tenant.reservations.create') }}" class="btn-primary">New reservation</a>
-        </div>
-    @endcan
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <x-ui.search-bar :value="$search" placeholder="Booking ref or guest name…" />
+        @can('manage-reservations')
+            <div class="flex flex-wrap gap-2">
+                <a href="{{ route('tenant.reservations.settings.edit') }}" class="btn-outline">Reservation settings</a>
+                <a href="{{ route('tenant.reservations.create') }}" class="btn-primary">New reservation</a>
+            </div>
+        @endcan
+    </div>
 
     <div class="mb-6 flex flex-wrap gap-2">
         @php
@@ -45,11 +48,12 @@
                                 <input id="select-all-reservations" type="checkbox" class="rounded border-slate-300 text-primary">
                             </th>
                         @endcan
-                        <th class="px-5 py-3">Booking ref</th>
-                        <th class="px-5 py-3">Guest</th>
-                        <th class="px-5 py-3">Room / type</th>
-                        <th class="px-5 py-3">Stay</th>
-                        <th class="px-5 py-3">Status</th>
+                        <x-ui.sort-th column="booking_ref" label="Booking ref" :sort="$sort" :dir="$dir" />
+                        <th class="px-5 py-3 text-left">Guest</th>
+                        <th class="px-5 py-3 text-left">Room / type</th>
+                        <x-ui.sort-th column="check_in_date" label="Check-in" :sort="$sort" :dir="$dir" />
+                        <x-ui.sort-th column="check_out_date" label="Check-out" :sort="$sort" :dir="$dir" />
+                        <th class="min-w-[9.5rem] px-5 py-3 text-left">Status</th>
                         <th class="px-5 py-3 text-right">Rate / total</th>
                         <th class="px-5 py-3 text-right"></th>
                     </tr>
@@ -68,7 +72,12 @@
                                     >
                                 </td>
                             @endcan
-                            <td class="px-5 py-4 font-mono text-xs font-semibold text-primary">{{ $reservation->booking_ref }}</td>
+                            <td class="px-5 py-4">
+                                <p class="font-mono text-xs font-semibold text-primary">{{ $reservation->booking_ref }}</p>
+                                <p class="mt-0.5 text-[11px] text-ink-subtle" title="{{ $reservation->created_at->format('d M Y H:i') }}">
+                                    Booked {{ $reservation->created_at->diffForHumans() }}
+                                </p>
+                            </td>
                             <td class="px-5 py-4">
                                 {{ $reservation->guest?->first_name }} {{ $reservation->guest?->last_name }}
                             </td>
@@ -79,11 +88,24 @@
                                     {{ $reservation->roomType?->name }}
                                 @endif
                             </td>
-                            <td class="px-5 py-4 text-ink-muted">
-                                {{ $reservation->check_in_date->format('d M Y') }} – {{ $reservation->check_out_date->format('d M Y') }}
+                            <td class="px-5 py-4">
+                                <p class="text-ink-muted">{{ $reservation->check_in_date->format('d M Y') }}</p>
+                                @if ($reservation->checked_in_at)
+                                    <p class="mt-0.5 text-[11px] text-emerald-600" title="Checked in at {{ $reservation->checked_in_at->format('d M Y H:i') }}">
+                                        ↳ {{ $reservation->checked_in_at->format('H:i') }}
+                                    </p>
+                                @endif
                             </td>
                             <td class="px-5 py-4">
-                                <x-ui.status-badge :status="$reservation->status" />
+                                <p class="text-ink-muted">{{ $reservation->check_out_date->format('d M Y') }}</p>
+                                @if ($reservation->checked_out_at)
+                                    <p class="mt-0.5 text-[11px] text-sky-600" title="Checked out at {{ $reservation->checked_out_at->format('d M Y H:i') }}">
+                                        ↳ {{ $reservation->checked_out_at->format('H:i') }}
+                                    </p>
+                                @endif
+                            </td>
+                            <td class="px-5 py-4 whitespace-nowrap">
+                                <x-ui.status-badge :status="$reservation->status" class="whitespace-nowrap px-3 py-1" />
                             </td>
                             <td class="px-5 py-4 text-right">
                                 <p class="font-medium">@money($reservation->daily_rate)</p>
@@ -110,6 +132,31 @@
                                     <x-icon name="document" class="size-4" />
                                     <span class="sr-only">Download ticket</span>
                                 </a>
+                                @can('check-in-guests')
+                                    @if ($reservation->status === 'confirmed')
+                                        <form method="POST" action="{{ route('tenant.reservations.check-in', $reservation) }}" class="ml-1 inline"
+                                              onsubmit="return confirm('Check in {{ addslashes($reservation->booking_ref) }}?')">
+                                            @csrf
+                                            <button type="submit"
+                                                class="inline-flex items-center rounded-md bg-emerald-600 px-2 py-1 text-xs font-semibold text-white hover:bg-emerald-700"
+                                                title="Check in guest"
+                                                @if (! $reservation->room_id) disabled title="No room assigned" @endif
+                                            >Check in</button>
+                                        </form>
+                                    @endif
+                                @endcan
+                                @can('check-out-guests')
+                                    @if ($reservation->status === 'checked_in')
+                                        <form method="POST" action="{{ route('tenant.reservations.check-out', $reservation) }}" class="ml-1 inline"
+                                              onsubmit="return confirm('Check out {{ addslashes($reservation->booking_ref) }}?\n\nEnsure folio balance is zero.')">
+                                            @csrf
+                                            <button type="submit"
+                                                class="inline-flex items-center rounded-md bg-sky-600 px-2 py-1 text-xs font-semibold text-white hover:bg-sky-700"
+                                                title="Check out guest"
+                                            >Check out</button>
+                                        </form>
+                                    @endif
+                                @endcan
                                 @can('manage-reservations')
                                     @if (in_array($reservation->status, ['inquiry', 'confirmed'], true))
                                         <a
@@ -121,20 +168,18 @@
                                             <x-icon name="pencil" class="size-4" />
                                             <span class="sr-only">Edit</span>
                                         </a>
-                                        <form method="POST" action="{{ route('tenant.reservations.cancel', $reservation) }}" class="ml-1 inline" onsubmit="return confirm('Cancel this reservation?')">
+                                        <form method="POST" action="{{ route('tenant.reservations.no-show', $reservation) }}" class="ml-1 inline"
+                                              onsubmit="return confirm('Mark {{ addslashes($reservation->booking_ref) }} as no-show?')">
                                             @csrf
-                                            <button
-                                                type="submit"
-                                                class="inline-flex items-center justify-center rounded-md p-1.5 text-amber-600 hover:bg-amber-50"
-                                                title="Cancel reservation"
-                                                aria-label="Cancel reservation"
-                                            >
+                                            <button type="submit"
+                                                class="inline-flex items-center justify-center rounded-md p-1.5 text-amber-500 hover:bg-amber-50"
+                                                title="Mark as no-show">
                                                 <x-icon name="x-circle" class="size-4" />
-                                                <span class="sr-only">Cancel</span>
+                                                <span class="sr-only">No show</span>
                                             </button>
                                         </form>
                                     @endif
-                                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" class="ml-2 inline" onsubmit="return confirm('Permanently delete this reservation? This cannot be undone.')">
+                                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" class="ml-1 inline" onsubmit="return confirm('Permanently delete this reservation? This cannot be undone.')">
                                         @csrf
                                         @method('DELETE')
                                         <button
@@ -152,7 +197,7 @@
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()?->can('manage-reservations') ? 8 : 7 }}" class="px-5 py-12 text-center text-ink-muted">No reservations found.</td>
+                            <td colspan="{{ auth()->user()?->can('manage-reservations') ? 9 : 8 }}" class="px-5 py-12 text-center text-ink-muted">No reservations found.</td>
                         </tr>
                     @endforelse
                 </tbody>

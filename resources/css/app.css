@@ -1,5 +1,8 @@
 @import 'tailwindcss';
 
+/* Class-based dark mode: applies dark: variants when .dark is on any ancestor */
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
     --font-sans: 'Plus Jakarta Sans', ui-sans-serif, system-ui, sans-serif;
 
@@ -23,6 +26,52 @@
     --radius-control: 0.75rem;
 }
 
+/* Dark mode: override semantic color variables + Tailwind slate utilities */
+.dark {
+    --color-surface: #0f172a;
+    --color-surface-elevated: #1e293b;
+    --color-ink: #f1f5f9;
+    --color-ink-muted: #94a3b8;
+    --color-ink-subtle: #64748b;
+    --color-primary: #3b82f6;
+    --color-primary-soft: #1e3a5f;
+    --color-primary-hover: #60a5fa;
+    --shadow-card: 0 4px 24px -4px rgb(0 0 0 / 0.4);
+    --shadow-card-hover: 0 8px 32px -4px rgb(0 0 0 / 0.5);
+
+    /* ── Slate background overrides (table headers, section rows, elevated areas) ── */
+    & .bg-slate-50              { background-color: #1e293b; }
+    & .bg-slate-50\/80          { background-color: rgb(30 41 59 / 0.97); }
+    & .bg-slate-50\/60          { background-color: rgb(30 41 59 / 0.9); }
+    & .bg-slate-50\/40          { background-color: rgb(30 41 59 / 0.7); }
+    & .bg-slate-100\/60         { background-color: rgb(51 65 85 / 0.6); }
+
+    /* ── Conditional status row backgrounds ── */
+    & .bg-emerald-50\/60        { background-color: rgb(6 78 59 / 0.25); }
+    & .bg-emerald-50\/40        { background-color: rgb(6 78 59 / 0.15); }
+    & .bg-amber-50\/50          { background-color: rgb(120 53 15 / 0.2); }
+
+    /* ── Border colors ── */
+    & .border-slate-100         { border-color: #334155; }
+    & .border-slate-200         { border-color: #334155; }
+    & .border-slate-300         { border-color: #475569; }
+
+    /* ── Row dividers (divide-y generates border-top on sibling children) ── */
+    & .divide-slate-100 > :not([hidden]) ~ :not([hidden]) { border-color: #334155; }
+    & .divide-slate-200 > :not([hidden]) ~ :not([hidden]) { border-color: #475569; }
+
+    /* ── Row hover backgrounds ── */
+    & .hover\:bg-slate-50:hover       { background-color: rgb(30 41 59 / 1); }
+    & .hover\:bg-slate-50\/40:hover   { background-color: rgb(30 41 59 / 0.5); }
+    & .hover\:bg-slate-50\/50:hover   { background-color: rgb(30 41 59 / 0.5); }
+    & .hover\:bg-slate-50\/60:hover   { background-color: rgb(30 41 59 / 0.6); }
+    & .hover\:bg-slate-100:hover      { background-color: rgb(51 65 85 / 0.5); }
+
+    /* ── Sticky table cells (need explicit bg to overlay scrolled content) ── */
+    & table .bg-white           { background-color: #1e293b; }
+    & table .bg-slate-50        { background-color: #1e293b; }
+}
+
 @layer base {
     body {
         @apply bg-surface font-sans text-ink antialiased;
@@ -39,15 +88,18 @@
     }
 
     .btn-outline {
-        @apply inline-flex items-center justify-center rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-ink transition hover:border-slate-300 hover:bg-slate-50;
+        @apply inline-flex items-center justify-center rounded-[var(--radius-control)] border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-ink transition hover:border-slate-300 hover:bg-slate-50
+               dark:border-slate-700 dark:bg-slate-800 dark:hover:border-slate-600 dark:hover:bg-slate-700;
     }
 
     .input-field {
-        @apply w-full rounded-[var(--radius-control)] border-0 bg-slate-100 px-4 py-3 text-sm text-ink placeholder:text-ink-subtle focus:ring-2 focus:ring-primary/30 focus:outline-none;
+        @apply w-full rounded-[var(--radius-control)] border-0 bg-slate-100 px-4 py-3 text-sm text-ink placeholder:text-ink-subtle focus:ring-2 focus:ring-primary/30 focus:outline-none
+               dark:bg-slate-700/60 dark:placeholder:text-slate-500 dark:focus:ring-blue-500/30;
     }
 
     .nav-item {
-        @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-muted transition hover:bg-slate-100 hover:text-ink;
+        @apply flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium text-ink-muted transition hover:bg-slate-100 hover:text-ink
+               dark:hover:bg-slate-700/50;
     }
 
     .nav-item-active {
@@ -79,11 +131,13 @@
     }
 
     .nav-group-children {
-        @apply mb-1 flex flex-col gap-0.5 border-l-2 border-slate-100 ml-5 pl-2;
+        @apply mb-1 flex flex-col gap-0.5 border-l-2 border-slate-100 ml-5 pl-2
+               dark:border-slate-700;
     }
 
     .nav-sub-item {
-        @apply block rounded-lg px-3 py-2 text-sm text-ink-muted transition hover:bg-slate-100 hover:text-ink;
+        @apply block rounded-lg px-3 py-2 text-sm text-ink-muted transition hover:bg-slate-100 hover:text-ink
+               dark:hover:bg-slate-700/50;
     }
 
     .nav-sub-item-active {

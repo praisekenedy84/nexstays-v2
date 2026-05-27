@@ -12,6 +12,8 @@ use App\Domain\Shared\Models\OrderStatusLog;
 use App\Domain\Shared\Models\Outlet;
 use App\Domain\Shared\Models\OutletTable;
 use App\Domain\Shared\Services\FolioService;
+use App\Domain\Shared\Services\PaymentMethodSettingsService;
+use App\Domain\Shared\Services\TaxService;
 use App\Domain\Shared\Support\OrderNumberGenerator;
 use App\Domain\Till\Models\Payment;
 use App\Domain\Till\Models\TillSession;
@@ -25,7 +27,9 @@ class OrderService
 {
     public function __construct(
         private readonly FolioService $folioService,
+        private readonly TaxService $taxService,
         private readonly TillSessionService $tillSessionService,
+        private readonly PaymentMethodSettingsService $paymentMethodSettings,
     ) {}
 
     /**
@@ -131,6 +135,7 @@ class OrderService
                 default => 'restaurant',
             };
 
+            // Charge the inclusive total — tax is already part of the price.
             $amount = Money::of((string) $order->total, config('nexstay.currency.default', 'TZS'));
 
             $this->folioService->postCharge(
@@ -159,6 +164,12 @@ class OrderService
 
     public function recordCashPayment(Order $order, Money $amount, Money $tendered, TillSession $tillSession): Payment
     {
+        throw_if(
+            ! $this->paymentMethodSettings->isEnabled('cash'),
+            \DomainException::class,
+            'Cash payments are currently disabled for this property.'
+        );
+
         return DB::transaction(function () use ($order, $amount, $tendered, $tillSession) {
             $this->ensureReadyForSettlement($order);
             $order = $this->recalculate($order);
@@ -200,27 +211,108 @@ class OrderService
         });
     }
 
+    /**
+     * Settle an order by direct payment (cash, mobile_money, or card) without requiring a folio.
+     * If a till session is provided and the method is cash, a TillMovement is also recorded.
+     */
+    public function recordDirectPayment(
+        Order $order,
+        string $method,
+        Money $amount,
+        ?string $transactionRef = null,
+        ?Money $tendered = null,
+        ?TillSession $tillSession = null,
+    ): Payment {
+        throw_if(
+            ! $this->paymentMethodSettings->isEnabled($method),
+            \DomainException::class,
+            "Payment method '{$method}' is not enabled for this property."
+        );
+
+        return DB::transaction(function () use ($order, $method, $amount, $transactionRef, $tendered, $tillSession) {
+            $this->ensureReadyForSettlement($order);
+            $order    = $this->recalculate($order);
+            $currency = config('nexstay.currency.default', 'TZS');
+
+            $cashChange   = null;
+            $cashTendered = null;
+
+            if ($method === 'cash' && $tendered !== null) {
+                $change = $tendered->minus($amount, RoundingMode::HALF_UP);
+                throw_if($change->isNegative(), \DomainException::class, 'Amount tendered is less than order total.');
+                $cashTendered = $tendered->getAmount()->toFloat();
+                $cashChange   = $change->getAmount()->toFloat();
+            }
+
+            $payment = Payment::query()->create([
+                'order_id'        => $order->id,
+                'till_session_id' => ($method === 'cash' && $tillSession !== null) ? $tillSession->id : null,
+                'amount'          => $amount->getAmount()->toFloat(),
+                'currency'        => $currency,
+                'method'          => $method,
+                'gateway_ref'     => $transactionRef,
+                'cash_tendered'   => $cashTendered,
+                'cash_change'     => $cashChange,
+                'received_by'     => Auth::id(),
+                'status'          => 'captured',
+            ]);
+
+            if ($method === 'cash' && $tillSession !== null) {
+                $this->tillSessionService->recordMovement(
+                    $tillSession,
+                    'cash_payment',
+                    $amount,
+                    "Cash payment for order {$order->order_number}",
+                    $payment->id,
+                    Payment::class,
+                );
+            }
+
+            $previousStatus = $order->status;
+            $order->update(['status' => 'closed', 'closed_at' => now()]);
+            $this->logOrderTransition($order, $previousStatus, 'closed', 'direct_payment', [
+                'payment_id' => $payment->id,
+                'method'     => $method,
+            ]);
+
+            if ($order->table_id) {
+                OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
+            }
+
+            return $payment;
+        });
+    }
+
     public function recalculate(Order $order): Order
     {
-        $order->load('items');
+        $order->load(['items', 'outlet']);
         $currency = config('nexstay.currency.default', 'TZS');
-        $subtotal = Money::zero($currency);
 
-        $tax = Money::zero($currency);
-
+        // Sum item prices — these are tax-inclusive (the price IS what the guest pays)
+        $total = Money::zero($currency);
         foreach ($order->items as $item) {
             if ($item->status === 'voided') {
                 continue;
             }
             $line = Money::of((string) $item->unit_price, $currency)
                 ->multipliedBy($item->quantity, RoundingMode::HALF_UP);
-            $subtotal = $subtotal->plus($line);
+            $total = $total->plus($line);
         }
 
+        $chargeType = match ($order->outlet?->type) {
+            'bar'    => 'bar',
+            'lounge' => 'restaurant',
+            default  => 'restaurant',
+        };
+
+        // Extract the tax component from the inclusive total
+        $tax      = $this->taxService->calculate($total, $chargeType);
+        $subtotal = $total->minus($tax->amount); // net pre-tax equivalent
+
         $order->update([
-            'subtotal' => $subtotal->getAmount()->toFloat(),
-            'tax_amount' => $tax->getAmount()->toFloat(),
-            'total' => $subtotal->plus($tax)->getAmount()->toFloat(),
+            'subtotal'   => $subtotal->getAmount()->toFloat(), // net (for reporting)
+            'tax_amount' => $tax->amount->getAmount()->toFloat(), // extracted tax portion
+            'total'      => $total->getAmount()->toFloat(),    // what the guest actually pays
         ]);
 
         return $order->fresh(['items.menuItem']);
@@ -267,6 +359,34 @@ class OrderService
             $this->syncOrderStatusFromItems($order);
 
             return $order->fresh(['items.menuItem']);
+        });
+    }
+
+    public function cancel(Order $order): Order
+    {
+        return DB::transaction(function () use ($order) {
+            throw_if(
+                ! $order->isOpen(),
+                \DomainException::class,
+                'Only open orders can be cancelled.'
+            );
+
+            $order->load('items');
+            $previousStatus = (string) $order->status;
+
+            foreach ($order->items->whereNotIn('status', ['voided']) as $item) {
+                $item->update(['status' => 'voided']);
+                $this->logOrderItemTransition($order, $item, (string) $item->status, 'voided', 'order_cancelled');
+            }
+
+            $order->update(['status' => 'voided', 'closed_at' => now()]);
+            $this->logOrderTransition($order, $previousStatus, 'voided', 'order_cancelled');
+
+            if ($order->table_id) {
+                OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
+            }
+
+            return $order->fresh();
         });
     }
 

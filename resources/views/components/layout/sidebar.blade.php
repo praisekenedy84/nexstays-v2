@@ -1,9 +1,9 @@
 @props(['active' => 'dashboard'])
 
-<aside class="flex w-56 shrink-0 flex-col border-r border-slate-200/80 bg-white px-3 py-6">
+<aside class="flex w-56 shrink-0 flex-col border-r border-slate-200/80 bg-white px-3 py-6 dark:bg-slate-900 dark:border-slate-700/60">
     <a
         href="{{ route('tenant.dashboard') }}"
-        class="mb-1 flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-50"
+        class="mb-1 flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
         title="{{ $tenantLabel ?? 'NexStay' }}"
     >
         <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold tracking-wide text-white">
@@ -61,11 +61,18 @@
         @endforeach
     </nav>
 
-    <form method="POST" action="{{ route('tenant.logout') }}" class="mt-4 border-t border-slate-100 pt-4">
-        @csrf
-        <button type="submit" class="nav-item">
-            <x-icon name="logout" class="size-5 shrink-0" />
-            <span class="truncate">Sign out</span>
-        </button>
-    </form>
+    <div class="mt-4 border-t border-slate-100 pt-4 space-y-0.5 dark:border-slate-700/60">
+        <a href="{{ route('tenant.profile.edit') }}"
+           @class(['nav-item', 'nav-item-active' => ($active ?? '') === 'profile'])>
+            <x-icon name="user" class="size-5 shrink-0" />
+            <span class="truncate">My profile</span>
+        </a>
+        <form method="POST" action="{{ route('tenant.logout') }}">
+            @csrf
+            <button type="submit" class="nav-item w-full">
+                <x-icon name="logout" class="size-5 shrink-0" />
+                <span class="truncate">Sign out</span>
+            </button>
+        </form>
+    </div>
 </aside>

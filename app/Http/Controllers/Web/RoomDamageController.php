@@ -19,14 +19,19 @@ class RoomDamageController extends Controller
 {
     public function index(Request $request): View
     {
+        $sort   = in_array($request->query('sort'), ['created_at', 'status', 'estimated_cost']) ? $request->query('sort') : 'created_at';
+        $dir    = $request->query('direction') === 'asc' ? 'asc' : 'desc';
+        $search = trim((string) $request->query('search', ''));
+
         $damages = RoomDamage::query()
             ->with(['room', 'reservation.guest', 'reporter'])
             ->when($request->filled('status'), fn ($q) => $q->where('status', $request->input('status')))
-            ->latest()
+            ->when($search, fn ($q) => $q->where('description', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
             ->paginate(20)
             ->withQueryString();
 
-        return view('modules.damage.index', compact('damages'));
+        return view('modules.damage.index', compact('damages', 'sort', 'dir', 'search'));
     }
 
     public function create(): View

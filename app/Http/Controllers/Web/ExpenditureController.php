@@ -18,22 +18,26 @@ class ExpenditureController extends Controller
 {
     public function index(Request $request): View
     {
-        $expenditures = Expenditure::query()
-            ->with(['outlet', 'recorder'])
+        $sort   = in_array($request->query('sort'), ['expense_date', 'category', 'amount']) ? $request->query('sort') : 'expense_date';
+        $dir    = $request->query('direction') === 'asc' ? 'asc' : 'desc';
+        $search = trim((string) $request->query('search', ''));
+
+        $baseQuery = fn ($q) => $q
             ->when($request->filled('category'), fn ($q) => $q->where('category', $request->input('category')))
             ->when($request->filled('from'), fn ($q) => $q->whereDate('expense_date', '>=', $request->input('from')))
             ->when($request->filled('to'), fn ($q) => $q->whereDate('expense_date', '<=', $request->input('to')))
-            ->latest('expense_date')
+            ->when($search, fn ($q) => $q->where('description', 'ilike', "%{$search}%"));
+
+        $expenditures = Expenditure::query()
+            ->with(['outlet', 'recorder'])
+            ->tap($baseQuery)
+            ->orderBy($sort, $dir)
             ->paginate(25)
             ->withQueryString();
 
-        $total = Expenditure::query()
-            ->when($request->filled('category'), fn ($q) => $q->where('category', $request->input('category')))
-            ->when($request->filled('from'), fn ($q) => $q->whereDate('expense_date', '>=', $request->input('from')))
-            ->when($request->filled('to'), fn ($q) => $q->whereDate('expense_date', '<=', $request->input('to')))
-            ->sum('amount');
+        $total = Expenditure::query()->tap($baseQuery)->sum('amount');
 
-        return view('modules.expenditures.index', compact('expenditures', 'total'));
+        return view('modules.expenditures.index', compact('expenditures', 'total', 'sort', 'dir', 'search'));
     }
 
     public function create(): View

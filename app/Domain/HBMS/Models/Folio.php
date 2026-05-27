@@ -41,4 +41,9 @@ class Folio extends Model
     {
         return $this->hasMany(FolioTransaction::class);
     }
+
+    public function payments(): HasMany
+    {
+        return $this->hasMany(\App\Domain\Till\Models\Payment::class);
+    }
 }

@@ -9,6 +9,7 @@ use App\Domain\Shared\Services\FolioService;
 use App\Http\Controllers\Controller;
 use App\Http\Concerns\RespondsWithJsonApi;
 use App\Http\Requests\Api\V1\HBMS\PostFolioChargeRequest;
+use App\Http\Requests\Api\V1\HBMS\PostFolioPaymentRequest;
 use App\Http\Resources\Api\V1\FolioResource;
 use App\Http\Resources\Api\V1\FolioTransactionResource;
 use Brick\Money\Money;
@@ -44,5 +45,20 @@ class FolioController extends Controller
         );
 
         return $this->respond(FolioTransactionResource::make($transaction), 201);
+    }
+
+    public function postPayment(PostFolioPaymentRequest $request, Folio $folio): JsonResponse
+    {
+        $result = app(FolioService::class)->postPayment(
+            folio: $folio,
+            amount: Money::of($request->validated('amount'), $folio->currency),
+            method: $request->validated('method'),
+            tillSessionId: $request->validated('till_session_id'),
+            notes: $request->validated('notes'),
+        );
+
+        return $this->respond(FolioTransactionResource::make($result['transaction']), 201, [
+            'payment_id' => $result['payment']->id,
+        ]);
     }
 }

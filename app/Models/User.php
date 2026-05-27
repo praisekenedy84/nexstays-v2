@@ -20,6 +20,19 @@ class User extends Authenticatable
     use Notifiable;
     use SoftDeletes;
 
+    /**
+     * Return 'tenant' when stancl has set up the tenant connection, otherwise
+     * fall back to the framework default.  This prevents any timing window
+     * where a query fires before the DatabaseTenancyBootstrapper has switched
+     * the default connection from 'central' (search_path=public) to 'tenant'.
+     */
+    public function getConnectionName(): ?string
+    {
+        return array_key_exists('tenant', config('database.connections', []))
+            ? 'tenant'
+            : parent::getConnectionName();
+    }
+
     protected $fillable = [
         'name',
         'email',

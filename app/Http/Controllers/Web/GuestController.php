@@ -16,24 +16,21 @@ class GuestController extends Controller
 {
     public function index(Request $request): View
     {
-        $search = $request->input('search');
+        $sort   = in_array($request->query('sort'), ['last_name', 'email', 'nationality', 'created_at']) ? $request->query('sort') : 'last_name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
 
         $guests = Guest::query()
-            ->when($search, function ($q) use ($search) {
-                $term = '%'.mb_strtolower($search).'%';
-                $q->where(function ($inner) use ($term) {
-                    $inner->whereRaw('LOWER(first_name) LIKE ?', [$term])
-                        ->orWhereRaw('LOWER(last_name) LIKE ?', [$term])
-                        ->orWhereRaw('LOWER(email) LIKE ?', [$term])
-                        ->orWhereRaw('LOWER(phone) LIKE ?', [$term]);
-                });
-            })
-            ->orderBy('last_name')
-            ->orderBy('first_name')
+            ->when($search, fn ($q) => $q->where(fn ($inner) => $inner
+                ->where('first_name', 'ilike', "%{$search}%")
+                ->orWhere('last_name', 'ilike', "%{$search}%")
+                ->orWhere('email', 'ilike', "%{$search}%")
+                ->orWhere('phone', 'ilike', "%{$search}%")))
+            ->orderBy($sort, $dir)
             ->paginate(25)
             ->withQueryString();
 
-        return view('hbms.guests.index', compact('guests', 'search'));
+        return view('hbms.guests.index', compact('guests', 'search', 'sort', 'dir'));
     }
 
     public function create(): View

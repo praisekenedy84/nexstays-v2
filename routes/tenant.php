@@ -28,7 +28,10 @@ use App\Http\Controllers\Web\RoomTypeController;
 use App\Http\Controllers\Web\StockItemController;
 use App\Http\Controllers\Web\LoungeController;
 use App\Http\Controllers\Web\OutletController;
+use App\Http\Controllers\Web\OutletTableController;
 use App\Http\Controllers\Web\ReportController;
+use App\Http\Controllers\Web\OccupancyReportController;
+use App\Http\Controllers\Web\PaymentSummaryReportController;
 use App\Http\Controllers\Web\RoomReservationReportController;
 use App\Http\Controllers\Web\RoomPaymentsAccountingReportController;
 use App\Http\Controllers\Web\ReservationController;
@@ -42,39 +45,48 @@ use App\Http\Controllers\Web\DebtController;
 use App\Http\Controllers\Web\ExpenditureController;
 use App\Http\Controllers\Web\FbReportController;
 use App\Http\Controllers\Web\PurchaseController;
+use App\Http\Controllers\Web\FinanceSettingsController;
 use App\Http\Controllers\Web\ReportDeliverySettingsController;
 use App\Http\Controllers\Web\RoomDamageController;
 use App\Http\Controllers\Web\TimeLeftController;
+use App\Http\Controllers\Web\PosController;
+use App\Http\Controllers\Web\ProfileController;
+use App\Http\Controllers\Web\RoleController;
+use App\Http\Controllers\Web\ShiftSummaryController;
 use App\Http\Controllers\Web\UserController;
+use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Api\V1\ReportController as ApiReportController;
+use App\Http\Middleware\InitializeTenancyBySession;
+use App\Http\Middleware\InitializeTenancyByToken;
 use Illuminate\Support\Facades\Route;
-use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
-use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 
 /*
 |--------------------------------------------------------------------------
-| Tenant API — modular monolith (HBMS + platform)
+| Web — staff dashboard (single domain, tenant resolved from session)
 |--------------------------------------------------------------------------
 |
-| Base URL: http://{tenant}.localhost:8000/api/v1
-| Demo tenant: http://demo.localhost:8000
+| Login initializes tenancy from property_code and stores tenant_id in the
+| session. Every subsequent web request resolves the tenant via that session
+| value — no subdomain required.
 |
 */
 
-Route::middleware([
-    'web',
-    InitializeTenancyBySubdomain::class,
-    PreventAccessFromCentralDomains::class,
-])->name('tenant.')->group(function () {
-    Route::middleware('guest:web')->group(function () {
-        Route::get('/login', [WebAuthController::class, 'create'])->name('login');
-        Route::post('/login', [WebAuthController::class, 'store'])->name('login.store');
-    });
+Route::middleware(['web'])->name('tenant.')->group(function () {
 
-    Route::middleware('auth:web')->group(function () {
+    // Login: no tenancy needed yet, controller initializes it after property_code lookup.
+    Route::get('/login', [WebAuthController::class, 'create'])->name('login');
+    Route::post('/login', [WebAuthController::class, 'store'])->name('login.store');
+
+    // Authenticated & tenant-scoped: tenancy is initialized first (from session),
+    // then the auth guard can resolve the user from the tenant schema.
+    Route::middleware([InitializeTenancyBySession::class, 'auth:web'])->group(function () {
         Route::get('/', fn () => redirect()->route('tenant.dashboard'));
         Route::post('/logout', [WebAuthController::class, 'destroy'])->name('logout');
+        Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.token');
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
+
+        Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
+        Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
         Route::middleware('permission:view-availability')->group(function () {
             Route::get('/availability', [AvailabilityController::class, 'index'])->name('availability');
@@ -87,6 +99,15 @@ Route::middleware([
             Route::post('/reservations/{reservation}/cancel', [ReservationController::class, 'cancel'])
                 ->middleware('permission:manage-reservations')
                 ->name('reservations.cancel');
+            Route::post('/reservations/{reservation}/check-in', [ReservationController::class, 'checkIn'])
+                ->middleware('permission:check-in-guests')
+                ->name('reservations.check-in');
+            Route::post('/reservations/{reservation}/check-out', [ReservationController::class, 'checkOut'])
+                ->middleware('permission:check-out-guests')
+                ->name('reservations.check-out');
+            Route::post('/reservations/{reservation}/no-show', [ReservationController::class, 'noShow'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.no-show');
             Route::get('/reservations/{reservation}/ticket', [ReservationController::class, 'ticket'])
                 ->name('reservations.ticket');
             Route::get('/reservations/available-rooms', [ReservationController::class, 'availableRooms'])
@@ -143,12 +164,31 @@ Route::middleware([
         });
 
         Route::middleware('permission:manage-users')->group(function () {
-            Route::resource('users', UserController::class)->except(['show']);
+            Route::resource('users', UserController::class);
+        });
+
+        Route::middleware('permission:manage-roles')->group(function () {
+            Route::get('/roles/matrix', [RoleController::class, 'matrix'])->name('roles.matrix');
+            Route::post('/roles/{role}/clone', [RoleController::class, 'clone'])->name('roles.clone');
+            Route::resource('roles', RoleController::class)->except(['show']);
+            Route::get('/finance/settings', [FinanceSettingsController::class, 'edit'])->name('finance.settings.edit');
+            Route::put('/finance/settings', [FinanceSettingsController::class, 'update'])->name('finance.settings.update');
+            Route::get('/finance/payment-methods', [FinanceSettingsController::class, 'paymentMethodsEdit'])->name('finance.payment-methods.edit');
+            Route::put('/finance/payment-methods', [FinanceSettingsController::class, 'paymentMethodsUpdate'])->name('finance.payment-methods.update');
+            Route::get('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsEdit'])->name('finance.fb-settings.edit');
+            Route::put('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsUpdate'])->name('finance.fb-settings.update');
         });
 
         Route::middleware('permission:view-reports|view-fb-reports|view-reservations')->group(function () {
             Route::get('/reports', ReportController::class)->name('reports');
             Route::get('/reports/fb-revenue', [FbReportController::class, 'index'])->name('reports.fb-revenue');
+            Route::get('/reports/fb-revenue/export', [FbReportController::class, 'exportRevenueCsv'])->name('reports.fb-revenue.export');
+            Route::get('/reports/fb-revenue/export-excel', [FbReportController::class, 'exportRevenueExcel'])->name('reports.fb-revenue.export-excel');
+            Route::get('/reports/fb-revenue/export-pdf', [FbReportController::class, 'exportRevenuePdf'])->name('reports.fb-revenue.export-pdf');
+            Route::get('/reports/fb-profitability', [FbReportController::class, 'profitability'])->name('reports.fb-profitability');
+            Route::get('/reports/fb-profitability/export', [FbReportController::class, 'exportProfitabilityCsv'])->name('reports.fb-profitability.export');
+            Route::get('/reports/fb-profitability/export-excel', [FbReportController::class, 'exportProfitabilityExcel'])->name('reports.fb-profitability.export-excel');
+            Route::get('/reports/fb-profitability/export-pdf', [FbReportController::class, 'exportProfitabilityPdf'])->name('reports.fb-profitability.export-pdf');
         });
         Route::middleware('permission:manage-reservations')->group(function () {
             Route::put('/reports/delivery-settings', [ReportDeliverySettingsController::class, 'update'])
@@ -160,12 +200,36 @@ Route::middleware([
         Route::middleware('permission:view-reports|view-reservations')->group(function () {
             Route::get('/reports/room-reservations', [RoomReservationReportController::class, 'index'])
                 ->name('reports.room-reservations');
+            Route::get('/reports/room-reservations/export', [RoomReservationReportController::class, 'exportCsv'])
+                ->name('reports.room-reservations.export');
+            Route::get('/reports/room-reservations/export-excel', [RoomReservationReportController::class, 'exportExcel'])
+                ->name('reports.room-reservations.export-excel');
+            Route::get('/reports/room-reservations/export-pdf', [RoomReservationReportController::class, 'exportPdf'])
+                ->name('reports.room-reservations.export-pdf');
             Route::get('/reports/room-payments-accounting', [RoomPaymentsAccountingReportController::class, 'index'])
                 ->name('reports.room-payments-accounting');
             Route::get('/reports/room-payments-accounting/export', [RoomPaymentsAccountingReportController::class, 'exportCsv'])
                 ->name('reports.room-payments-accounting.export');
             Route::get('/reports/room-payments-accounting/export-excel', [RoomPaymentsAccountingReportController::class, 'exportExcel'])
                 ->name('reports.room-payments-accounting.export-excel');
+            Route::get('/reports/room-payments-accounting/export-pdf', [RoomPaymentsAccountingReportController::class, 'exportPdf'])
+                ->name('reports.room-payments-accounting.export-pdf');
+            Route::get('/reports/occupancy', [OccupancyReportController::class, 'index'])
+                ->name('reports.occupancy');
+            Route::get('/reports/occupancy/export', [OccupancyReportController::class, 'exportCsv'])
+                ->name('reports.occupancy.export');
+            Route::get('/reports/occupancy/export-excel', [OccupancyReportController::class, 'exportExcel'])
+                ->name('reports.occupancy.export-excel');
+            Route::get('/reports/occupancy/export-pdf', [OccupancyReportController::class, 'exportPdf'])
+                ->name('reports.occupancy.export-pdf');
+            Route::get('/reports/payment-summary', [PaymentSummaryReportController::class, 'index'])
+                ->name('reports.payment-summary');
+            Route::get('/reports/payment-summary/export', [PaymentSummaryReportController::class, 'exportCsv'])
+                ->name('reports.payment-summary.export');
+            Route::get('/reports/payment-summary/export-excel', [PaymentSummaryReportController::class, 'exportExcel'])
+                ->name('reports.payment-summary.export-excel');
+            Route::get('/reports/payment-summary/export-pdf', [PaymentSummaryReportController::class, 'exportPdf'])
+                ->name('reports.payment-summary.export-pdf');
         });
 
         Route::middleware('permission:view-debts')->group(function () {
@@ -182,8 +246,11 @@ Route::middleware([
             Route::middleware('permission:manage-purchases')->group(function () {
                 Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
                 Route::post('/purchases', [PurchaseController::class, 'store'])->name('purchases.store');
+                Route::post('/purchases/{purchase}/order', [PurchaseController::class, 'markOrdered'])->name('purchases.mark-ordered');
+                Route::get('/purchases/{purchase}/receive', [PurchaseController::class, 'receiveForm'])->name('purchases.receive-form');
                 Route::post('/purchases/{purchase}/receive', [PurchaseController::class, 'receive'])->name('purchases.receive');
             });
+            Route::get('/purchases/{purchase}/print', [PurchaseController::class, 'print'])->name('purchases.print');
             Route::get('/purchases/{purchase}', [PurchaseController::class, 'show'])->name('purchases.show');
         });
 
@@ -233,6 +300,13 @@ Route::middleware([
                 Route::get('/outlets/{outlet}/edit', [OutletController::class, 'edit'])->name('outlets.edit');
                 Route::put('/outlets/{outlet}', [OutletController::class, 'update'])->name('outlets.update');
                 Route::delete('/outlets/{outlet}', [OutletController::class, 'destroy'])->name('outlets.destroy');
+
+                // Table management (nested under outlet)
+                Route::get('/outlets/{outlet}/tables', [OutletTableController::class, 'index'])->name('outlets.tables.index');
+                Route::post('/outlets/{outlet}/tables', [OutletTableController::class, 'store'])->name('outlets.tables.store');
+                Route::put('/outlets/{outlet}/tables/{table}', [OutletTableController::class, 'update'])->name('outlets.tables.update');
+                Route::patch('/outlets/{outlet}/tables/{table}/status', [OutletTableController::class, 'updateStatus'])->name('outlets.tables.status');
+                Route::delete('/outlets/{outlet}/tables/{table}', [OutletTableController::class, 'destroy'])->name('outlets.tables.destroy');
             });
         });
 
@@ -240,6 +314,26 @@ Route::middleware([
             Route::get('/restaurant', [RestaurantController::class, 'index'])->name('restaurant.index');
             Route::get('/bar', [BarController::class, 'index'])->name('bar.index');
             Route::get('/lounge', [LoungeController::class, 'index'])->name('lounge.index');
+
+            // POS order management
+            Route::get('/pos/orders/{order}', [PosController::class, 'manage'])->name('pos.manage');
+            Route::get('/shift/mine', [ShiftSummaryController::class, 'mine'])->name('shift.mine');
+            Route::get('/shift/all', [ShiftSummaryController::class, 'all'])->name('shift.all');
+        });
+
+        Route::middleware('permission:manage-orders')->group(function () {
+            Route::post('/pos/{outlet}/orders', [PosController::class, 'createOrder'])->name('pos.orders.create');
+            Route::post('/pos/orders/{order}/items', [PosController::class, 'addItem'])->name('pos.orders.add-item');
+            Route::post('/pos/orders/{order}/items/{item}/void', [PosController::class, 'voidItem'])->name('pos.orders.void-item');
+            Route::post('/pos/orders/{order}/fire', [PosController::class, 'fire'])->name('pos.orders.fire');
+            Route::post('/pos/orders/{order}/settle-cash', [PosController::class, 'settleCash'])->name('pos.orders.settle-cash');
+            Route::post('/pos/orders/{order}/settle-folio', [PosController::class, 'settleFollio'])->name('pos.orders.settle-folio');
+            Route::post('/pos/orders/{order}/settle-direct', [PosController::class, 'settleDirectPayment'])->name('pos.orders.settle-direct');
+            Route::post('/pos/orders/{order}/cancel', [PosController::class, 'cancelOrder'])->name('pos.orders.cancel');
+        });
+
+        Route::middleware('permission:view-orders')->group(function () {
+            Route::get('/pos/orders/{order}/receipt', [PosController::class, 'receipt'])->name('pos.orders.receipt');
         });
 
         Route::middleware('permission:view-till|manage-till')->group(function () {
@@ -265,22 +359,40 @@ Route::middleware([
         });
 
         Route::middleware('permission:view-inventory|manage-inventory')->group(function () {
+            Route::get('/stock-items/json', [StockItemController::class, 'json'])->name('stock-items.json');
             Route::resource('stock-items', StockItemController::class)->except(['show']);
         });
+
+        // Notifications (all authenticated staff)
+        Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
+        Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
+        Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');
     });
 });
 
-Route::middleware([
-    'api',
-    InitializeTenancyBySubdomain::class,
-    PreventAccessFromCentralDomains::class,
-])->prefix('api/v1')->name('api.v1.')->group(function () {
+/*
+|--------------------------------------------------------------------------
+| API v1 — tenant-scoped REST (single domain, tenant from token or header)
+|--------------------------------------------------------------------------
+|
+| Login: POST /api/v1/auth/login — accepts property_code, email, password.
+|        Controller initializes tenancy, returns token + tenant_id.
+|
+| All other authenticated routes: InitializeTenancyByToken reads the tenant_id
+|        stored on the Sanctum token (central PAT table), initializes tenancy,
+|        then auth:sanctum authenticates the user from the tenant schema.
+|
+| Public tenant endpoints (e.g. availability): pass X-Tenant-Id header.
+|
+*/
+
+Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function () {
 
     Route::get('/health', function () {
         return response()->json([
             'data' => [
                 'app' => config('app.name'),
-                'tenant' => tenant('id'),
+                'tenant' => tenancy()->initialized ? tenant('id') : null,
                 'status' => 'ok',
                 'time' => now()->toIso8601String(),
             ],
@@ -290,140 +402,149 @@ Route::middleware([
         ]);
     })->name('health');
 
+    // Login resolves the tenant from property_code inside the controller.
     Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
 
-    Route::get('/availability', [ApiAvailabilityController::class, 'index'])
-        ->name('availability.index');
+    // Tenant context required (token → tenant_id, or X-Tenant-Id header for public endpoints).
+    Route::middleware([InitializeTenancyByToken::class])->group(function () {
 
-    Route::middleware('auth:sanctum')->group(function () {
-        Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
-        Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
+        // Public: guest booking engine uses X-Tenant-Id header.
+        Route::get('/availability', [ApiAvailabilityController::class, 'index'])
+            ->name('availability.index');
 
-        Route::middleware('permission:manage-users')->group(function () {
-            Route::get('/users', [ApiUserController::class, 'index'])->name('users.index');
-        });
+        // Authenticated tenant routes.
+        Route::middleware('auth:sanctum')->group(function () {
+            Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
+            Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 
-        Route::middleware('permission:view-guests|manage-guests')->group(function () {
-            Route::get('/guests', [ApiGuestController::class, 'index'])->name('guests.index');
-            Route::get('/guests/{guest}', [ApiGuestController::class, 'show'])->name('guests.show');
-        });
-
-        Route::middleware('permission:manage-guests')->group(function () {
-            Route::post('/guests', [ApiGuestController::class, 'store'])->name('guests.store');
-            Route::patch('/guests/{guest}', [ApiGuestController::class, 'update'])->name('guests.update');
-        });
-
-        Route::middleware('permission:view-rooms|manage-room-status')->group(function () {
-            Route::get('/rooms', [ApiRoomController::class, 'index'])->name('rooms.index');
-            Route::get('/rooms/{room}', [ApiRoomController::class, 'show'])->name('rooms.show');
-        });
-
-        Route::middleware('permission:manage-rooms|manage-room-status')->group(function () {
-            Route::patch('/rooms/{room}', [ApiRoomController::class, 'update'])->name('rooms.update');
-        });
-
-        Route::middleware('permission:manage-room-status')->group(function () {
-            Route::patch('/rooms/{room}/status', [ApiRoomController::class, 'updateStatus'])
-                ->name('rooms.status');
-        });
-
-        Route::middleware('permission:view-availability')->group(function () {
-            Route::get('/room-types', [ApiRoomTypeController::class, 'index'])->name('room-types.index');
-            Route::get('/room-types/{roomType}', [ApiRoomTypeController::class, 'show'])->name('room-types.show');
-        });
-
-        Route::middleware('permission:view-folios|post-folio-charges')->group(function () {
-            Route::get('/folios/{folio}', [FolioController::class, 'show'])->name('folios.show');
-        });
-
-        Route::middleware('permission:post-folio-charges')->group(function () {
-            Route::post('/folios/{folio}/transactions', [FolioController::class, 'postCharge'])
-                ->name('folios.transactions.store');
-        });
-
-        Route::middleware('permission:view-outlets')->group(function () {
-            Route::get('/outlets', [ApiOutletController::class, 'index'])->name('outlets.index');
-            Route::get('/outlets/{outlet}', [ApiOutletController::class, 'show'])->name('outlets.show');
-            Route::get('/outlets/{outlet}/tables', [ApiOutletController::class, 'tables'])->name('outlets.tables');
-            Route::get('/outlets/{outlet}/menu', [ApiOutletController::class, 'menu'])->name('outlets.menu');
-            Route::get('/outlets/{outlet}/orders', [ApiOrderController::class, 'index'])->name('outlets.orders.index');
-            Route::post('/outlets/{outlet}/orders', [ApiOrderController::class, 'store'])->name('outlets.orders.store');
-            Route::get('/outlets/{outlet}/tabs', [BarTabController::class, 'index'])->name('outlets.tabs.index');
-            Route::post('/outlets/{outlet}/tabs', [BarTabController::class, 'store'])->name('outlets.tabs.store');
-        });
-
-        Route::middleware('permission:view-orders')->group(function () {
-            Route::get('/orders/{order}', [ApiOrderController::class, 'show'])->name('orders.show');
-        });
-
-        Route::middleware('permission:manage-orders')->group(function () {
-            Route::post('/orders/{order}/items', [ApiOrderController::class, 'addItems'])->name('orders.items.store');
-            Route::patch('/orders/{order}/items/status', [ApiOrderController::class, 'updateItemStatus'])->name('orders.items.status');
-            Route::post('/orders/{order}/fire', [ApiOrderController::class, 'fire'])->name('orders.fire');
-            Route::post('/orders/{order}/post-to-folio', [ApiOrderController::class, 'postToFolio'])->name('orders.post-to-folio');
-            Route::post('/orders/{order}/cash-payment', [ApiOrderController::class, 'cashPayment'])->name('orders.cash-payment');
-        });
-
-        Route::prefix('tills')->name('tills.')->group(function () {
-            Route::middleware('permission:manage-till')->group(function () {
-                Route::post('/open', [ApiTillController::class, 'open'])->name('open');
-                Route::get('/active', [ApiTillController::class, 'active'])->name('active');
-                Route::post('/{till}/close', [ApiTillController::class, 'close'])->name('close');
-            });
-            Route::middleware('permission:view-till')->group(function () {
-                Route::get('/history', [ApiTillController::class, 'history'])->name('history');
-            });
-        });
-
-        Route::middleware('permission:view-inventory|manage-inventory')->group(function () {
-            Route::get('/inventory/stock-items', [ApiStockItemController::class, 'index'])->name('inventory.stock-items.index');
-            Route::post('/inventory/stock-items', [ApiStockItemController::class, 'store'])->name('inventory.stock-items.store');
-            Route::patch('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'update'])->name('inventory.stock-items.update');
-            Route::delete('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'destroy'])->name('inventory.stock-items.destroy');
-        });
-
-        Route::middleware('permission:manage-menu')->group(function () {
-            Route::post('/outlets/{outlet}/menu/items', [ApiMenuItemController::class, 'store'])->name('outlets.menu.items.store');
-            Route::patch('/menu-items/{menuItem}', [ApiMenuItemController::class, 'update'])->name('menu-items.update');
-            Route::delete('/menu-items/{menuItem}', [ApiMenuItemController::class, 'destroy'])->name('menu-items.destroy');
-            Route::post('/menu-items/{menuItem}/toggle', [ApiMenuItemController::class, 'toggle'])->name('menu-items.toggle');
-        });
-
-        Route::middleware('permission:view-debts')->group(function () {
-            Route::get('/reports/debts', [ApiReportController::class, 'debts'])->name('reports.debts');
-        });
-
-        Route::middleware('permission:view-fb-reports')->group(function () {
-            Route::get('/reports/fb-revenue', [ApiReportController::class, 'fbRevenue'])->name('reports.fb-revenue');
-        });
-
-        Route::middleware('permission:view-reports|view-reservations')->group(function () {
-            Route::get('/reports/room-reservations', [ApiReportController::class, 'roomReservations'])
-                ->name('reports.room-reservations');
-            Route::get('/reports/room-payments-accounting', [ApiReportController::class, 'roomPaymentsAccounting'])
-                ->name('reports.room-payments-accounting');
-        });
-
-        Route::prefix('reservations')->name('reservations.')->group(function () {
-            Route::middleware('permission:view-reservations|manage-reservations')->group(function () {
-                Route::get('/', [ApiReservationController::class, 'index'])->name('index');
-                Route::get('/{reservation}', [ApiReservationController::class, 'show'])->name('show');
+            Route::middleware('permission:manage-users')->group(function () {
+                Route::get('/users', [ApiUserController::class, 'index'])->name('users.index');
             });
 
-            Route::middleware('permission:manage-reservations')->group(function () {
-                Route::post('/', [ApiReservationController::class, 'store'])->name('store');
-                Route::patch('/{reservation}', [ApiReservationController::class, 'update'])->name('update');
-                Route::delete('/{reservation}', [ApiReservationController::class, 'destroy'])->name('destroy');
+            Route::middleware('permission:view-guests|manage-guests')->group(function () {
+                Route::get('/guests', [ApiGuestController::class, 'index'])->name('guests.index');
+                Route::get('/guests/{guest}', [ApiGuestController::class, 'show'])->name('guests.show');
             });
 
-            Route::middleware('permission:check-in-guests')->group(function () {
-                Route::post('/{reservation}/check-in', [ApiReservationController::class, 'checkIn'])
-                    ->name('check-in');
+            Route::middleware('permission:manage-guests')->group(function () {
+                Route::post('/guests', [ApiGuestController::class, 'store'])->name('guests.store');
+                Route::patch('/guests/{guest}', [ApiGuestController::class, 'update'])->name('guests.update');
             });
 
-            Route::middleware('permission:check-out-guests')->group(function () {
-                Route::post('/{reservation}/check-out', [ApiReservationController::class, 'checkOut'])
-                    ->name('check-out');
+            Route::middleware('permission:view-rooms|manage-room-status')->group(function () {
+                Route::get('/rooms', [ApiRoomController::class, 'index'])->name('rooms.index');
+                Route::get('/rooms/{room}', [ApiRoomController::class, 'show'])->name('rooms.show');
+            });
+
+            Route::middleware('permission:manage-rooms|manage-room-status')->group(function () {
+                Route::patch('/rooms/{room}', [ApiRoomController::class, 'update'])->name('rooms.update');
+            });
+
+            Route::middleware('permission:manage-room-status')->group(function () {
+                Route::patch('/rooms/{room}/status', [ApiRoomController::class, 'updateStatus'])
+                    ->name('rooms.status');
+            });
+
+            Route::middleware('permission:view-availability')->group(function () {
+                Route::get('/room-types', [ApiRoomTypeController::class, 'index'])->name('room-types.index');
+                Route::get('/room-types/{roomType}', [ApiRoomTypeController::class, 'show'])->name('room-types.show');
+            });
+
+            Route::middleware('permission:view-folios|post-folio-charges')->group(function () {
+                Route::get('/folios/{folio}', [FolioController::class, 'show'])->name('folios.show');
+            });
+
+            Route::middleware('permission:post-folio-charges')->group(function () {
+                Route::post('/folios/{folio}/transactions', [FolioController::class, 'postCharge'])
+                    ->name('folios.transactions.store');
+                Route::post('/folios/{folio}/payments', [FolioController::class, 'postPayment'])
+                    ->name('folios.payments.store');
+            });
+
+            Route::middleware('permission:view-outlets')->group(function () {
+                Route::get('/outlets', [ApiOutletController::class, 'index'])->name('outlets.index');
+                Route::get('/outlets/{outlet}', [ApiOutletController::class, 'show'])->name('outlets.show');
+                Route::get('/outlets/{outlet}/tables', [ApiOutletController::class, 'tables'])->name('outlets.tables');
+                Route::get('/outlets/{outlet}/menu', [ApiOutletController::class, 'menu'])->name('outlets.menu');
+                Route::get('/outlets/{outlet}/orders', [ApiOrderController::class, 'index'])->name('outlets.orders.index');
+                Route::post('/outlets/{outlet}/orders', [ApiOrderController::class, 'store'])->name('outlets.orders.store');
+                Route::get('/outlets/{outlet}/tabs', [BarTabController::class, 'index'])->name('outlets.tabs.index');
+                Route::post('/outlets/{outlet}/tabs', [BarTabController::class, 'store'])->name('outlets.tabs.store');
+            });
+
+            Route::middleware('permission:view-orders')->group(function () {
+                Route::get('/orders/{order}', [ApiOrderController::class, 'show'])->name('orders.show');
+            });
+
+            Route::middleware('permission:manage-orders')->group(function () {
+                Route::post('/orders/{order}/items', [ApiOrderController::class, 'addItems'])->name('orders.items.store');
+                Route::patch('/orders/{order}/items/status', [ApiOrderController::class, 'updateItemStatus'])->name('orders.items.status');
+                Route::post('/orders/{order}/fire', [ApiOrderController::class, 'fire'])->name('orders.fire');
+                Route::post('/orders/{order}/post-to-folio', [ApiOrderController::class, 'postToFolio'])->name('orders.post-to-folio');
+                Route::post('/orders/{order}/cash-payment', [ApiOrderController::class, 'cashPayment'])->name('orders.cash-payment');
+            });
+
+            Route::prefix('tills')->name('tills.')->group(function () {
+                Route::middleware('permission:manage-till')->group(function () {
+                    Route::post('/open', [ApiTillController::class, 'open'])->name('open');
+                    Route::get('/active', [ApiTillController::class, 'active'])->name('active');
+                    Route::post('/{till}/close', [ApiTillController::class, 'close'])->name('close');
+                });
+                Route::middleware('permission:view-till')->group(function () {
+                    Route::get('/history', [ApiTillController::class, 'history'])->name('history');
+                });
+            });
+
+            Route::middleware('permission:view-inventory|manage-inventory')->group(function () {
+                Route::get('/inventory/stock-items', [ApiStockItemController::class, 'index'])->name('inventory.stock-items.index');
+                Route::post('/inventory/stock-items', [ApiStockItemController::class, 'store'])->name('inventory.stock-items.store');
+                Route::patch('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'update'])->name('inventory.stock-items.update');
+                Route::delete('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'destroy'])->name('inventory.stock-items.destroy');
+            });
+
+            Route::middleware('permission:manage-menu')->group(function () {
+                Route::post('/outlets/{outlet}/menu/items', [ApiMenuItemController::class, 'store'])->name('outlets.menu.items.store');
+                Route::patch('/menu-items/{menuItem}', [ApiMenuItemController::class, 'update'])->name('menu-items.update');
+                Route::delete('/menu-items/{menuItem}', [ApiMenuItemController::class, 'destroy'])->name('menu-items.destroy');
+                Route::post('/menu-items/{menuItem}/toggle', [ApiMenuItemController::class, 'toggle'])->name('menu-items.toggle');
+            });
+
+            Route::middleware('permission:view-debts')->group(function () {
+                Route::get('/reports/debts', [ApiReportController::class, 'debts'])->name('reports.debts');
+            });
+
+            Route::middleware('permission:view-fb-reports')->group(function () {
+                Route::get('/reports/fb-revenue', [ApiReportController::class, 'fbRevenue'])->name('reports.fb-revenue');
+            });
+
+            Route::middleware('permission:view-reports|view-reservations')->group(function () {
+                Route::get('/reports/room-reservations', [ApiReportController::class, 'roomReservations'])
+                    ->name('reports.room-reservations');
+                Route::get('/reports/room-payments-accounting', [ApiReportController::class, 'roomPaymentsAccounting'])
+                    ->name('reports.room-payments-accounting');
+            });
+
+            Route::prefix('reservations')->name('reservations.')->group(function () {
+                Route::middleware('permission:view-reservations|manage-reservations')->group(function () {
+                    Route::get('/', [ApiReservationController::class, 'index'])->name('index');
+                    Route::get('/{reservation}', [ApiReservationController::class, 'show'])->name('show');
+                });
+
+                Route::middleware('permission:manage-reservations')->group(function () {
+                    Route::post('/', [ApiReservationController::class, 'store'])->name('store');
+                    Route::patch('/{reservation}', [ApiReservationController::class, 'update'])->name('update');
+                    Route::delete('/{reservation}', [ApiReservationController::class, 'destroy'])->name('destroy');
+                });
+
+                Route::middleware('permission:check-in-guests')->group(function () {
+                    Route::post('/{reservation}/check-in', [ApiReservationController::class, 'checkIn'])
+                        ->name('check-in');
+                });
+
+                Route::middleware('permission:check-out-guests')->group(function () {
+                    Route::post('/{reservation}/check-out', [ApiReservationController::class, 'checkOut'])
+                        ->name('check-out');
+                });
             });
         });
     });

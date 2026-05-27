@@ -27,5 +27,10 @@
                 @endforelse
             </tbody>
         </table>
+        @if ($debts->hasPages())
+            <div class="border-t border-slate-100 px-5 py-3">
+                {{ $debts->links() }}
+            </div>
+        @endif
     </div>
 </x-layouts.app>

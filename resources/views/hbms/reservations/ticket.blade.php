@@ -2,192 +2,418 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Reservation Ticket - {{ $reservation->booking_ref }}</title>
+    <title>Reservation Ticket &mdash; {{ $reservation->booking_ref }}</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
     <style>
-        :root {
-            color-scheme: light;
-        }
-
-        * {
-            box-sizing: border-box;
-        }
+        :root { color-scheme: light; }
+        * { box-sizing: border-box; margin: 0; padding: 0; }
 
         body {
-            margin: 0;
-            padding: 24px;
-            font-family: "Segoe UI", Arial, sans-serif;
+            font-family: 'Plus Jakarta Sans', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+            font-size: 11px;
             color: #0f172a;
-            background: #f8fafc;
+            background: #f1f5f9;
+            padding: 16px;
         }
 
-        .ticket {
-            max-width: 820px;
+        .receipt {
+            max-width: 420px;
             margin: 0 auto;
             background: #ffffff;
+            border-radius: 8px;
+            overflow: hidden;
             border: 1px solid #e2e8f0;
-            border-radius: 12px;
+        }
+
+        /* ── Header band ── */
+        .receipt-header {
+            background: #0f172a;
+            color: #ffffff;
+            padding: 16px 18px 12px;
+            text-align: center;
+        }
+
+        .property-name {
+            font-size: 15px;
+            font-weight: 800;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+        }
+
+        .property-sub {
+            font-size: 9px;
+            opacity: 0.55;
+            margin-top: 1px;
+            letter-spacing: 0.08em;
+            text-transform: uppercase;
+        }
+
+        .ref-band {
+            margin-top: 10px;
+            display: inline-block;
+            background: rgba(255,255,255,0.10);
+            border: 1px solid rgba(255,255,255,0.18);
+            border-radius: 5px;
+            padding: 5px 14px;
+        }
+
+        .ref-label {
+            font-size: 8px;
+            opacity: 0.60;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+        }
+
+        .ref-value {
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+
+        /* ── Status pill ── */
+        .status-row { text-align: center; padding: 6px 0 3px; }
+
+        .status-pill {
+            display: inline-block;
+            font-size: 8px;
+            font-weight: 700;
+            letter-spacing: 0.10em;
+            text-transform: uppercase;
+            border-radius: 999px;
+            padding: 2px 9px;
+        }
+
+        .status-confirmed   { background: #dcfce7; color: #15803d; }
+        .status-checked_in  { background: #dbeafe; color: #1d4ed8; }
+        .status-checked_out { background: #f1f5f9; color: #475569; }
+        .status-cancelled   { background: #fee2e2; color: #b91c1c; }
+        .status-inquiry     { background: #fef9c3; color: #854d0e; }
+        .status-no_show     { background: #fde8d8; color: #9a3412; }
+
+        /* ── Tear line ── */
+        .tear { border: none; border-top: 1px dashed #cbd5e1; margin: 0 14px; }
+
+        /* ── Dates block ── */
+        .dates-row { padding: 10px 16px 8px; }
+
+        .dates-table { width: 100%; border-collapse: collapse; }
+
+        .dates-table td { text-align: center; vertical-align: middle; padding: 0 3px; }
+
+        .date-label {
+            font-size: 8px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+        }
+
+        .date-value { font-size: 13px; font-weight: 700; color: #0f172a; margin-top: 1px; }
+        .date-year  { font-size: 9px; color: #64748b; }
+
+        .dates-divider { font-size: 16px; color: #cbd5e1; font-weight: 300; padding: 0 3px; }
+
+        .nights-box { text-align: center; }
+        .nights-num { font-size: 18px; font-weight: 800; color: #0f172a; }
+        .nights-lbl { font-size: 8px; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.07em; }
+
+        /* ── Room highlight ── */
+        .room-block {
+            background: #f8fafc;
+            border-top: 1px solid #f1f5f9;
+            border-bottom: 1px solid #f1f5f9;
+            padding: 8px 16px;
+            text-align: center;
+        }
+
+        .room-number    { font-size: 18px; font-weight: 800; color: #0f172a; }
+        .room-type      { font-size: 10px; color: #475569; margin-top: 1px; }
+        .room-unassigned { font-size: 11px; font-weight: 600; color: #94a3b8; }
+
+        /* ── Detail rows ── */
+        .detail-section { padding: 9px 16px 3px; }
+
+        .section-heading {
+            font-size: 8px;
+            font-weight: 700;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.10em;
+            margin-bottom: 5px;
+        }
+
+        .detail-row { width: 100%; margin-bottom: 3px; }
+
+        .detail-row td.dl {
+            font-size: 10px;
+            color: #64748b;
+            width: 42%;
+            vertical-align: top;
+        }
+
+        .detail-row td.dv {
+            font-size: 10px;
+            font-weight: 600;
+            color: #0f172a;
+            vertical-align: top;
+        }
+
+        /* ── Financial block ── */
+        .finance-block {
+            margin: 3px 16px 0;
+            border: 1px solid #e2e8f0;
+            border-radius: 6px;
             overflow: hidden;
         }
 
-        .header {
-            padding: 18px 24px;
+        .finance-row { width: 100%; border-collapse: collapse; }
+
+        .finance-row td {
+            padding: 5px 10px;
+            font-size: 10px;
+            vertical-align: middle;
+        }
+
+        .finance-row tr + tr td { border-top: 1px solid #f1f5f9; }
+
+        .finance-label { color: #64748b; }
+        .finance-value { text-align: right; font-weight: 600; color: #0f172a; }
+
+        .finance-total-row td {
             background: #0f172a;
             color: #ffffff;
-            display: flex;
-            justify-content: space-between;
-            gap: 16px;
-            align-items: center;
-            flex-wrap: wrap;
-        }
-
-        .title {
-            margin: 0;
-            font-size: 18px;
             font-weight: 700;
+            font-size: 11px;
         }
 
-        .meta {
-            margin: 6px 0 0;
-            font-size: 12px;
-            opacity: 0.85;
-        }
+        .finance-total-row td.finance-value { color: #ffffff; }
 
-        .body {
-            padding: 18px 24px 24px;
-        }
-
-        .section {
-            margin-top: 18px;
-        }
-
-        .section:first-child {
-            margin-top: 0;
-        }
-
-        .section-title {
-            margin: 0 0 8px;
-            font-size: 12px;
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            color: #475569;
-            font-weight: 700;
-        }
-
-        .grid {
-            display: grid;
-            grid-template-columns: repeat(2, minmax(0, 1fr));
-            gap: 8px 16px;
-        }
-
-        .row {
-            font-size: 13px;
+        /* ── Notes ── */
+        .notes-block {
+            margin: 7px 16px 0;
+            padding: 6px 9px;
+            background: #fef9c3;
+            border-radius: 5px;
+            font-size: 10px;
+            color: #713f12;
             line-height: 1.5;
         }
 
-        .label {
-            color: #64748b;
-            margin-right: 6px;
+        /* ── QR block ── */
+        .qr-block { padding: 10px 16px 8px; text-align: center; }
+        .qr-block img { width: 72px; height: 72px; }
+        .qr-hint {
+            font-size: 8px;
+            color: #94a3b8;
+            margin-top: 3px;
+            letter-spacing: 0.06em;
+            text-transform: uppercase;
+            font-weight: 500;
         }
 
-        .value {
-            font-weight: 600;
-            color: #0f172a;
-        }
-
-        .notes {
-            margin-top: 8px;
-            padding: 10px 12px;
-            border-radius: 8px;
-            border: 1px solid #e2e8f0;
+        /* ── Footer ── */
+        .receipt-footer {
             background: #f8fafc;
-            font-size: 13px;
-            white-space: pre-wrap;
-        }
-
-        .footer {
-            margin-top: 20px;
-            padding-top: 14px;
             border-top: 1px dashed #cbd5e1;
-            font-size: 12px;
-            color: #64748b;
+            padding: 8px 16px;
+            text-align: center;
+            font-size: 9px;
+            color: #94a3b8;
         }
 
+        /* ── Print ── */
         @media print {
-            body {
-                background: #ffffff;
-                padding: 0;
-            }
-
-            .ticket {
-                border: 0;
-                border-radius: 0;
-            }
+            @page { size: A4 portrait; margin: 10mm; }
+            body { background: #ffffff; padding: 0; }
+            .receipt { border: 0; border-radius: 0; max-width: 100%; box-shadow: none; page-break-inside: avoid; }
         }
     </style>
 </head>
 <body>
-    <article class="ticket">
-        <header class="header">
-            <div>
-                <h1 class="title">{{ config('app.name') }} Reservation Ticket</h1>
-                <p class="meta">Booking Ref: {{ $reservation->booking_ref }}</p>
+
+<article class="receipt">
+
+    {{-- ── Header ── --}}
+    <header class="receipt-header">
+        <div class="property-name">{{ config('app.name') }}</div>
+        <div class="property-sub">Reservation Ticket</div>
+        <div style="margin-top:10px;">
+            <div class="ref-band">
+                <div class="ref-label">Booking Reference</div>
+                <div class="ref-value">{{ $reservation->booking_ref }}</div>
             </div>
-            <div>
-                <p class="meta">Generated: {{ $generatedAt->format('d M Y H:i') }}</p>
-                <p class="meta">Status: {{ str_replace('_', ' ', strtoupper((string) $reservation->status)) }}</p>
-            </div>
-        </header>
-
-        <div class="body">
-            <section class="section">
-                <h2 class="section-title">Guest Details</h2>
-                <div class="grid">
-                    <div class="row"><span class="label">Name:</span><span class="value">{{ trim(($reservation->guest?->first_name ?? '').' '.($reservation->guest?->last_name ?? '')) ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Phone:</span><span class="value">{{ $reservation->guest?->phone ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Email:</span><span class="value">{{ $reservation->guest?->email ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Nationality:</span><span class="value">{{ $reservation->guest?->nationality ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">ID Type:</span><span class="value">{{ $reservation->guest?->id_type ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">ID Number:</span><span class="value">{{ $reservation->guest?->id_number ?: 'N/A' }}</span></div>
-                </div>
-            </section>
-
-            <section class="section">
-                <h2 class="section-title">Booking Details</h2>
-                <div class="grid">
-                    <div class="row"><span class="label">Check-in:</span><span class="value">{{ $reservation->check_in_date?->format('d M Y') ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Check-out:</span><span class="value">{{ $reservation->check_out_date?->format('d M Y') ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Nights:</span><span class="value">{{ $reservation->total_nights }}</span></div>
-                    <div class="row"><span class="label">Guests:</span><span class="value">{{ $reservation->adults }} adult(s), {{ $reservation->children }} child(ren)</span></div>
-                    <div class="row"><span class="label">Room:</span><span class="value">{{ $reservation->room?->room_number ? 'Room '.$reservation->room->room_number : 'Unassigned' }}</span></div>
-                    <div class="row"><span class="label">Room Type:</span><span class="value">{{ $reservation->roomType?->name ?: $reservation->room?->roomType?->name ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Rate Plan:</span><span class="value">{{ $reservation->ratePlan?->name ?: 'N/A' }}</span></div>
-                    <div class="row"><span class="label">Payment Mode:</span><span class="value">{{ strtoupper((string) $paymentMode) }}</span></div>
-                    <div class="row"><span class="label">Source:</span><span class="value">{{ $reservation->source ?: 'Direct' }}</span></div>
-                    <div class="row"><span class="label">OTA Ref:</span><span class="value">{{ $reservation->ota_ref ?: 'N/A' }}</span></div>
-                </div>
-                @if ($reservation->special_requests)
-                    <div class="notes">{{ $reservation->special_requests }}</div>
-                @endif
-            </section>
-
-            <section class="section">
-                <h2 class="section-title">Financial Summary</h2>
-                <div class="grid">
-                    <div class="row"><span class="label">Daily Rate:</span><span class="value">@money($reservation->daily_rate)</span></div>
-                    <div class="row"><span class="label">Total Stay Amount:</span><span class="value">@money($reservation->total_amount)</span></div>
-                    <div class="row"><span class="label">Deposit:</span><span class="value">@money($reservation->deposit_amount ?? 0)</span></div>
-                    @if ($reservation->status === 'cancelled')
-                        <div class="row"><span class="label">Cancellation Charge:</span><span class="value">@money($reservation->cancellation_charge_amount ?? 0)</span></div>
-                        <div class="row"><span class="label">Refund Amount:</span><span class="value">@money($reservation->cancellation_refund_amount ?? 0)</span></div>
-                    @endif
-                </div>
-            </section>
-
-            <footer class="footer">
-                Keep this ticket for check-in and any booking support.
-            </footer>
         </div>
-    </article>
+    </header>
+
+    {{-- ── Status ── --}}
+    <div class="status-row">
+        <span class="status-pill status-{{ $reservation->status }}">
+            {{ str_replace('_', ' ', $reservation->status) }}
+        </span>
+    </div>
+
+    <hr class="tear">
+
+    {{-- ── Dates ── --}}
+    <div class="dates-row">
+        <table class="dates-table">
+            <tr>
+                <td>
+                    <div class="date-label">Check-in</div>
+                    <div class="date-value">{{ $reservation->check_in_date->format('d M') }}</div>
+                    <div class="date-year">{{ $reservation->check_in_date->format('Y') }}</div>
+                </td>
+                <td class="dates-divider">&rarr;</td>
+                <td>
+                    <div class="date-label">Check-out</div>
+                    <div class="date-value">{{ $reservation->check_out_date->format('d M') }}</div>
+                    <div class="date-year">{{ $reservation->check_out_date->format('Y') }}</div>
+                </td>
+                <td style="width:1px; background:#e2e8f0; padding:0;"></td>
+                <td class="nights-box">
+                    <div class="nights-num">{{ $reservation->total_nights }}</div>
+                    <div class="nights-lbl">Night{{ $reservation->total_nights !== 1 ? 's' : '' }}</div>
+                </td>
+            </tr>
+        </table>
+    </div>
+
+    {{-- ── Room ── --}}
+    <div class="room-block">
+        @if ($reservation->room?->room_number)
+            <div class="room-number">Room {{ $reservation->room->room_number }}</div>
+            <div class="room-type">{{ $reservation->roomType?->name ?? $reservation->room?->roomType?->name ?? '' }}</div>
+        @else
+            <div class="room-unassigned">Room TBA</div>
+            <div class="room-type">{{ $reservation->roomType?->name ?? '' }}</div>
+        @endif
+    </div>
+
+    {{-- ── Guest ── --}}
+    <div class="detail-section">
+        <div class="section-heading">Guest</div>
+        <table class="detail-row">
+            <tr>
+                <td class="dl">Name</td>
+                <td class="dv">{{ trim(($reservation->guest?->first_name ?? '').' '.($reservation->guest?->last_name ?? '')) ?: 'N/A' }}</td>
+            </tr>
+            <tr>
+                <td class="dl">Phone</td>
+                <td class="dv">{{ $reservation->guest?->phone ?: 'N/A' }}</td>
+            </tr>
+            @if ($reservation->guest?->email)
+            <tr>
+                <td class="dl">Email</td>
+                <td class="dv">{{ $reservation->guest->email }}</td>
+            </tr>
+            @endif
+            @if ($reservation->guest?->nationality)
+            <tr>
+                <td class="dl">Nationality</td>
+                <td class="dv">{{ $reservation->guest->nationality }}</td>
+            </tr>
+            @endif
+            @if ($reservation->guest?->id_number)
+            <tr>
+                <td class="dl">{{ $reservation->guest?->id_type ?: 'ID' }}</td>
+                <td class="dv">{{ $reservation->guest->id_number }}</td>
+            </tr>
+            @endif
+            <tr>
+                <td class="dl">Guests</td>
+                <td class="dv">{{ $reservation->adults }} adult{{ $reservation->adults !== 1 ? 's' : '' }}{{ $reservation->children ? ', '.$reservation->children.' child'.($reservation->children !== 1 ? 'ren' : '') : '' }}</td>
+            </tr>
+        </table>
+    </div>
+
+    {{-- ── Booking meta ── --}}
+    <div class="detail-section" style="padding-top:6px;">
+        <div class="section-heading">Booking</div>
+        <table class="detail-row">
+            <tr>
+                <td class="dl">Rate plan</td>
+                <td class="dv">{{ $reservation->ratePlan?->name ?: 'Standard' }}</td>
+            </tr>
+            <tr>
+                <td class="dl">Payment mode</td>
+                <td class="dv">{{ strtoupper((string) $paymentMode) }}</td>
+            </tr>
+            @if ($reservation->source)
+            <tr>
+                <td class="dl">Source</td>
+                <td class="dv">{{ $reservation->source }}</td>
+            </tr>
+            @endif
+            @if ($reservation->ota_ref)
+            <tr>
+                <td class="dl">OTA Ref</td>
+                <td class="dv">{{ $reservation->ota_ref }}</td>
+            </tr>
+            @endif
+        </table>
+    </div>
+
+    {{-- ── Financials ── --}}
+    <div class="detail-section" style="padding-bottom:10px;">
+        <div class="section-heading" style="margin-bottom:5px;">Financials</div>
+        <div class="finance-block">
+            <table class="finance-row" style="width:100%; border-collapse:collapse;">
+                <tr>
+                    <td class="finance-label">Daily rate</td>
+                    <td class="finance-value">@money($reservation->daily_rate)</td>
+                </tr>
+                <tr>
+                    <td class="finance-label">{{ $reservation->total_nights }} night{{ $reservation->total_nights !== 1 ? 's' : '' }}</td>
+                    <td class="finance-value">@money($reservation->total_amount)</td>
+                </tr>
+                @if ($reservation->deposit_amount > 0)
+                <tr>
+                    <td class="finance-label">Deposit</td>
+                    <td class="finance-value">@money($reservation->deposit_amount)</td>
+                </tr>
+                @endif
+                @if ($reservation->status === 'cancelled')
+                <tr>
+                    <td class="finance-label">Cancellation charge</td>
+                    <td class="finance-value">@money($reservation->cancellation_charge_amount ?? 0)</td>
+                </tr>
+                <tr>
+                    <td class="finance-label">Refund</td>
+                    <td class="finance-value">@money($reservation->cancellation_refund_amount ?? 0)</td>
+                </tr>
+                @endif
+                <tr class="finance-total-row">
+                    <td class="finance-label">Total stay</td>
+                    <td class="finance-value">@money($reservation->total_amount)</td>
+                </tr>
+            </table>
+        </div>
+    </div>
+
+    {{-- ── Special requests ── --}}
+    @if ($reservation->special_requests)
+        <div class="notes-block">
+            <strong>Special requests:</strong> {{ $reservation->special_requests }}
+        </div>
+        <div style="height:7px;"></div>
+    @endif
+
+    <hr class="tear">
+
+    {{-- ── QR code ── --}}
+    <div class="qr-block">
+        <img src="data:image/svg+xml;base64,{{ $qrSvgB64 }}"
+             width="72" height="72" alt="QR: {{ $reservation->booking_ref }}">
+        <div class="qr-hint">{{ $reservation->booking_ref }}</div>
+    </div>
+
+    {{-- ── Footer ── --}}
+    <footer class="receipt-footer">
+        Generated {{ $generatedAt->format('d M Y, H:i') }} &nbsp;&middot;&nbsp;
+        Keep this ticket for check-in and booking support.
+    </footer>
+
+</article>
+
 </body>
 </html>

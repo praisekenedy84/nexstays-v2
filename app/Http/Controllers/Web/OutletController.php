@@ -9,15 +9,24 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreOutletRequest;
 use App\Http\Requests\Web\UpdateOutletRequest;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class OutletController extends Controller
 {
-    public function index(): View
+    public function index(Request $request): View
     {
-        $outlets = Outlet::query()->orderBy('name')->paginate(20);
+        $sort   = in_array($request->query('sort'), ['name', 'type']) ? $request->query('sort') : 'name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
 
-        return view('modules.outlets.index', compact('outlets'));
+        $outlets = Outlet::query()
+            ->when($search, fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
+            ->paginate(20)
+            ->withQueryString();
+
+        return view('modules.outlets.index', compact('outlets', 'sort', 'dir', 'search'));
     }
 
     public function create(): View

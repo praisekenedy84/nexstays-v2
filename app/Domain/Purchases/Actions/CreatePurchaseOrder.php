@@ -17,7 +17,7 @@ class CreatePurchaseOrder
     ) {}
 
     /**
-     * @param  array{department: string, supplier_name: string, outlet_id?: string|null, notes?: string|null, lines: list<array{stock_item_id: string, quantity: float|int|string, unit_cost: float|int|string}>}  $data
+     * @param  array{department: string, supplier_name: string, supplier_reference?: string|null, outlet_id?: string|null, delivery_date_expected?: string|null, payment_terms?: string|null, notes?: string|null, lines: list<array{stock_item_id: string, quantity: float|int|string, unit_cost: float|int|string, line_notes?: string|null}>}  $data
      */
     public function execute(array $data, bool $receiveImmediately = false): PurchaseOrder
     {
@@ -30,26 +30,30 @@ class CreatePurchaseOrder
             }
 
             $purchaseOrder = PurchaseOrder::query()->create([
-                'po_number' => $this->numberGenerator->generate(),
-                'outlet_id' => $data['outlet_id'] ?? null,
-                'department' => $data['department'],
-                'supplier_name' => $data['supplier_name'],
-                'status' => $receiveImmediately ? 'ordered' : 'draft',
-                'total_amount' => $total,
-                'currency' => $currency,
-                'ordered_at' => $receiveImmediately ? now() : null,
-                'notes' => $data['notes'] ?? null,
-                'created_by' => Auth::id(),
+                'po_number'                => $this->numberGenerator->generate(),
+                'outlet_id'                => $data['outlet_id'] ?? null,
+                'department'               => $data['department'],
+                'supplier_name'            => $data['supplier_name'],
+                'supplier_reference'       => $data['supplier_reference'] ?? null,
+                'status'                   => $receiveImmediately ? 'ordered' : 'draft',
+                'total_amount'             => $total,
+                'currency'                 => $currency,
+                'ordered_at'               => $receiveImmediately ? now() : null,
+                'delivery_date_expected'   => $data['delivery_date_expected'] ?? null,
+                'payment_terms'            => $data['payment_terms'] ?? null,
+                'notes'                    => $data['notes'] ?? null,
+                'created_by'               => Auth::id(),
             ]);
 
             foreach ($data['lines'] as $line) {
                 $lineTotal = (float) $line['quantity'] * (float) $line['unit_cost'];
                 PurchaseOrderLine::query()->create([
                     'purchase_order_id' => $purchaseOrder->id,
-                    'stock_item_id' => $line['stock_item_id'],
-                    'quantity' => $line['quantity'],
-                    'unit_cost' => $line['unit_cost'],
-                    'line_total' => $lineTotal,
+                    'stock_item_id'     => $line['stock_item_id'],
+                    'quantity'          => $line['quantity'],
+                    'unit_cost'         => $line['unit_cost'],
+                    'line_total'        => $lineTotal,
+                    'line_notes'        => $line['line_notes'] ?? null,
                 ]);
             }
 

@@ -1,10 +1,22 @@
 <x-layouts.app active-nav="menu-categories" title="Menu categories">
-    @can('manage-menu')<div class="mb-4 flex justify-end"><a href="{{ route('tenant.menu-categories.create') }}" class="btn-primary">Add category</a></div>@endcan
+    <div class="mb-4 flex flex-wrap items-center justify-between gap-4">
+        <x-ui.search-bar :value="$search" placeholder="Category name…" />
+        @can('manage-menu')
+            <a href="{{ route('tenant.menu-categories.create') }}" class="btn-primary">Add category</a>
+        @endcan
+    </div>
     <div class="card overflow-hidden">
         <table class="w-full text-sm">
-            <thead class="bg-slate-50 text-xs uppercase text-ink-muted"><tr><th class="px-5 py-3">Name</th><th class="px-5 py-3">Outlet</th><th class="px-5 py-3">Order</th><th></th></tr></thead>
+            <thead class="bg-slate-50 text-xs uppercase text-ink-muted">
+                <tr>
+                    <x-ui.sort-th column="name" label="Name" :sort="$sort" :dir="$dir" />
+                    <th class="px-5 py-3 text-left">Outlet</th>
+                    <x-ui.sort-th column="display_order" label="Order" :sort="$sort" :dir="$dir" />
+                    <th></th>
+                </tr>
+            </thead>
             <tbody class="divide-y divide-slate-100">
-                @foreach ($categories as $cat)
+                @forelse ($categories as $cat)
                     <tr>
                         <td class="px-5 py-4 font-medium">{{ $cat->name }}</td>
                         <td class="px-5 py-4 text-ink-muted">{{ $cat->outlet?->name }}</td>
@@ -16,8 +28,11 @@
                             @endcan
                         </td>
                     </tr>
-                @endforeach
+                @empty
+                    <tr><td colspan="4" class="px-5 py-12 text-center text-ink-muted">No categories found.</td></tr>
+                @endforelse
             </tbody>
         </table>
+        <div class="border-t px-5 py-3">{{ $categories->links() }}</div>
     </div>
 </x-layouts.app>

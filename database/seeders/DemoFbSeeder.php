@@ -46,7 +46,7 @@ class DemoFbSeeder extends Seeder
             ['display_order' => 1]
         );
 
-        $grilledFish = MenuItem::query()->updateOrCreate(
+        $grilledFish = MenuItem::withTrashed()->updateOrCreate(
             ['category_id' => $mains->id, 'name' => 'Grilled Red Snapper'],
             [
                 'description' => 'Catch of the day with ugali',
@@ -56,26 +56,38 @@ class DemoFbSeeder extends Seeder
                 'is_available' => true,
             ]
         );
+        if ($grilledFish->trashed()) {
+            $grilledFish->restore();
+        }
 
-        MenuItem::query()->updateOrCreate(
+        $chickenPilau = MenuItem::withTrashed()->updateOrCreate(
             ['category_id' => $mains->id, 'name' => 'Chicken Pilau'],
             ['price' => '28000.00', 'is_available' => true]
         );
+        if ($chickenPilau->trashed()) {
+            $chickenPilau->restore();
+        }
 
         $barCat = MenuCategory::query()->updateOrCreate(
             ['outlet_id' => $bar->id, 'name' => 'Cocktails'],
             ['display_order' => 1]
         );
 
-        MenuItem::query()->updateOrCreate(
+        $dawa = MenuItem::withTrashed()->updateOrCreate(
             ['category_id' => $barCat->id, 'name' => 'Dawa'],
             ['price' => '12000.00', 'is_available' => true]
         );
+        if ($dawa->trashed()) {
+            $dawa->restore();
+        }
 
-        MenuItem::query()->updateOrCreate(
+        $kili = MenuItem::withTrashed()->updateOrCreate(
             ['category_id' => $barCat->id, 'name' => 'Kilimanjaro Lager'],
             ['price' => '8000.00', 'is_available' => true]
         );
+        if ($kili->trashed()) {
+            $kili->restore();
+        }
 
         $gin = StockItem::query()->updateOrCreate(
             ['name' => 'Gin (750ml)'],
@@ -89,13 +101,10 @@ class DemoFbSeeder extends Seeder
             ]
         );
 
-        $dawa = MenuItem::query()->where('name', 'Dawa')->first();
-        if ($dawa) {
-            RecipeIngredient::query()->updateOrCreate(
-                ['menu_item_id' => $dawa->id, 'stock_item_id' => $gin->id],
-                ['quantity' => 45, 'unit' => 'ml']
-            );
-        }
+        RecipeIngredient::query()->updateOrCreate(
+            ['menu_item_id' => $dawa->id, 'stock_item_id' => $gin->id],
+            ['quantity' => 45, 'unit' => 'ml']
+        );
 
         $waiter = User::query()->where('email', config('nexstay.demo.front_desk_email'))->first();
 
@@ -135,6 +144,6 @@ class DemoFbSeeder extends Seeder
             ]
         );
 
-        unset($lounge, $grilledFish);
+        unset($lounge, $grilledFish, $chickenPilau, $kili);
     }
 }

@@ -9,23 +9,44 @@ use App\Domain\Shared\Models\Outlet;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreStockItemRequest;
 use App\Http\Requests\Web\UpdateStockItemRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class StockItemController extends Controller
 {
-    public function index(): View
+    public function json(Request $request): JsonResponse
     {
+        $q = trim((string) $request->query('q', ''));
+
+        $items = StockItem::query()
+            ->when($q, fn ($query) => $query->where('name', 'ilike', "%{$q}%"))
+            ->orderBy('name')
+            ->limit(30)
+            ->get(['id', 'name', 'unit']);
+
+        return response()->json($items);
+    }
+
+    public function index(Request $request): View
+    {
+        $sort   = in_array($request->query('sort'), ['name', 'category', 'current_stock', 'reorder_level']) ? $request->query('sort') : 'name';
+        $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
+        $search = trim((string) $request->query('search', ''));
+
         $items = StockItem::query()
             ->with('outlet')
-            ->orderBy('name')
-            ->paginate(30);
+            ->when($search, fn ($q) => $q->where('name', 'ilike', "%{$search}%"))
+            ->orderBy($sort, $dir)
+            ->paginate(30)
+            ->withQueryString();
 
         $lowStock = StockItem::query()
             ->whereColumn('current_stock', '<=', 'reorder_level')
             ->count();
 
-        return view('modules.inventory.index', compact('items', 'lowStock'));
+        return view('modules.inventory.index', compact('items', 'lowStock', 'sort', 'dir', 'search'));
     }
 
     public function create(): View
