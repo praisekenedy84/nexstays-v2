@@ -16,6 +16,21 @@ jobs:
   tests:
     runs-on: ubuntu-latest
 
+    services:
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_USER: nexstay
+          POSTGRES_PASSWORD: nexstay
+          POSTGRES_DB: nexstay
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+        ports:
+          - 5432:5432
+
     strategy:
       fail-fast: true
       matrix:
@@ -31,7 +46,7 @@ jobs:
         uses: shivammathur/setup-php@v2
         with:
           php-version: ${{ matrix.php }}
-          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite
+          extensions: dom, curl, libxml, mbstring, zip, pcntl, pdo, sqlite, pdo_sqlite, pdo_pgsql
           coverage: none
 
       - name: Install Composer dependencies
@@ -42,6 +57,9 @@ jobs:
 
       - name: Generate app key
         run: php artisan key:generate
+
+      - name: Run database migrations
+        run: php artisan migrate
 
       - name: Execute tests
         run: vendor/bin/phpunit
