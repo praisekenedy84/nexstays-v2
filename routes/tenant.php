@@ -11,6 +11,7 @@ use App\Http\Controllers\Api\V1\MenuItemController as ApiMenuItemController;
 use App\Http\Controllers\Api\V1\StockItemController as ApiStockItemController;
 use App\Http\Controllers\Api\V1\TillController as ApiTillController;
 use App\Http\Controllers\Api\V1\HBMS\FolioController;
+use App\Http\Controllers\Web\FolioController as WebFolioController;
 use App\Http\Controllers\Api\V1\HBMS\GuestController as ApiGuestController;
 use App\Http\Controllers\Api\V1\HBMS\ReservationController as ApiReservationController;
 use App\Http\Controllers\Api\V1\HBMS\RoomController as ApiRoomController;
@@ -105,6 +106,15 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::post('/reservations/{reservation}/check-out', [ReservationController::class, 'checkOut'])
                 ->middleware('permission:check-out-guests')
                 ->name('reservations.check-out');
+            Route::post('/folios/{folio}/payments', [WebFolioController::class, 'postPayment'])
+                ->middleware('permission:post-folio-charges')
+                ->name('folios.payments.store');
+            Route::post('/reservations/{reservation}/overstay/charge', [ReservationController::class, 'postOverstayCharge'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.overstay.charge');
+            Route::post('/reservations/{reservation}/overstay/settle', [ReservationController::class, 'settleOverstay'])
+                ->middleware('permission:post-folio-charges')
+                ->name('reservations.overstay.settle');
             Route::post('/reservations/{reservation}/no-show', [ReservationController::class, 'noShow'])
                 ->middleware('permission:manage-reservations')
                 ->name('reservations.no-show');
@@ -277,6 +287,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::middleware('permission:post-folio-charges')->group(function () {
                 Route::get('/ancillary-services/charge', [AncillaryServiceController::class, 'chargeForm'])->name('ancillary-services.charge');
                 Route::post('/ancillary-services/charge', [AncillaryServiceController::class, 'charge'])->name('ancillary-services.charge.store');
+                Route::post('/folios/{folio}/write-off', [WebFolioController::class, 'writeOff'])->name('folios.write-off');
             });
         });
 
@@ -459,6 +470,8 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                     ->name('folios.transactions.store');
                 Route::post('/folios/{folio}/payments', [FolioController::class, 'postPayment'])
                     ->name('folios.payments.store');
+                Route::post('/folios/{folio}/write-off', [FolioController::class, 'writeOff'])
+                    ->name('folios.write-off');
             });
 
             Route::middleware('permission:view-outlets')->group(function () {
@@ -544,6 +557,16 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                 Route::middleware('permission:check-out-guests')->group(function () {
                     Route::post('/{reservation}/check-out', [ApiReservationController::class, 'checkOut'])
                         ->name('check-out');
+                });
+
+                Route::middleware('permission:manage-reservations')->group(function () {
+                    Route::post('/{reservation}/overstay/charge', [ApiReservationController::class, 'postOverstayCharge'])
+                        ->name('overstay.charge');
+                });
+
+                Route::middleware('permission:post-folio-charges')->group(function () {
+                    Route::post('/{reservation}/overstay/settle', [ApiReservationController::class, 'settleOverstay'])
+                        ->name('overstay.settle');
                 });
             });
         });

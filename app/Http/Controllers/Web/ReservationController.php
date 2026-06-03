@@ -8,18 +8,23 @@ use App\Domain\HBMS\Actions\CancelReservation;
 use App\Domain\HBMS\Actions\CheckInGuest;
 use App\Domain\HBMS\Actions\CheckOutGuest;
 use App\Domain\HBMS\Actions\CreateReservation;
+use App\Domain\HBMS\Actions\PostOverstayCharge;
+use App\Domain\HBMS\Actions\SettleOverstay;
 use App\Domain\HBMS\Actions\UpdateReservation;
 use App\Domain\HBMS\Models\Guest;
 use App\Domain\HBMS\Models\RatePlan;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
 use App\Domain\HBMS\Services\ReservationSettingsService;
+use App\Domain\Shared\Services\FolioService;
+use App\Domain\Shared\Services\PaymentMethodSettingsService;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\HBMS\CreateReservationRequest;
 use Barryvdh\DomPDF\Facade\Pdf;
 use chillerlan\QRCode\QRCode;
 use chillerlan\QRCode\QROptions;
-use App\Http\Requests\Api\V1\HBMS\UpdateReservationRequest;
+use App\Http\Requests\Web\PostOverstayChargeRequest;
+use App\Http\Requests\Web\SettleOverstayRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -129,13 +134,31 @@ class ReservationController extends Controller
 
     public function show(Reservation $reservation): View
     {
-        $reservation->load(['guest', 'room', 'roomType', 'ratePlan', 'folio.transactions']);
+        $reservation->load([
+            'guest',
+            'room',
+            'roomType',
+            'ratePlan',
+            'overstayChargeTransaction',
+            'overstaySettlementTransaction',
+            'overstaySettlementPayment',
+            'overstaySettledBy',
+            'folio.transactions' => fn ($q) => $q->orderByDesc('posted_at'),
+        ]);
 
-        $folioBalance = $reservation->folio
-            ? app(\App\Domain\Shared\Services\FolioService::class)->balance($reservation->folio)
-            : null;
+        $folioService    = app(FolioService::class);
+        $folioBalance    = $reservation->folio ? $folioService->balance($reservation->folio) : null;
+        $enabledMethods  = app(PaymentMethodSettingsService::class)->enabledMethods();
+        $paymentMethods  = PaymentMethodSettingsService::METHODS;
+        $overstayIncrease = $reservation->overstayIncrease();
 
-        return view('hbms.reservations.show', compact('reservation', 'folioBalance'));
+        return view('hbms.reservations.show', compact(
+            'reservation',
+            'folioBalance',
+            'enabledMethods',
+            'paymentMethods',
+            'overstayIncrease',
+        ));
     }
 
     public function ticket(Reservation $reservation): Response
@@ -241,6 +264,50 @@ class ReservationController extends Controller
         return redirect()
             ->route('tenant.reservations.show', $reservation)
             ->with('success', "Guest checked out — {$reservation->booking_ref}.");
+    }
+
+    public function postOverstayCharge(PostOverstayChargeRequest $request, Reservation $reservation): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        try {
+            app(PostOverstayCharge::class)->execute(
+                $reservation,
+                $validated['notes'] ?? null,
+                isset($validated['rate_override']) ? (float) $validated['rate_override'] : null,
+            );
+        } catch (\DomainException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()
+            ->route('tenant.reservations.show', $reservation)
+            ->with('success', 'Overstay charge posted to folio. Collect payment or waive to complete settlement.');
+    }
+
+    public function settleOverstay(SettleOverstayRequest $request, Reservation $reservation): RedirectResponse
+    {
+        $validated = $request->validated();
+
+        try {
+            app(SettleOverstay::class)->execute(
+                reservation: $reservation,
+                settlement: $validated['settlement'],
+                method: $validated['method'] ?? null,
+                waiverReason: $validated['waiver_reason'] ?? null,
+                notes: $validated['notes'] ?? null,
+            );
+        } catch (\DomainException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        $label = $validated['settlement'] === 'paid'
+            ? 'Overstay charge paid and settled.'
+            : 'Overstay charge waived.';
+
+        return redirect()
+            ->route('tenant.reservations.show', $reservation)
+            ->with('success', $label);
     }
 
     public function noShow(Reservation $reservation): RedirectResponse

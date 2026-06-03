@@ -36,18 +36,18 @@
 
                 <div>
                     <label class="mb-1.5 block text-xs font-medium text-ink-muted">Current password <span class="text-red-500">*</span></label>
-                    <input type="password" name="current_password" required autocomplete="current-password" class="input-field max-w-sm">
+                    <x-ui.password-input name="current_password" required autocomplete="current-password" class="input-field max-w-sm" />
                     @error('current_password')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
                         <label class="mb-1.5 block text-xs font-medium text-ink-muted">New password</label>
-                        <input type="password" name="password" autocomplete="new-password" placeholder="Leave blank to keep current" class="input-field">
+                        <x-ui.password-input name="password" autocomplete="new-password" placeholder="Leave blank to keep current" class="input-field" />
                         @error('password')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
                         <label class="mb-1.5 block text-xs font-medium text-ink-muted">Confirm new password</label>
-                        <input type="password" name="password_confirmation" autocomplete="new-password" class="input-field">
+                        <x-ui.password-input name="password_confirmation" autocomplete="new-password" class="input-field" />
                     </div>
                 </div>
 

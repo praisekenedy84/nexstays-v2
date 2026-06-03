@@ -8,6 +8,8 @@ use App\Domain\HBMS\Actions\CancelReservation;
 use App\Domain\HBMS\Actions\CheckInGuest;
 use App\Domain\HBMS\Actions\CheckOutGuest;
 use App\Domain\HBMS\Actions\CreateReservation;
+use App\Domain\HBMS\Actions\PostOverstayCharge;
+use App\Domain\HBMS\Actions\SettleOverstay;
 use App\Domain\HBMS\Actions\UpdateReservation;
 use App\Domain\HBMS\Models\Reservation;
 use App\Http\Controllers\Controller;
@@ -109,6 +111,52 @@ class ReservationController extends Controller
     public function checkOut(CheckOutReservationRequest $request, Reservation $reservation): JsonResponse
     {
         $reservation = app(CheckOutGuest::class)->execute($reservation);
+
+        return $this->respond(ReservationResource::make($reservation));
+    }
+
+    public function postOverstayCharge(Request $request, Reservation $reservation): JsonResponse
+    {
+        abort_unless($request->user()?->can('manage-reservations'), 403);
+
+        $validated = $request->validate([
+            'rate_override' => ['nullable', 'numeric', 'min:0'],
+            'notes'         => ['nullable', 'string', 'max:500'],
+        ]);
+
+        app(PostOverstayCharge::class)->execute(
+            $reservation,
+            $validated['notes'] ?? null,
+            isset($validated['rate_override']) ? (float) $validated['rate_override'] : null,
+        );
+
+        $reservation->refresh()->load(self::DEFAULT_INCLUDES);
+
+        return $this->respond(ReservationResource::make($reservation));
+    }
+
+    public function settleOverstay(Request $request, Reservation $reservation): JsonResponse
+    {
+        abort_unless($request->user()?->can('post-folio-charges'), 403);
+
+        $enabled = app(\App\Domain\Shared\Services\PaymentMethodSettingsService::class)->enabledMethods();
+
+        $validated = $request->validate([
+            'settlement'    => ['required', 'string', 'in:paid,waived'],
+            'method'        => ['required_if:settlement,paid', 'nullable', 'string', 'in:'.implode(',', $enabled !== [] ? $enabled : ['__none__'])],
+            'waiver_reason' => ['required_if:settlement,waived', 'nullable', 'string', 'max:500'],
+            'notes'         => ['nullable', 'string', 'max:500'],
+        ]);
+
+        app(SettleOverstay::class)->execute(
+            reservation: $reservation,
+            settlement: $validated['settlement'],
+            method: $validated['method'] ?? null,
+            waiverReason: $validated['waiver_reason'] ?? null,
+            notes: $validated['notes'] ?? null,
+        );
+
+        $reservation->refresh()->load(self::DEFAULT_INCLUDES);
 
         return $this->respond(ReservationResource::make($reservation));
     }

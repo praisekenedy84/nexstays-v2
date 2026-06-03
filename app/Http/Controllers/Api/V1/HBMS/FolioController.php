@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Concerns\RespondsWithJsonApi;
 use App\Http\Requests\Api\V1\HBMS\PostFolioChargeRequest;
 use App\Http\Requests\Api\V1\HBMS\PostFolioPaymentRequest;
+use App\Http\Requests\Api\V1\HBMS\PostFolioWriteOffRequest;
 use App\Http\Resources\Api\V1\FolioResource;
 use App\Http\Resources\Api\V1\FolioTransactionResource;
 use Brick\Money\Money;
@@ -49,12 +50,45 @@ class FolioController extends Controller
 
     public function postPayment(PostFolioPaymentRequest $request, Folio $folio): JsonResponse
     {
+        $folio->loadMissing('reservation');
+
+        throw_if(
+            $folio->reservation?->hasPendingOverstay(),
+            \DomainException::class,
+            'Settle the pending overstay charge (pay or waive) before recording other folio payments.'
+        );
+
         $result = app(FolioService::class)->postPayment(
             folio: $folio,
             amount: Money::of($request->validated('amount'), $folio->currency),
             method: $request->validated('method'),
             tillSessionId: $request->validated('till_session_id'),
             notes: $request->validated('notes'),
+        );
+
+        return $this->respond(FolioTransactionResource::make($result['transaction']), 201, [
+            'payment_id' => $result['payment']->id,
+        ]);
+    }
+
+    public function writeOff(PostFolioWriteOffRequest $request, Folio $folio): JsonResponse
+    {
+        $folio->loadMissing('reservation');
+
+        throw_if(
+            $folio->reservation?->hasPendingOverstay(),
+            \DomainException::class,
+            'Settle the pending overstay charge (pay or waive) before writing off other folio balances.'
+        );
+
+        $amount = $request->validated('amount')
+            ? Money::of($request->validated('amount'), $folio->currency)
+            : null;
+
+        $result = app(FolioService::class)->postWriteOff(
+            folio: $folio,
+            reason: $request->validated('reason'),
+            amount: $amount,
         );
 
         return $this->respond(FolioTransactionResource::make($result['transaction']), 201, [

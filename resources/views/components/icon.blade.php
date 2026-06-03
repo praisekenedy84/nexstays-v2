@@ -32,6 +32,7 @@
         'clipboard' => 'clipboard',
         'alert' => 'alert-triangle',
         'eye' => 'eye',
+        'eye-off' => 'eye-off',
         'pencil' => 'pencil',
         'x-circle' => 'x-circle',
         'trash' => 'trash-2',

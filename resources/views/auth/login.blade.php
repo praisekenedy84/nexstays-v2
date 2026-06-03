@@ -6,7 +6,7 @@
     <title>Sign in — NexStay</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="flex min-h-screen items-center justify-center bg-surface px-4">
     <div class="card w-full max-w-md p-8">
@@ -41,7 +41,7 @@
             </div>
             <div>
                 <label for="password" class="mb-1.5 block text-xs font-medium text-ink-muted">Password</label>
-                <input id="password" type="password" name="password" required class="input-field">
+                <x-ui.password-input id="password" name="password" required class="input-field" />
             </div>
             <label class="flex items-center gap-2 text-sm text-ink-muted">
                 <input type="checkbox" name="remember" value="1" class="rounded border-slate-300 text-primary focus:ring-primary/30">

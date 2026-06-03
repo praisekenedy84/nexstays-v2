@@ -30,6 +30,24 @@ document.querySelectorAll('[data-stepper]').forEach((stepper) => {
     });
 });
 
+document.querySelectorAll('[data-password-field]').forEach((wrapper) => {
+    const input = wrapper.querySelector('input');
+    const btn = wrapper.querySelector('[data-password-toggle]');
+    if (!input || !btn) return;
+
+    const iconShow = btn.querySelector('[data-lucide="eye"]');
+    const iconHide = btn.querySelector('[data-lucide="eye-off"]');
+
+    btn.addEventListener('click', () => {
+        const reveal = input.type === 'password';
+        input.type = reveal ? 'text' : 'password';
+        btn.setAttribute('aria-pressed', reveal ? 'true' : 'false');
+        btn.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+        iconShow?.classList.toggle('hidden', reveal);
+        iconHide?.classList.toggle('hidden', !reveal);
+    });
+});
+
 document.querySelectorAll('[data-filter-tabs]').forEach((group) => {
     group.querySelectorAll('[data-filter-tab]').forEach((tab) => {
         tab.addEventListener('click', () => {

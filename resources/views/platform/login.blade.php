@@ -6,7 +6,7 @@
     <title>Platform Admin — NexStay</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
-    @vite(['resources/css/app.css'])
+    @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="flex min-h-screen items-center justify-center bg-slate-900 px-4">
     <div class="w-full max-w-sm">
@@ -33,8 +33,13 @@
             </div>
             <div>
                 <label for="password" class="mb-1.5 block text-xs font-medium text-slate-400">Password</label>
-                <input id="password" type="password" name="password" required
-                    class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                <x-ui.password-input
+                    id="password"
+                    name="password"
+                    required
+                    toggle-class="text-slate-400 hover:text-slate-200 focus-visible:ring-indigo-500/30"
+                    class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
+                />
             </div>
             <label class="flex items-center gap-2 text-sm text-slate-400">
                 <input type="checkbox" name="remember" value="1" class="rounded border-white/20 bg-white/5 text-indigo-500">

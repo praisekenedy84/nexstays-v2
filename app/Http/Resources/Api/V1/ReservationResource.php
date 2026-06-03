@@ -43,6 +43,16 @@ class ReservationResource extends JsonResource
                 'room_id' => $this->room_id,
                 'room_type_id' => $this->room_type_id,
                 'rate_plan_id' => $this->rate_plan_id,
+                'overstay' => $this->overstayIncrease() !== null ? array_merge($this->overstayIncrease(), [
+                    'waiver_reason' => $this->overstay_waiver_reason,
+                    'settled_at'    => $this->overstay_settled_at?->toIso8601String(),
+                    'settled_by'    => $this->whenLoaded('overstaySettledBy', fn () => $this->overstaySettledBy?->name),
+                    'payment'       => $this->whenLoaded('overstaySettlementPayment', fn () => $this->overstaySettlementPayment ? [
+                        'amount' => $this->overstaySettlementPayment->amount,
+                        'method' => $this->overstaySettlementPayment->method,
+                        'notes'  => $this->overstaySettlementPayment->notes,
+                    ] : null),
+                ]) : null,
                 'created_at' => $this->created_at?->toIso8601String(),
                 'updated_at' => $this->updated_at?->toIso8601String(),
             ],

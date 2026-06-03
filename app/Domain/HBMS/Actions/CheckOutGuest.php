@@ -34,6 +34,23 @@ class CheckOutGuest
                 'No folio exists for this reservation.'
             );
 
+            $checkOutDate = $reservation->check_out_date?->startOfDay();
+            $today        = now()->startOfDay();
+
+            if ($reservation->isOverstay() && $reservation->overstay_settlement === null) {
+                $nights     = (int) $checkOutDate->diffInDays($today);
+                $nightLabel = $nights === 1 ? 'night' : 'nights';
+                throw new DomainException(
+                    "Guest overstayed by {$nights} {$nightLabel}. Post the overstay charge to the folio first."
+                );
+            }
+
+            if ($reservation->hasPendingOverstay()) {
+                throw new DomainException(
+                    'Overstay charge is on the folio but not yet settled. Collect payment or waive with a reason before check-out.'
+                );
+            }
+
             $balance = $this->folioService->balance($folio);
 
             throw_if(

@@ -2,6 +2,7 @@
 
 namespace Tests;
 
+use App\Http\Middleware\InitializeTenancyBySession;
 use App\Models\User;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -32,6 +33,18 @@ abstract class TenantTestCase extends TestCase
         $this->user = User::factory()->create();
         $this->user->assignRole('general_manager');
         Sanctum::actingAs($this->user);
+    }
+
+    /**
+     * Disable tenancy middleware so web routes do not redirect to login in tests.
+     */
+    protected function web(): static
+    {
+        return $this->withoutMiddleware([
+            InitializeTenancyBySubdomain::class,
+            PreventAccessFromCentralDomains::class,
+            InitializeTenancyBySession::class,
+        ]);
     }
 
     /**

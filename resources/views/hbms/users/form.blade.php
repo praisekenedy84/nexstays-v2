@@ -5,8 +5,14 @@
         @csrf @if($isEdit) @method('PUT') @endif
         <div><label class="mb-1.5 block text-xs font-medium text-ink-muted">Name</label><input name="name" value="{{ old('name', $user->name) }}" required class="input-field"></div>
         <div><label class="mb-1.5 block text-xs font-medium text-ink-muted">Email</label><input type="email" name="email" value="{{ old('email', $user->email) }}" required class="input-field"></div>
-        <div><label class="mb-1.5 block text-xs font-medium text-ink-muted">Password {{ $isEdit ? '(leave blank to keep)' : '' }}</label><input type="password" name="password" {{ $isEdit ? '' : 'required' }} class="input-field"></div>
-        <div><label class="mb-1.5 block text-xs font-medium text-ink-muted">Confirm password</label><input type="password" name="password_confirmation" class="input-field"></div>
+        <div>
+            <label class="mb-1.5 block text-xs font-medium text-ink-muted">Password {{ $isEdit ? '(leave blank to keep)' : '' }}</label>
+            <x-ui.password-input name="password" @unless($isEdit) required @endunless class="input-field" />
+        </div>
+        <div>
+            <label class="mb-1.5 block text-xs font-medium text-ink-muted">Confirm password</label>
+            <x-ui.password-input name="password_confirmation" class="input-field" />
+        </div>
         <div><label class="mb-1.5 block text-xs font-medium text-ink-muted">Role</label>
             <select name="role" required class="input-field">
                 @foreach ($roles as $role)

@@ -97,6 +97,47 @@ class FolioService
         });
     }
 
+    public function postWriteOff(
+        Folio $folio,
+        string $reason,
+        ?Money $amount = null,
+    ): array {
+        return DB::transaction(function () use ($folio, $reason, $amount) {
+            $writeOffAmount = $amount ?? $this->balance($folio);
+
+            throw_if(
+                $writeOffAmount->isNegative() || $writeOffAmount->isZero(),
+                \DomainException::class,
+                'Write-off amount must be greater than zero.'
+            );
+
+            $transaction = FolioTransaction::query()->create([
+                'folio_id'         => $folio->id,
+                'transaction_type' => 'write_off',
+                'description'      => 'Write-off — '.$reason,
+                'amount'           => $writeOffAmount->negated()->getAmount()->toFloat(),
+                'tax_amount'       => 0,
+                'tax_code'         => null,
+                'posted_by'        => Auth::id(),
+                'posted_at'        => now(),
+            ]);
+
+            $payment = \App\Domain\Till\Models\Payment::query()->create([
+                'folio_id'    => $folio->id,
+                'amount'      => $writeOffAmount->getAmount()->toFloat(),
+                'currency'    => $folio->currency,
+                'method'      => 'waiver',
+                'received_by' => Auth::id(),
+                'notes'       => $reason,
+                'status'      => 'captured',
+            ]);
+
+            $folio->increment('settled_amount', $writeOffAmount->getAmount()->toFloat());
+
+            return ['transaction' => $transaction, 'payment' => $payment];
+        });
+    }
+
     public function balance(Folio $folio): Money
     {
         $currency = $folio->currency;
