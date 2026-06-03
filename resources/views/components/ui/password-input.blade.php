@@ -5,9 +5,10 @@
 
 <div class="relative" data-password-field>
     <input
-        type="password"
-        name="{{ $name }}"
-        {{ $attributes->class(['pr-11']) }}
+        {{ $attributes->merge([
+            'type' => 'password',
+            'name' => $name,
+        ])->class(['pr-11']) }}
     />
     <button
         type="button"

@@ -48,6 +48,7 @@
                     <div>
                         <label class="mb-1.5 block text-xs font-medium text-ink-muted">Confirm new password</label>
                         <x-ui.password-input name="password_confirmation" autocomplete="new-password" class="input-field" />
+                        @error('password_confirmation')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 </div>
 

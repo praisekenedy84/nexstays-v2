@@ -37,6 +37,7 @@
                     id="password"
                     name="password"
                     required
+                    autocomplete="current-password"
                     toggle-class="text-slate-400 hover:text-slate-200 focus-visible:ring-indigo-500/30"
                     class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-500 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30"
                 />

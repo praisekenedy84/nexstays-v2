@@ -41,7 +41,7 @@
             </div>
             <div>
                 <label for="password" class="mb-1.5 block text-xs font-medium text-ink-muted">Password</label>
-                <x-ui.password-input id="password" name="password" required class="input-field" />
+                <x-ui.password-input id="password" name="password" required autocomplete="current-password" class="input-field" />
             </div>
             <label class="flex items-center gap-2 text-sm text-ink-muted">
                 <input type="checkbox" name="remember" value="1" class="rounded border-slate-300 text-primary focus:ring-primary/30">
