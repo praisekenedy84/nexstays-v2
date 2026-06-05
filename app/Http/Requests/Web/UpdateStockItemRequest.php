@@ -26,6 +26,9 @@ class UpdateStockItemRequest extends FormRequest
             'reorder_level' => ['required', 'numeric', 'min:0'],
             'current_stock' => ['required', 'numeric', 'min:0'],
             'cost_per_unit' => ['nullable', 'numeric', 'min:0'],
+            'menu_item_id' => ['nullable', 'uuid', 'exists:menu_items,id'],
+            'serve_quantity' => ['nullable', 'numeric', 'min:0.0001'],
+            'serve_unit' => ['nullable', 'string', 'max:20'],
         ];
     }
 }

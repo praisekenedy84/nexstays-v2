@@ -10,6 +10,7 @@ use Spatie\Permission\Models\Role as TenantRole;
 use App\Http\Controllers\Controller;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\Username;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -45,8 +46,9 @@ class TenantController extends Controller
         $validated = $request->validate([
             'property_code' => ['required', 'string', 'max:50', 'regex:/^[a-z0-9_]+$/', 'unique:tenants,id'],
             'property_name' => ['required', 'string', 'max:200'],
-            'admin_name'    => ['required', 'string', 'max:200'],
-            'admin_email'   => ['required', 'email', 'max:200'],
+            'admin_name'     => ['required', 'string', 'max:200'],
+            'admin_username' => ['required', 'string', 'max:50', 'regex:'. Username::PATTERN],
+            'admin_email'    => ['nullable', 'email', 'max:200'],
             'admin_password' => ['nullable', 'string', 'min:8', 'max:200'],
         ]);
 
@@ -64,9 +66,10 @@ class TenantController extends Controller
 
         $admin = User::create([
             'name'              => $validated['admin_name'],
-            'email'             => $validated['admin_email'],
+            'username'          => $validated['admin_username'],
+            'email'             => $validated['admin_email'] ?? null,
             'password'          => Hash::make($password),
-            'email_verified_at' => now(),
+            'email_verified_at' => $validated['admin_email'] ? now() : null,
         ]);
         $admin->syncRoles(['general_manager', 'super_admin']);
 
@@ -75,7 +78,8 @@ class TenantController extends Controller
         return redirect()->route('platform.tenants.index')->with('provisioned', [
             'property_code' => $tenant->id,
             'property_name' => $tenant->name,
-            'admin_email'   => $validated['admin_email'],
+            'admin_username' => $validated['admin_username'],
+            'admin_email'   => $validated['admin_email'] ?? null,
             'password'      => $password,
             'login_url'     => rtrim(config('app.url'), '/').'/login',
         ]);
@@ -147,6 +151,7 @@ class TenantController extends Controller
 
         return back()->with('password_reset', [
             'user_name' => $user->name,
+            'username'  => $user->username,
             'email'     => $user->email,
             'password'  => $password,
         ]);

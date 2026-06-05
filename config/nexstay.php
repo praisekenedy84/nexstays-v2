@@ -47,6 +47,9 @@ return [
     'demo' => [
         'tenant_id' => env('DEMO_TENANT_ID', 'demo'),
         'domain' => env('DEMO_TENANT_DOMAIN', 'demo'),
+        'admin_username' => env('DEMO_ADMIN_USERNAME', 'admin'),
+        'front_desk_username' => env('DEMO_FRONT_DESK_USERNAME', 'frontdesk'),
+        'housekeeper_username' => env('DEMO_HOUSEKEEPER_USERNAME', 'housekeeper'),
         'admin_email' => env('DEMO_ADMIN_EMAIL', 'admin@demo.local'),
         'front_desk_email' => env('DEMO_FRONT_DESK_EMAIL', 'frontdesk@demo.local'),
         'housekeeper_email' => env('DEMO_HOUSEKEEPER_EMAIL', 'housekeeper@demo.local'),
@@ -98,6 +101,7 @@ return [
                 ['id' => 'restaurant', 'label' => 'Restaurant', 'route' => 'tenant.restaurant.index', 'permission' => 'view-orders'],
                 ['id' => 'bar', 'label' => 'Bar', 'route' => 'tenant.bar.index', 'permission' => 'view-orders'],
                 ['id' => 'lounge', 'label' => 'Lounge', 'route' => 'tenant.lounge.index', 'permission' => 'view-orders'],
+                ['id' => 'fb-orders', 'label' => 'Orders & sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-orders'],
                 ['id' => 'shift-mine', 'label' => 'My shift', 'route' => 'tenant.shift.mine', 'permission' => 'view-orders'],
                 ['id' => 'shift-all', 'label' => 'Staff shift', 'route' => 'tenant.shift.all', 'permission' => 'view-fb-reports'],
                 ['id' => 'outlets', 'label' => 'Outlets', 'route' => 'tenant.outlets.index', 'permission' => 'view-outlets'],

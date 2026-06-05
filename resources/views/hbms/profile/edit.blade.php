@@ -23,8 +23,13 @@
                         @error('name')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                     <div>
-                        <label class="mb-1.5 block text-xs font-medium text-ink-muted">Email address</label>
-                        <input type="email" name="email" value="{{ old('email', $user->email) }}" required class="input-field">
+                        <label class="mb-1.5 block text-xs font-medium text-ink-muted">Username</label>
+                        <input value="{{ $user->username }}" disabled class="input-field bg-slate-50 text-ink-muted">
+                        <p class="mt-1 text-xs text-ink-muted">Ask a manager to change your username.</p>
+                    </div>
+                    <div class="sm:col-span-2">
+                        <label class="mb-1.5 block text-xs font-medium text-ink-muted">Email address <span class="text-ink-subtle">(optional)</span></label>
+                        <input type="email" name="email" value="{{ old('email', $user->email) }}" class="input-field">
                         @error('email')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
                     </div>
                 </div>

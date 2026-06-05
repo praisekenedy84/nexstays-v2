@@ -9,8 +9,15 @@
             @error('name')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
         </div>
         <div>
-            <label class="mb-1.5 block text-xs font-medium text-ink-muted">Email</label>
-            <input type="email" name="email" value="{{ old('email', $user->email) }}" required autocomplete="email" class="input-field">
+            <label class="mb-1.5 block text-xs font-medium text-ink-muted">Username</label>
+            <input name="username" value="{{ old('username', $user->username) }}" required autocomplete="username"
+                pattern="[a-z0-9_.-]+" spellcheck="false" class="input-field">
+            <p class="mt-1 text-xs text-ink-muted">Lowercase letters, numbers, dots, hyphens, and underscores.</p>
+            @error('username')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+        </div>
+        <div>
+            <label class="mb-1.5 block text-xs font-medium text-ink-muted">Email <span class="text-ink-subtle">(optional)</span></label>
+            <input type="email" name="email" value="{{ old('email', $user->email) }}" autocomplete="email" class="input-field">
             @error('email')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
         </div>
         <div>

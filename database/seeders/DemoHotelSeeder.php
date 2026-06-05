@@ -23,9 +23,10 @@ class DemoHotelSeeder extends Seeder
         $password = config('nexstay.demo.password');
 
         $admin = User::withTrashed()->updateOrCreate(
-            ['email' => config('nexstay.demo.admin_email')],
+            ['username' => config('nexstay.demo.admin_username')],
             [
                 'name' => 'Demo Admin',
+                'email' => config('nexstay.demo.admin_email'),
                 'password' => Hash::make($password),
                 'email_verified_at' => now(),
             ]
@@ -36,9 +37,10 @@ class DemoHotelSeeder extends Seeder
         $admin->syncRoles(['general_manager', 'super_admin']);
 
         $frontDesk = User::withTrashed()->updateOrCreate(
-            ['email' => config('nexstay.demo.front_desk_email')],
+            ['username' => config('nexstay.demo.front_desk_username')],
             [
                 'name' => 'Demo Front Desk',
+                'email' => config('nexstay.demo.front_desk_email'),
                 'password' => Hash::make($password),
                 'email_verified_at' => now(),
             ]
@@ -49,9 +51,10 @@ class DemoHotelSeeder extends Seeder
         $frontDesk->syncRoles(['front_desk']);
 
         $housekeeper = User::withTrashed()->updateOrCreate(
-            ['email' => config('nexstay.demo.housekeeper_email')],
+            ['username' => config('nexstay.demo.housekeeper_username')],
             [
                 'name' => 'Demo Housekeeper',
+                'email' => config('nexstay.demo.housekeeper_email'),
                 'password' => Hash::make($password),
                 'email_verified_at' => now(),
             ]

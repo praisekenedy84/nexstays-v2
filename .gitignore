@@ -23,6 +23,7 @@ yarn-error.log
 
 # Local databases and dumps (never commit)
 /database/tenanttest
+/database/tenantdemo
 *.sqlite
 *.sqlite3
 *.db-journal

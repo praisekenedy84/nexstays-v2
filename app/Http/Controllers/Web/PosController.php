@@ -254,7 +254,7 @@ class PosController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()->to($backRoute)
+        return back(fallback: $backRoute)
             ->with('success', "Order {$order->order_number} has been cancelled.");
     }
 

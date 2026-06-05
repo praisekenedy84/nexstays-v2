@@ -61,6 +61,51 @@
             </div>
         </div>
 
+        <div class="card p-6">
+            <h2 class="mb-1 text-sm font-semibold text-ink">Sidebar menu</h2>
+            <p class="mb-4 text-xs text-ink-muted">
+                Fine-tune which sidebar links this role sees. Links stay hidden until the matching permission is enabled.
+                Uncheck a link to hide it without revoking route access.
+            </p>
+            <div class="space-y-5">
+                @foreach ($navigationGroups as $group)
+                    <fieldset>
+                        <legend class="mb-2 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                            {{ $group['label'] }}
+                        </legend>
+                        <div class="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+                            @foreach ($group['items'] as $navItem)
+                                @php
+                                    $hasPermission = $navItem['permission'] === null
+                                        || in_array($navItem['permission'], old('permissions', $rolePermissions), true);
+                                    $isChecked = in_array($navItem['id'], old('navigation', $visibleNavigationIds), true);
+                                @endphp
+                                <label @class([
+                                    'flex items-center gap-2 text-sm',
+                                    'cursor-pointer' => $hasPermission,
+                                    'cursor-not-allowed opacity-50' => ! $hasPermission,
+                                ])>
+                                    <input type="checkbox" name="navigation[]" value="{{ $navItem['id'] }}"
+                                        class="size-4 rounded border-slate-300 text-primary focus:ring-primary"
+                                        @checked($isChecked && $hasPermission)
+                                        @disabled(! $hasPermission)>
+                                    <span>
+                                        {{ $navItem['label'] }}
+                                        @if ($navItem['permission'])
+                                            <span class="block text-[11px] text-ink-subtle">{{ str_replace('-', ' ', $navItem['permission']) }}</span>
+                                        @endif
+                                    </span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </fieldset>
+                    @if (! $loop->last)
+                        <hr class="border-slate-100">
+                    @endif
+                @endforeach
+            </div>
+        </div>
+
         @if ($errors->any())
             <div class="rounded-lg border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
                 {{ $errors->first() }}

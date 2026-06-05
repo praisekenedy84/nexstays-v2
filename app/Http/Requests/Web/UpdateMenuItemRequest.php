@@ -27,6 +27,14 @@ class UpdateMenuItemRequest extends FormRequest
             'photo' => ['nullable', 'image', 'mimes:jpg,jpeg,png,webp', 'max:2048'],
             'remove_photo' => ['nullable', 'boolean'],
             'is_available' => ['sometimes', 'boolean'],
+            'recipe' => ['sometimes', 'array'],
+            'recipe.*.stock_item_id' => ['nullable', 'uuid', 'exists:stock_items,id'],
+            'recipe.*.quantity' => ['nullable', 'numeric', 'min:0'],
+            'recipe.*.unit' => ['nullable', 'string', 'max:20'],
+            'inventory_link_mode' => ['nullable', 'string', 'in:existing,awaiting,recipe'],
+            'linked_stock_item_id' => ['nullable', 'uuid', 'exists:stock_items,id'],
+            'serve_quantity' => ['nullable', 'numeric', 'min:0.0001'],
+            'serve_unit' => ['nullable', 'string', 'max:20'],
         ];
     }
 

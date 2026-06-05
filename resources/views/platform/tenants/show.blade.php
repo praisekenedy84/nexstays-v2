@@ -18,8 +18,11 @@
         @php $pr = session('password_reset'); @endphp
         <div class="mb-6 rounded-2xl bg-amber-900/40 p-4 ring-1 ring-amber-600/40">
             <p class="mb-2 text-sm font-semibold text-amber-300">Password reset for {{ $pr['user_name'] }}</p>
-            <div class="flex gap-6 text-xs">
-                <span class="text-slate-400">Email: <code class="font-mono text-white">{{ $pr['email'] }}</code></span>
+            <div class="flex flex-wrap gap-6 text-xs">
+                <span class="text-slate-400">Username: <code class="font-mono text-white">{{ $pr['username'] }}</code></span>
+                @if (! empty($pr['email']))
+                    <span class="text-slate-400">Email: <code class="font-mono text-white">{{ $pr['email'] }}</code></span>
+                @endif
                 <span class="text-slate-400">New password: <code class="font-mono text-white">{{ $pr['password'] }}</code></span>
             </div>
         </div>
@@ -130,6 +133,7 @@
                 <thead class="bg-white/5 text-xs font-medium uppercase tracking-wider text-slate-400">
                     <tr>
                         <th class="px-5 py-3 text-left">Name</th>
+                        <th class="px-5 py-3 text-left">Username</th>
                         <th class="px-5 py-3 text-left">Email</th>
                         <th class="px-5 py-3 text-left">Roles</th>
                         <th class="px-5 py-3 text-right">Actions</th>
@@ -139,7 +143,8 @@
                     @foreach ($users as $user)
                         <tr class="bg-slate-900/40 hover:bg-white/5 transition">
                             <td class="px-5 py-3 font-medium text-white">{{ $user->name }}</td>
-                            <td class="px-5 py-3 text-slate-400">{{ $user->email }}</td>
+                            <td class="px-5 py-3 font-mono text-sm text-slate-300">{{ $user->username }}</td>
+                            <td class="px-5 py-3 text-slate-400">{{ $user->email ?? '—' }}</td>
                             <td class="px-5 py-3">
                                 <form method="POST"
                                       action="{{ route('platform.tenants.users.change-role', [$tenant->id, $user->id]) }}">

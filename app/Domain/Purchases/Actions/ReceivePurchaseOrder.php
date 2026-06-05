@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Domain\Purchases\Actions;
 
 use App\Domain\Inventory\Models\StockMovement;
+use App\Domain\Inventory\Services\BeverageStockLinkService;
 use App\Domain\Purchases\Models\PurchaseOrder;
 use App\Domain\Purchases\Models\PurchaseOrderLine;
 use Illuminate\Support\Facades\Auth;
@@ -12,6 +13,10 @@ use Illuminate\Support\Facades\DB;
 
 class ReceivePurchaseOrder
 {
+    public function __construct(
+        private readonly BeverageStockLinkService $beverageStockLink
+    ) {}
+
     /**
      * @param  list<array{line_id: string, qty_received: float|string, actual_unit_cost: float|string, line_notes?: string|null}>  $lineData
      */
@@ -77,6 +82,8 @@ class ReceivePurchaseOrder
         ]);
 
         $stockItem->increment('current_stock', $qty);
+        $stockItem = $stockItem->fresh();
+        $this->beverageStockLink->clearAwaitingWhenStocked($stockItem);
 
         if ($cost > 0) {
             $stockItem->update(['cost_per_unit' => $cost]);

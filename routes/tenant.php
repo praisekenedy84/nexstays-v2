@@ -20,6 +20,7 @@ use App\Http\Controllers\Api\V1\UserController as ApiUserController;
 use App\Http\Controllers\Web\AuthController as WebAuthController;
 use App\Http\Controllers\Web\AvailabilityController;
 use App\Http\Controllers\Web\BarController;
+use App\Http\Controllers\Web\FbOrderController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GuestController;
 use App\Http\Controllers\Web\MenuCategoryController;
@@ -325,6 +326,8 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/restaurant', [RestaurantController::class, 'index'])->name('restaurant.index');
             Route::get('/bar', [BarController::class, 'index'])->name('bar.index');
             Route::get('/lounge', [LoungeController::class, 'index'])->name('lounge.index');
+            Route::get('/fb/orders', [FbOrderController::class, 'index'])->name('fb.orders.index');
+            Route::get('/fb/orders/{order}', [FbOrderController::class, 'show'])->name('fb.orders.show');
 
             // POS order management
             Route::get('/pos/orders/{order}', [PosController::class, 'manage'])->name('pos.manage');
@@ -333,6 +336,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
         });
 
         Route::middleware('permission:manage-orders')->group(function () {
+            Route::delete('/fb/orders/{order}', [FbOrderController::class, 'destroy'])->name('fb.orders.destroy');
             Route::post('/pos/{outlet}/orders', [PosController::class, 'createOrder'])->name('pos.orders.create');
             Route::post('/pos/orders/{order}/items', [PosController::class, 'addItem'])->name('pos.orders.add-item');
             Route::post('/pos/orders/{order}/items/{item}/void', [PosController::class, 'voidItem'])->name('pos.orders.void-item');
@@ -366,11 +370,24 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
                 Route::put('/menu-categories/{menuCategory}', [MenuCategoryController::class, 'update'])->name('menu-categories.update');
                 Route::delete('/menu-categories/{menuCategory}', [MenuCategoryController::class, 'destroy'])->name('menu-categories.destroy');
             });
+            Route::get('/menu-items/json', [MenuItemController::class, 'json'])->name('menu-items.json');
+            Route::post('/menu-items/sync-bar-inventory', [MenuItemController::class, 'syncBarInventory'])
+                ->middleware('permission:manage-menu|manage-inventory')
+                ->name('menu-items.sync-bar-inventory');
             Route::resource('menu-items', MenuItemController::class)->except(['show']);
         });
 
         Route::middleware('permission:view-inventory|manage-inventory')->group(function () {
             Route::get('/stock-items/json', [StockItemController::class, 'json'])->name('stock-items.json');
+            Route::get('/stock-items/{stockItem}/restock', [StockItemController::class, 'restockForm'])
+                ->middleware('permission:manage-inventory')
+                ->name('stock-items.restock-form');
+            Route::post('/stock-items/{stockItem}/restock', [StockItemController::class, 'restock'])
+                ->middleware('permission:manage-inventory')
+                ->name('stock-items.restock');
+            Route::post('/stock-items/sync', [StockItemController::class, 'sync'])
+                ->middleware('permission:manage-inventory')
+                ->name('stock-items.sync');
             Route::resource('stock-items', StockItemController::class)->except(['show']);
         });
 
@@ -386,7 +403,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
 | API v1 — tenant-scoped REST (single domain, tenant from token or header)
 |--------------------------------------------------------------------------
 |
-| Login: POST /api/v1/auth/login — accepts property_code, email, password.
+| Login: POST /api/v1/auth/login — accepts property_code, username, password.
 |        Controller initializes tenancy, returns token + tenant_id.
 |
 | All other authenticated routes: InitializeTenancyByToken reads the tenant_id

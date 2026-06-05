@@ -36,7 +36,7 @@
         @php $imp = session('impersonating'); @endphp
         <div class="flex items-center justify-between bg-amber-400 px-5 py-2 text-xs font-medium text-amber-950">
             <span>
-                Viewing as <strong>{{ $imp['user_name'] }}</strong> ({{ $imp['user_email'] }})
+                Viewing as <strong>{{ $imp['user_name'] }}</strong> ({{ $imp['user_username'] ?? $imp['user_email'] }})
                 at <strong>{{ $imp['tenant_name'] }}</strong>
                 &nbsp;·&nbsp; Platform admin: {{ $imp['platform_admin'] }}
             </span>

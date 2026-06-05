@@ -10,8 +10,12 @@
             <div class="grid grid-cols-2 gap-x-8 gap-y-1 text-xs text-slateald-300 sm:grid-cols-4">
                 <span class="text-slate-400">Property code</span>
                 <code class="font-mono text-white">{{ $p['property_code'] }}</code>
-                <span class="text-slate-400">Admin email</span>
-                <code class="font-mono text-white">{{ $p['admin_email'] }}</code>
+                <span class="text-slate-400">Admin username</span>
+                <code class="font-mono text-white">{{ $p['admin_username'] }}</code>
+                @if (! empty($p['admin_email']))
+                    <span class="text-slate-400">Admin email</span>
+                    <code class="font-mono text-white">{{ $p['admin_email'] }}</code>
+                @endif
                 <span class="text-slate-400">Password</span>
                 <code class="font-mono text-white">{{ $p['password'] }}</code>
                 <span class="text-slate-400">Login URL</span>

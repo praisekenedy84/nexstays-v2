@@ -12,19 +12,22 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Spatie\Permission\Models\Role;
+use App\Models\Role;
 
 class UserController extends Controller
 {
     public function index(Request $request): View
     {
-        $sort   = in_array($request->query('sort'), ['name', 'email', 'created_at']) ? $request->query('sort') : 'name';
+        $sort   = in_array($request->query('sort'), ['name', 'username', 'email', 'created_at']) ? $request->query('sort') : 'name';
         $dir    = $request->query('direction') === 'desc' ? 'desc' : 'asc';
         $search = trim((string) $request->query('search', ''));
 
         $users = User::query()
             ->with('roles')
-            ->when($search, fn ($q) => $q->where(fn ($inner) => $inner->where('name', 'ilike', "%{$search}%")->orWhere('email', 'ilike', "%{$search}%")))
+            ->when($search, fn ($q) => $q->where(fn ($inner) => $inner
+                ->where('name', 'ilike', "%{$search}%")
+                ->orWhere('username', 'ilike', "%{$search}%")
+                ->orWhere('email', 'ilike', "%{$search}%")))
             ->orderBy($sort, $dir)
             ->paginate(25)
             ->withQueryString();
@@ -44,6 +47,7 @@ class UserController extends Controller
     {
         $user = User::query()->create([
             'name' => $request->validated('name'),
+            'username' => $request->validated('username'),
             'email' => $request->validated('email'),
             'password' => $request->validated('password'),
         ]);
@@ -76,6 +80,7 @@ class UserController extends Controller
     {
         $data = [
             'name' => $request->validated('name'),
+            'username' => $request->validated('username'),
             'email' => $request->validated('email'),
         ];
         if ($request->filled('password')) {

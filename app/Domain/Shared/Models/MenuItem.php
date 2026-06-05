@@ -7,8 +7,10 @@ namespace App\Domain\Shared\Models;
 use App\Domain\Inventory\Models\RecipeIngredient;
 use Illuminate\Database\Eloquent\Concerns\HasUuids;
 use Illuminate\Database\Eloquent\Model;
+use App\Domain\Inventory\Models\StockItem;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
 
@@ -73,5 +75,15 @@ class MenuItem extends Model
     public function recipeIngredients(): HasMany
     {
         return $this->hasMany(RecipeIngredient::class);
+    }
+
+    public function linkedStockItem(): HasOne
+    {
+        return $this->hasOne(StockItem::class);
+    }
+
+    public function isAwaitingInventoryLink(): bool
+    {
+        return $this->recipeIngredients()->doesntExist();
     }
 }

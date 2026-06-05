@@ -7,9 +7,11 @@ namespace App\Http\Controllers\Web;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\LoginRequest;
 use App\Models\Tenant;
+use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Hash;
 use Illuminate\View\View;
 
 class AuthController extends Controller
@@ -41,17 +43,21 @@ class AuthController extends Controller
 
         if (! $tenant) {
             return back()
-                ->withInput($request->only('email', 'property_code'))
+                ->withInput($request->only('username', 'property_code'))
                 ->withErrors(['property_code' => 'Property code not found. Please check with your manager.']);
         }
 
         tenancy()->initialize($tenant);
 
-        if (! Auth::attempt($request->only('email', 'password'), $request->boolean('remember'))) {
+        $user = User::findByLoginIdentifier($request->validated('username'));
+
+        if ($user === null || ! Hash::check($request->validated('password'), $user->password)) {
             return back()
-                ->withInput($request->only('email', 'property_code'))
-                ->withErrors(['email' => 'The provided credentials are incorrect.']);
+                ->withInput($request->only('username', 'property_code'))
+                ->withErrors(['username' => 'The provided credentials are incorrect.']);
         }
+
+        Auth::login($user, $request->boolean('remember'));
 
         $request->session()->regenerate();
         $request->session()->put('tenant_id', $tenant->id);

@@ -24,7 +24,10 @@
                 </div>
                 <div>
                     <p class="font-semibold text-ink">{{ $user->name }}</p>
-                    <p class="text-sm text-ink-muted">{{ $user->email }}</p>
+                    <p class="font-mono text-sm text-ink-muted">{{ $user->username }}</p>
+                    @if ($user->email)
+                        <p class="text-sm text-ink-muted">{{ $user->email }}</p>
+                    @endif
                 </div>
             </div>
 

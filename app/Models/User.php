@@ -35,6 +35,7 @@ class User extends Authenticatable
 
     protected $fillable = [
         'name',
+        'username',
         'email',
         'password',
     ];
@@ -50,5 +51,13 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
         ];
+    }
+
+    public static function findByLoginIdentifier(string $identifier): ?self
+    {
+        return static::query()
+            ->where('username', $identifier)
+            ->orWhere('email', $identifier)
+            ->first();
     }
 }

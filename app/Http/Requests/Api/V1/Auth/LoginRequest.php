@@ -20,9 +20,15 @@ class LoginRequest extends FormRequest
     {
         return [
             'property_code' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email'],
+            'username' => ['required_without:email', 'nullable', 'string', 'max:255'],
+            'email' => ['required_without:username', 'nullable', 'email', 'max:255'],
             'password' => ['required', 'string'],
             'device_name' => ['sometimes', 'string', 'max:100'],
         ];
+    }
+
+    public function loginIdentifier(): string
+    {
+        return (string) ($this->validated('username') ?? $this->validated('email'));
     }
 }

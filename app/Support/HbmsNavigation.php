@@ -20,6 +20,8 @@ final class HbmsNavigation
             return [];
         }
 
+        $user->loadMissing('roles');
+
         return Collection::make(config('nexstay.navigation', []))
             ->map(fn (array $item) => self::resolveItem($item, $user))
             ->filter()
@@ -63,13 +65,25 @@ final class HbmsNavigation
     }
 
     /**
-     * @param  array{permission?: string|null}  $item
+     * @param  array{id: string, permission?: string|null}  $item
      */
     private static function canSee(array $item, User $user): bool
     {
         $permission = $item['permission'] ?? null;
 
-        return $permission === null || $user->can($permission);
+        if ($permission !== null && ! $user->can($permission)) {
+            return false;
+        }
+
+        $roles = $user->roles;
+
+        if ($roles->isEmpty()) {
+            return $permission === null;
+        }
+
+        return $roles->contains(
+            fn ($role) => ! in_array($item['id'], $role->hidden_navigation_ids ?? [], true)
+        );
     }
 
     public static function tenantHomeUrl(): string

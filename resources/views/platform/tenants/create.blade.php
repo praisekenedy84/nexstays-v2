@@ -55,9 +55,18 @@
                 </div>
 
                 <div>
-                    <label for="admin_email" class="mb-1.5 block text-xs font-medium text-slate-400">Email</label>
+                    <label for="admin_username" class="mb-1.5 block text-xs font-medium text-slate-400">Username</label>
+                    <input id="admin_username" type="text" name="admin_username" value="{{ old('admin_username') }}"
+                        required placeholder="e.g. gm" pattern="[a-z0-9_.-]+" spellcheck="false"
+                        class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
+                </div>
+
+                <div>
+                    <label for="admin_email" class="mb-1.5 block text-xs font-medium text-slate-400">
+                        Email <span class="text-slate-500">(optional contact)</span>
+                    </label>
                     <input id="admin_email" type="email" name="admin_email" value="{{ old('admin_email') }}"
-                        required placeholder="gm@hotel.co.tz"
+                        placeholder="gm@hotel.co.tz"
                         class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
                 </div>
 

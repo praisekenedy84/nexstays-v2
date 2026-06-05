@@ -63,9 +63,10 @@ use OpenApi\Attributes as OA;
 )]
 #[OA\Schema(
     schema: 'AuthLoginRequest',
-    required: ['email', 'password'],
+    required: ['password'],
     properties: [
-        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'admin@demo.local'),
+        new OA\Property(property: 'username', type: 'string', example: 'admin', description: 'Username or email (provide username or email)'),
+        new OA\Property(property: 'email', type: 'string', format: 'email', example: 'admin@demo.local', description: 'Alternative to username for legacy clients'),
         new OA\Property(property: 'password', type: 'string', format: 'password', example: 'NexStay2026!'),
         new OA\Property(property: 'device_name', type: 'string', maxLength: 100, example: 'swagger-ui'),
     ]
@@ -82,7 +83,8 @@ use OpenApi\Attributes as OA;
                     property: 'attributes',
                     properties: [
                         new OA\Property(property: 'name', type: 'string'),
-                        new OA\Property(property: 'email', type: 'string', format: 'email'),
+                        new OA\Property(property: 'username', type: 'string', example: 'admin'),
+                        new OA\Property(property: 'email', type: 'string', format: 'email', nullable: true),
                     ],
                     type: 'object'
                 ),

@@ -52,4 +52,13 @@ class Outlet extends Model
     {
         return $this->type === 'lounge';
     }
+
+    /**
+     * Recipe-based stock tracking applies to bar beverage sales only.
+     * Restaurant and lounge orders are never blocked or deducted by inventory.
+     */
+    public function tracksBeverageInventory(): bool
+    {
+        return $this->isBar();
+    }
 }

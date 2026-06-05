@@ -12,9 +12,20 @@
             </div>
             <x-ui.search-bar :value="$search" placeholder="Item name…" />
         </form>
-        @can('manage-menu')
-            <a href="{{ route('tenant.menu-items.create', ['outlet_id' => $outletId]) }}" class="btn-primary">Add item</a>
-        @endcan
+        <div class="flex flex-wrap gap-2">
+            @if ($outletId && $outlets->firstWhere('id', $outletId)?->isBar())
+                @can('manage-menu')
+                    <form method="POST" action="{{ route('tenant.menu-items.sync-bar-inventory') }}">
+                        @csrf
+                        <input type="hidden" name="outlet_id" value="{{ $outletId }}">
+                        <button type="submit" class="btn-outline">Sync with inventory</button>
+                    </form>
+                @endcan
+            @endif
+            @can('manage-menu')
+                <a href="{{ route('tenant.menu-items.create', ['outlet_id' => $outletId]) }}" class="btn-primary">Add item</a>
+            @endcan
+        </div>
     </div>
 
     <div class="card overflow-hidden">
@@ -26,6 +37,9 @@
                     <th class="px-5 py-3 text-left">Category</th>
                     <th class="px-5 py-3 text-left">Outlet</th>
                     <x-ui.sort-th column="price" label="Price" :sort="$sort" :dir="$dir" class="text-right" />
+                    @if ($outletId && $outlets->firstWhere('id', $outletId)?->isBar())
+                        <th class="px-5 py-3 text-left">Inventory</th>
+                    @endif
                     <th class="px-5 py-3 text-left">Available</th>
                     @can('manage-menu')
                         <th class="px-5 py-3 text-right">Actions</th>
@@ -50,6 +64,22 @@
                         <td class="px-5 py-4 text-ink-muted">{{ $item->category?->name }}</td>
                         <td class="px-5 py-4 text-ink-muted">{{ $item->category?->outlet?->name }}</td>
                         <td class="px-5 py-4 text-right">@money($item->price)</td>
+                        @if ($outletId && $outlets->firstWhere('id', $outletId)?->isBar())
+                            <td class="px-5 py-4 text-xs">
+                                @if ($item->recipeIngredients->isEmpty())
+                                    <span class="text-amber-700">Not linked</span>
+                                @elseif ($item->linkedStockItem?->awaiting_stock)
+                                    <span class="text-amber-700">Awaiting stock</span>
+                                    <span class="block text-ink-subtle">0 {{ $item->linkedStockItem->unit }}</span>
+                                @else
+                                    @php $primary = $item->linkedStockItem ?? $item->recipeIngredients->first()?->stockItem; @endphp
+                                    <span class="text-ink-muted">{{ $primary?->current_stock }} {{ $primary?->unit }} on hand</span>
+                                    @if ($item->recipeIngredients->count() > 1)
+                                        <span class="block text-ink-subtle">{{ $item->recipeIngredients->count() }} ingredients</span>
+                                    @endif
+                                @endif
+                            </td>
+                        @endif
                         <td class="px-5 py-4">
                             @if ($item->is_available)
                                 <span class="text-emerald-600">Yes</span>
@@ -70,7 +100,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-5 py-12 text-center text-ink-muted">No menu items.</td>
+                        <td colspan="8" class="px-5 py-12 text-center text-ink-muted">No menu items.</td>
                     </tr>
                 @endforelse
             </tbody>

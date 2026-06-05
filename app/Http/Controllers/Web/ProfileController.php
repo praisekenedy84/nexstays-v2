@@ -23,7 +23,7 @@ class ProfileController extends Controller
 
         $validated = $request->validate([
             'name'                  => ['required', 'string', 'max:200'],
-            'email'                 => ['required', 'email', 'max:200', 'unique:users,email,' . $user->id],
+            'email'                 => ['nullable', 'email', 'max:200', 'unique:users,email,' . $user->id],
             'current_password'      => ['required', 'string'],
             'password'              => ['nullable', 'string', 'min:8', 'max:200', 'confirmed'],
         ]);

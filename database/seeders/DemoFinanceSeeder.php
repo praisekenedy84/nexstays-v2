@@ -13,7 +13,7 @@ class DemoFinanceSeeder extends Seeder
 {
     public function run(): void
     {
-        $admin = User::query()->where('email', config('nexstay.demo.admin_email'))->first();
+        $admin = User::query()->where('username', config('nexstay.demo.admin_username'))->first();
 
         $services = [
             ['name' => 'Airport transfer', 'default_price' => 45000, 'description' => 'One-way airport pickup'],

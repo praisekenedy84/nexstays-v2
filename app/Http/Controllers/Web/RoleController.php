@@ -4,14 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\Shared\Actions\SyncRoleNavigation;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\StoreRoleRequest;
 use App\Http\Requests\Web\UpdateRoleRequest;
+use App\Models\Role;
+use App\Support\NavigationMenuRegistry;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
-use Spatie\Permission\Models\Role;
 
 class RoleController extends Controller
 {
@@ -66,21 +68,26 @@ class RoleController extends Controller
 
     public function create(): View
     {
+        $role = new Role;
+
         return view('hbms.roles.form', [
-            'role' => new Role,
+            'role' => $role,
             'permissionGroups' => self::PERMISSION_GROUPS,
             'rolePermissions' => [],
+            'navigationGroups' => NavigationMenuRegistry::groups(),
+            'visibleNavigationIds' => NavigationMenuRegistry::allItemIds(),
             'systemRoles' => RoleAndPermissionSeeder::ROLES,
         ]);
     }
 
-    public function store(StoreRoleRequest $request): RedirectResponse
+    public function store(StoreRoleRequest $request, SyncRoleNavigation $syncRoleNavigation): RedirectResponse
     {
         $role = Role::create([
             'name' => $request->validated('name'),
             'guard_name' => 'web',
         ]);
         $role->syncPermissions($request->validated('permissions', []));
+        $syncRoleNavigation->execute($role, $request->validated('navigation', []));
 
         return redirect()->route('tenant.roles.index')->with('success', 'Role created.');
     }
@@ -91,15 +98,18 @@ class RoleController extends Controller
             'role' => $role,
             'permissionGroups' => self::PERMISSION_GROUPS,
             'rolePermissions' => $role->permissions->pluck('name')->all(),
+            'navigationGroups' => NavigationMenuRegistry::groups(),
+            'visibleNavigationIds' => NavigationMenuRegistry::visibleItemIdsForRole($role),
             'systemRoles' => RoleAndPermissionSeeder::ROLES,
         ]);
     }
 
-    public function update(UpdateRoleRequest $request, Role $role): RedirectResponse
+    public function update(UpdateRoleRequest $request, Role $role, SyncRoleNavigation $syncRoleNavigation): RedirectResponse
     {
         $role->syncPermissions($request->validated('permissions', []));
+        $syncRoleNavigation->execute($role, $request->validated('navigation', []));
 
-        return redirect()->route('tenant.roles.index')->with('success', 'Role permissions updated.');
+        return redirect()->route('tenant.roles.index')->with('success', 'Role updated.');
     }
 
     public function matrix(): View
@@ -132,7 +142,11 @@ class RoleController extends Controller
             $name = $baseName . '_' . $suffix++;
         }
 
-        $clone = Role::create(['name' => $name, 'guard_name' => 'web']);
+        $clone = Role::create([
+            'name' => $name,
+            'guard_name' => 'web',
+            'hidden_navigation_ids' => $role->hidden_navigation_ids,
+        ]);
         $clone->syncPermissions($role->permissions);
 
         return redirect()

@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace App\Domain\Restaurant\Services;
 
 use App\Domain\HBMS\Models\Folio;
+use App\Domain\Bar\Models\BarTab;
+use App\Domain\Inventory\Services\InventoryAvailabilityService;
+use App\Domain\Restaurant\Events\OrderClosed;
 use App\Domain\Shared\Models\MenuItem;
 use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\OrderItem;
@@ -30,6 +33,8 @@ class OrderService
         private readonly TaxService $taxService,
         private readonly TillSessionService $tillSessionService,
         private readonly PaymentMethodSettingsService $paymentMethodSettings,
+        private readonly InventoryAvailabilityService $inventoryAvailability,
+        private readonly OrderSettlementReversalService $settlementReversal,
     ) {}
 
     /**
@@ -74,9 +79,16 @@ class OrderService
         return DB::transaction(function () use ($order, $lines) {
             throw_if(! $order->isOpen(), \DomainException::class, 'Cannot add items to a closed order.');
 
+            $order->loadMissing('outlet');
+            $enforceStock = $order->outlet?->tracksBeverageInventory() ?? false;
+
             foreach ($lines as $line) {
                 $menuItem = MenuItem::query()->findOrFail($line['menu_item_id']);
                 throw_if(! $menuItem->is_available, \DomainException::class, "Menu item {$menuItem->name} is not available.");
+
+                if ($enforceStock) {
+                    $this->inventoryAvailability->assertCanFulfill($menuItem, (int) $line['quantity']);
+                }
 
                 $item = OrderItem::query()->create([
                     'order_id' => $order->id,
@@ -146,19 +158,13 @@ class OrderService
                 ['reference_id' => $order->id, 'reference_type' => Order::class]
             );
 
-            $previousStatus = $order->status;
-            $order->update([
-                'folio_id' => $folio->id,
-                'status' => 'closed',
-                'closed_at' => now(),
-            ]);
-            $this->logOrderTransition($order, $previousStatus, 'closed', 'posted_to_folio', ['folio_id' => $folio->id]);
-
-            if ($order->table_id) {
-                OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
-            }
-
-            return $order->fresh();
+            return $this->finalizeClosedOrder(
+                $order,
+                (string) $order->status,
+                'posted_to_folio',
+                ['folio_id' => $folio->id],
+                ['folio_id' => $folio->id]
+            );
         });
     }
 
@@ -199,13 +205,12 @@ class OrderService
                 Payment::class,
             );
 
-            $previousStatus = $order->status;
-            $order->update(['status' => 'closed', 'closed_at' => now()]);
-            $this->logOrderTransition($order, $previousStatus, 'closed', 'cash_payment', ['payment_id' => $payment->id]);
-
-            if ($order->table_id) {
-                OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
-            }
+            $this->finalizeClosedOrder(
+                $order,
+                (string) $order->status,
+                'cash_payment',
+                ['payment_id' => $payment->id]
+            );
 
             return $payment;
         });
@@ -268,16 +273,12 @@ class OrderService
                 );
             }
 
-            $previousStatus = $order->status;
-            $order->update(['status' => 'closed', 'closed_at' => now()]);
-            $this->logOrderTransition($order, $previousStatus, 'closed', 'direct_payment', [
-                'payment_id' => $payment->id,
-                'method'     => $method,
-            ]);
-
-            if ($order->table_id) {
-                OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
-            }
+            $this->finalizeClosedOrder(
+                $order,
+                (string) $order->status,
+                'direct_payment',
+                ['payment_id' => $payment->id, 'method' => $method]
+            );
 
             return $payment;
         });
@@ -366,17 +367,28 @@ class OrderService
     {
         return DB::transaction(function () use ($order) {
             throw_if(
+                $order->status === 'voided',
+                \DomainException::class,
+                'This order has already been voided.'
+            );
+
+            if ($order->status === 'closed') {
+                return $this->cancelSettledOrder($order);
+            }
+
+            throw_if(
                 ! $order->isOpen(),
                 \DomainException::class,
-                'Only open orders can be cancelled.'
+                'Only open or settled orders can be cancelled.'
             );
 
             $order->load('items');
             $previousStatus = (string) $order->status;
 
             foreach ($order->items->whereNotIn('status', ['voided']) as $item) {
+                $fromStatus = (string) $item->status;
                 $item->update(['status' => 'voided']);
-                $this->logOrderItemTransition($order, $item, (string) $item->status, 'voided', 'order_cancelled');
+                $this->logOrderItemTransition($order, $item, $fromStatus, 'voided', 'order_cancelled');
             }
 
             $order->update(['status' => 'voided', 'closed_at' => now()]);
@@ -388,6 +400,65 @@ class OrderService
 
             return $order->fresh();
         });
+    }
+
+    private function cancelSettledOrder(Order $order): Order
+    {
+        $order->load(['outlet', 'items.menuItem']);
+        $previousStatus = (string) $order->status;
+
+        $this->settlementReversal->execute($order, 'Order cancelled after settlement');
+
+        foreach ($order->items->whereNotIn('status', ['voided']) as $item) {
+            $fromStatus = (string) $item->status;
+            $item->update(['status' => 'voided']);
+            $this->logOrderItemTransition($order, $item, $fromStatus, 'voided', 'order_cancelled');
+        }
+
+        $order->update(['status' => 'voided']);
+        $this->logOrderTransition($order, $previousStatus, 'voided', 'order_cancelled');
+
+        BarTab::query()
+            ->where('order_id', $order->id)
+            ->update(['order_id' => null]);
+
+        if ($order->table_id) {
+            OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
+        }
+
+        return $order->fresh();
+    }
+
+    /**
+     * @param  array<string, mixed>  $orderUpdates
+     * @param  array<string, mixed>|null  $meta
+     */
+    private function finalizeClosedOrder(
+        Order $order,
+        string $previousStatus,
+        string $reason,
+        array $orderUpdates = [],
+        ?array $meta = null
+    ): Order {
+        $order->update(array_merge([
+            'status' => 'closed',
+            'closed_at' => now(),
+        ], $orderUpdates));
+
+        $this->logOrderTransition($order, $previousStatus, 'closed', $reason, $meta);
+
+        if ($order->table_id) {
+            OutletTable::query()->whereKey($order->table_id)->update(['status' => 'available']);
+        }
+
+        $order = $order->fresh([
+            'items.menuItem.recipeIngredients.stockItem',
+            'outlet',
+        ]);
+
+        DB::afterCommit(fn () => OrderClosed::dispatch($order));
+
+        return $order;
     }
 
     private function ensureReadyForSettlement(Order $order): void

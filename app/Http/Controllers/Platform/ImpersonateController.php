@@ -27,6 +27,7 @@ class ImpersonateController extends Controller
             'tenant_name'    => $tenant->name ?? $tenant->id,
             'user_id'        => $userId,
             'user_name'      => $user->name,
+            'user_username'  => $user->username,
             'user_email'     => $user->email,
             'platform_admin' => Auth::guard('platform_admin')->user()->name,
             'return_url'     => route('platform.tenants.show', $tenantId),

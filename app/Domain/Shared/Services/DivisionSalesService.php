@@ -137,6 +137,7 @@ class DivisionSalesService
             ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
             ->whereNull('payments.folio_id')
             ->whereNotNull('payments.order_id')
+            ->where('orders.status', 'closed')
             ->whereBetween('payments.created_at', [$from, $to])
             ->where('payments.status', 'captured')
             ->selectRaw('outlets.type, SUM(payments.amount) as total')

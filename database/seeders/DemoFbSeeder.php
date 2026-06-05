@@ -106,6 +106,23 @@ class DemoFbSeeder extends Seeder
             ['quantity' => 45, 'unit' => 'ml']
         );
 
+        $lagerStock = StockItem::query()->updateOrCreate(
+            ['name' => 'Kilimanjaro Lager (bottle)'],
+            [
+                'outlet_id' => $bar->id,
+                'category' => 'beverage',
+                'unit' => 'bottle',
+                'current_stock' => 48,
+                'reorder_level' => 12,
+                'cost_per_unit' => '2500',
+            ]
+        );
+
+        RecipeIngredient::query()->updateOrCreate(
+            ['menu_item_id' => $kili->id, 'stock_item_id' => $lagerStock->id],
+            ['quantity' => 1, 'unit' => 'bottle']
+        );
+
         $waiter = User::query()->where('email', config('nexstay.demo.front_desk_email'))->first();
 
         $table = OutletTable::query()->where('outlet_id', $restaurant->id)->where('table_number', 'T1')->first();

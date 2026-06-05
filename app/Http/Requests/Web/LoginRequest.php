@@ -20,7 +20,7 @@ class LoginRequest extends FormRequest
     {
         return [
             'property_code' => ['required', 'string', 'max:100'],
-            'email' => ['required', 'email'],
+            'username' => ['required', 'string', 'max:255'],
             'password' => ['required', 'string'],
             'remember' => ['sometimes', 'boolean'],
         ];

@@ -31,11 +31,11 @@ class AuthController extends Controller
 
         tenancy()->initialize($tenant);
 
-        $user = User::query()->where('email', $request->validated('email'))->first();
+        $user = User::findByLoginIdentifier($request->loginIdentifier());
 
         if ($user === null || ! Hash::check($request->validated('password'), $user->password)) {
             throw ValidationException::withMessages([
-                'email' => ['The provided credentials are incorrect.'],
+                'username' => ['The provided credentials are incorrect.'],
             ]);
         }
 

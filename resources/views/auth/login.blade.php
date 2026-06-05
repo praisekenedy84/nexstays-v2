@@ -36,8 +36,10 @@
                     class="input-field">
             </div>
             <div>
-                <label for="email" class="mb-1.5 block text-xs font-medium text-ink-muted">Email</label>
-                <input id="email" type="email" name="email" value="{{ old('email') }}" required class="input-field">
+                <label for="username" class="mb-1.5 block text-xs font-medium text-ink-muted">Username or email</label>
+                <input id="username" type="text" name="username" value="{{ old('username') }}" required
+                    autocomplete="username" spellcheck="false"
+                    class="input-field">
             </div>
             <div>
                 <label for="password" class="mb-1.5 block text-xs font-medium text-ink-muted">Password</label>
@@ -54,7 +56,7 @@
             <div class="mt-6 rounded-lg bg-slate-50 px-4 py-3 text-center text-xs text-ink-muted">
                 <span class="font-medium">Demo credentials</span><br>
                 Code: <code class="rounded bg-white px-1">{{ config('nexstay.demo.tenant_id') }}</code>
-                &nbsp;·&nbsp; Email: <code class="rounded bg-white px-1">{{ config('nexstay.demo.admin_email') }}</code>
+                &nbsp;·&nbsp; Username: <code class="rounded bg-white px-1">{{ config('nexstay.demo.admin_username') }}</code>
                 &nbsp;·&nbsp; Password: <code class="rounded bg-white px-1">{{ config('nexstay.demo.password') }}</code>
             </div>
         @endif

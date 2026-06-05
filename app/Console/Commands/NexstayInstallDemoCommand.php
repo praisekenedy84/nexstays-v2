@@ -55,17 +55,17 @@ class NexstayInstallDemoCommand extends Command
         $this->newLine();
         $this->components->info('Demo tenant ready.');
         $this->table(
-            ['Role', 'Email', 'Password'],
+            ['Role', 'Username', 'Password'],
             [
-                ['Admin (GM)', config('nexstay.demo.admin_email'), $password],
-                ['Front desk', config('nexstay.demo.front_desk_email'), $password],
-                ['Housekeeper', config('nexstay.demo.housekeeper_email'), $password],
+                ['Admin (GM)', config('nexstay.demo.admin_username'), $password],
+                ['Front desk', config('nexstay.demo.front_desk_username'), $password],
+                ['Housekeeper', config('nexstay.demo.housekeeper_username'), $password],
             ]
         );
         $this->line("  Web login: {$appUrl}/login  (property code: {$tenantId})");
         $this->line("  API base:  {$appUrl}/api/v1");
         $this->line("  API login: POST {$appUrl}/api/v1/auth/login");
-        $this->line('             Body: { "property_code": "'.$tenantId.'", "email": "...", "password": "..." }');
+        $this->line('             Body: { "property_code": "'.$tenantId.'", "username": "...", "password": "..." }');
         $this->newLine();
 
         return self::SUCCESS;
