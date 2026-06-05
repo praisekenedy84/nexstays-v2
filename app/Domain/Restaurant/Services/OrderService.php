@@ -15,6 +15,7 @@ use App\Domain\Shared\Models\OrderStatusLog;
 use App\Domain\Shared\Models\Outlet;
 use App\Domain\Shared\Models\OutletTable;
 use App\Domain\Shared\Services\FolioService;
+use App\Domain\Shared\Services\OrderRevenueService;
 use App\Domain\Shared\Services\PaymentMethodSettingsService;
 use App\Domain\Shared\Services\TaxService;
 use App\Domain\Shared\Support\OrderNumberGenerator;
@@ -35,6 +36,7 @@ class OrderService
         private readonly PaymentMethodSettingsService $paymentMethodSettings,
         private readonly InventoryAvailabilityService $inventoryAvailability,
         private readonly OrderSettlementReversalService $settlementReversal,
+        private readonly OrderRevenueService $orderRevenue,
     ) {}
 
     /**
@@ -80,13 +82,15 @@ class OrderService
             throw_if(! $order->isOpen(), \DomainException::class, 'Cannot add items to a closed order.');
 
             $order->loadMissing('outlet');
-            $enforceStock = $order->outlet?->tracksBeverageInventory() ?? false;
 
             foreach ($lines as $line) {
-                $menuItem = MenuItem::query()->findOrFail($line['menu_item_id']);
+                $menuItem = MenuItem::query()
+                    ->with('category.outlet')
+                    ->findOrFail($line['menu_item_id']);
                 throw_if(! $menuItem->is_available, \DomainException::class, "Menu item {$menuItem->name} is not available.");
+                $this->assertMenuItemAllowedOnOrder($order, $menuItem);
 
-                if ($enforceStock) {
+                if ($menuItem->tracksBeverageInventory()) {
                     $this->inventoryAvailability->assertCanFulfill($menuItem, (int) $line['quantity']);
                 }
 
@@ -141,22 +145,28 @@ class OrderService
         return DB::transaction(function () use ($order, $folio) {
             $this->ensureReadyForSettlement($order);
             $order = $this->recalculate($order);
-            $chargeType = match ($order->outlet->type) {
-                'bar' => 'bar',
-                'lounge' => 'restaurant',
-                default => 'restaurant',
-            };
+            $split = $this->orderRevenue->splitOrderTotals($order);
+            $meta = ['reference_id' => $order->id, 'reference_type' => Order::class];
 
-            // Charge the inclusive total — tax is already part of the price.
-            $amount = Money::of((string) $order->total, config('nexstay.currency.default', 'TZS'));
+            if ($split['restaurant']->isPositive()) {
+                $this->folioService->postCharge(
+                    $folio,
+                    'restaurant',
+                    "Order {$order->order_number} — food",
+                    $split['restaurant'],
+                    $meta
+                );
+            }
 
-            $this->folioService->postCharge(
-                $folio,
-                $chargeType,
-                "Order {$order->order_number}",
-                $amount,
-                ['reference_id' => $order->id, 'reference_type' => Order::class]
-            );
+            if ($split['bar']->isPositive()) {
+                $this->folioService->postCharge(
+                    $folio,
+                    'bar',
+                    "Order {$order->order_number} — beverages",
+                    $split['bar'],
+                    $meta
+                );
+            }
 
             return $this->finalizeClosedOrder(
                 $order,
@@ -286,33 +296,19 @@ class OrderService
 
     public function recalculate(Order $order): Order
     {
-        $order->load(['items', 'outlet']);
+        $order->load(['items.menuItem.category.outlet', 'outlet']);
         $currency = config('nexstay.currency.default', 'TZS');
+        $split = $this->orderRevenue->splitOrderTotals($order);
 
-        // Sum item prices — these are tax-inclusive (the price IS what the guest pays)
-        $total = Money::zero($currency);
-        foreach ($order->items as $item) {
-            if ($item->status === 'voided') {
-                continue;
-            }
-            $line = Money::of((string) $item->unit_price, $currency)
-                ->multipliedBy($item->quantity, RoundingMode::HALF_UP);
-            $total = $total->plus($line);
-        }
-
-        $chargeType = match ($order->outlet?->type) {
-            'bar'    => 'bar',
-            'lounge' => 'restaurant',
-            default  => 'restaurant',
-        };
-
-        // Extract the tax component from the inclusive total
-        $tax      = $this->taxService->calculate($total, $chargeType);
-        $subtotal = $total->minus($tax->amount); // net pre-tax equivalent
+        $total = $split['restaurant']->plus($split['bar']);
+        $foodTax = $this->taxService->calculate($split['restaurant'], 'restaurant');
+        $drinksTax = $this->taxService->calculate($split['bar'], 'bar');
+        $tax = $foodTax->amount->plus($drinksTax->amount);
+        $subtotal = $total->minus($tax);
 
         $order->update([
             'subtotal'   => $subtotal->getAmount()->toFloat(), // net (for reporting)
-            'tax_amount' => $tax->amount->getAmount()->toFloat(), // extracted tax portion
+            'tax_amount' => $tax->getAmount()->toFloat(), // extracted tax portion
             'total'      => $total->getAmount()->toFloat(),    // what the guest actually pays
         ]);
 
@@ -459,6 +455,29 @@ class OrderService
         DB::afterCommit(fn () => OrderClosed::dispatch($order));
 
         return $order;
+    }
+
+    private function assertMenuItemAllowedOnOrder(Order $order, MenuItem $menuItem): void
+    {
+        $order->loadMissing('outlet');
+        $menuItem->loadMissing('category.outlet');
+        $sourceOutlet = $menuItem->category?->outlet;
+
+        throw_if($sourceOutlet === null, \DomainException::class, 'Menu item has no outlet.');
+
+        if ($order->outlet->isRestaurant() || $order->outlet->isLounge()) {
+            if ($sourceOutlet->id === $order->outlet_id || $sourceOutlet->isBar()) {
+                return;
+            }
+
+            throw new \DomainException('This menu item cannot be added to a restaurant order.');
+        }
+
+        throw_if(
+            $sourceOutlet->id !== $order->outlet_id,
+            \DomainException::class,
+            'Menu items must belong to this outlet.'
+        );
     }
 
     private function ensureReadyForSettlement(Order $order): void

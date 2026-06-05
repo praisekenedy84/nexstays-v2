@@ -13,6 +13,10 @@ use Illuminate\Support\Collection;
 
 class DivisionSalesService
 {
+    public function __construct(
+        private readonly OrderRevenueService $orderRevenue,
+    ) {}
+
     private const FB_FOLIO_TYPES    = ['restaurant', 'bar', 'lounge'];
     private const KNOWN_FOLIO_TYPES = ['room_charge', 'restaurant', 'bar', 'lounge', 'payment'];
 
@@ -205,18 +209,7 @@ class DivisionSalesService
             ->where('amount', '>', 0)
             ->sum('amount');
 
-        // --- Direct POS payments (no folio) ---
-        $directRows = Payment::query()
-            ->join('orders', 'payments.order_id', '=', 'orders.id')
-            ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
-            ->whereNull('payments.folio_id')
-            ->whereNotNull('payments.order_id')
-            ->where('orders.status', 'closed')
-            ->whereBetween('payments.created_at', [$from, $to])
-            ->where('payments.status', 'captured')
-            ->selectRaw('outlets.type, SUM(payments.amount) as total')
-            ->groupBy('outlets.type')
-            ->pluck('total', 'outlets.type');
+        $directSplit = $this->orderRevenue->directPaymentRevenueSplit($from, $to);
 
         // --- Room nights occupied during the from-date ---
         $dateStr    = $from->toDateString();
@@ -235,11 +228,10 @@ class DivisionSalesService
 
         $rooms      = (float) ($folioRows['room_charge'] ?? 0);
         $restaurant = (float) ($folioRows['restaurant'] ?? 0)
-                    + (float) ($directRows['restaurant'] ?? 0);
-        $bar        = (float) ($folioRows['bar'] ?? 0)
                     + (float) ($folioRows['lounge'] ?? 0)
-                    + (float) ($directRows['bar'] ?? 0)
-                    + (float) ($directRows['lounge'] ?? 0);
+                    + $directSplit['restaurant'];
+        $bar        = (float) ($folioRows['bar'] ?? 0)
+                    + $directSplit['bar'];
         $ancillary  = (float) $ancillaryFolio;
         $total      = $rooms + $restaurant + $bar + $ancillary;
 

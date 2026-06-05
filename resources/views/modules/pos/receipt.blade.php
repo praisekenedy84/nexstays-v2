@@ -161,7 +161,12 @@
     @else
         @foreach ($activeItems as $item)
             <div class="item-row">
-                <div class="item-name">{{ $item->menuItem?->name ?? 'Item' }}</div>
+                <div class="item-name">
+                    {{ $item->menuItem?->name ?? 'Item' }}
+                    @if ($item->menuItem?->isBeverage())
+                        <span style="font-size:8px;font-weight:700;color:#0369a1;text-transform:uppercase;">bar</span>
+                    @endif
+                </div>
                 <div class="item-detail">
                     <span>{{ (int) $item->quantity }} × {{ number_format((float) $item->unit_price) }}</span>
                     <span style="font-weight:600; color:#0f172a;">{{ number_format((float) $item->unit_price * $item->quantity) }}</span>

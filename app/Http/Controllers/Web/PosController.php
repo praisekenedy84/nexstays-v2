@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Domain\HBMS\Models\Folio;
 use App\Domain\Restaurant\Services\OrderService;
+use App\Domain\Shared\Models\MenuCategory;
 use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\OrderItem;
 use App\Domain\Shared\Models\Outlet;
@@ -62,10 +63,27 @@ class PosController extends Controller
         $order->load([
             'outlet.menuCategories' => fn ($q) => $q->where('is_active', true)->orderBy('display_order'),
             'outlet.menuCategories.items' => fn ($q) => $q->where('is_available', true)->orderBy('sort_order'),
-            'items.menuItem',
+            'items.menuItem.category.outlet',
             'table',
             'waiter',
         ]);
+
+        $beverageCategories = collect();
+        if ($order->outlet->isRestaurant() || $order->outlet->isLounge()) {
+            $barOutlet = Outlet::query()
+                ->where('type', 'bar')
+                ->where('is_active', true)
+                ->first();
+
+            if ($barOutlet !== null) {
+                $beverageCategories = MenuCategory::query()
+                    ->where('outlet_id', $barOutlet->id)
+                    ->where('is_active', true)
+                    ->with(['items' => fn ($q) => $q->where('is_available', true)->orderBy('sort_order')])
+                    ->orderBy('display_order')
+                    ->get();
+            }
+        }
 
         $activeTill     = $this->tillService->activeForOutlet($order->outlet_id);
         $fbSettings     = $this->fbSettings->all();
@@ -82,7 +100,7 @@ class PosController extends Controller
             : collect();
 
         return view('modules.pos.manage', compact(
-            'order', 'activeTill', 'openFolios',
+            'order', 'activeTill', 'openFolios', 'beverageCategories',
             'allowsDirect', 'allowsFolio', 'enabledMethods'
         ));
     }

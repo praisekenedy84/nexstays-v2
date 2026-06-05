@@ -18,12 +18,6 @@ class InventoryDeductionService
 
     public function deductForOrder(Order $order): void
     {
-        $order->loadMissing('outlet');
-
-        if (! $order->outlet?->tracksBeverageInventory()) {
-            return;
-        }
-
         $alreadyDeducted = StockMovement::query()
             ->where('reference_id', $order->id)
             ->where('reference_type', Order::class)
@@ -45,7 +39,7 @@ class InventoryDeductionService
                 }
 
                 $menuItem = $item->menuItem;
-                if ($menuItem === null) {
+                if ($menuItem === null || ! $menuItem->tracksBeverageInventory()) {
                     continue;
                 }
 

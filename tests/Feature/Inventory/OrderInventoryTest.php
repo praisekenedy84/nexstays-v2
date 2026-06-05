@@ -177,7 +177,7 @@ class OrderInventoryTest extends TenantTestCase
         ]);
     }
 
-    public function test_restaurant_orders_ignore_recipes_even_when_defined(): void
+    public function test_restaurant_food_items_ignore_recipes_even_when_defined(): void
     {
         $this->user->givePermissionTo(['manage-orders', 'view-orders']);
 
@@ -237,6 +237,120 @@ class OrderInventoryTest extends TenantTestCase
         $this->assertDatabaseMissing('stock_movements', [
             'stock_item_id' => $stock->id,
             'movement_type' => 'consumption',
+        ]);
+    }
+
+    public function test_restaurant_order_with_bar_beverage_rejects_insufficient_stock(): void
+    {
+        $this->user->givePermissionTo(['manage-orders', 'view-orders']);
+
+        $restaurant = Outlet::query()->create([
+            'name' => 'Test Restaurant',
+            'type' => 'restaurant',
+            'is_active' => true,
+        ]);
+
+        $bar = Outlet::query()->create([
+            'name' => 'Test Bar',
+            'type' => 'bar',
+            'is_active' => true,
+        ]);
+
+        $barCategory = $bar->menuCategories()->create(['name' => 'Drinks', 'display_order' => 1]);
+        $drink = MenuItem::query()->create([
+            'category_id' => $barCategory->id,
+            'name' => 'Safari Lager',
+            'price' => '8000.00',
+            'is_available' => true,
+        ]);
+
+        $stock = StockItem::query()->create([
+            'outlet_id' => $bar->id,
+            'name' => 'Safari Lager (bottle)',
+            'unit' => 'bottle',
+            'current_stock' => 0,
+            'reorder_level' => 2,
+        ]);
+
+        RecipeIngredient::query()->create([
+            'menu_item_id' => $drink->id,
+            'stock_item_id' => $stock->id,
+            'quantity' => 1,
+            'unit' => 'bottle',
+        ]);
+
+        $order = app(OrderService::class)->create($restaurant, ['covers' => 2]);
+
+        $this->expectException(InsufficientStockException::class);
+
+        app(OrderService::class)->addItems($order, [
+            ['menu_item_id' => $drink->id, 'quantity' => 1],
+        ]);
+    }
+
+    public function test_restaurant_order_with_bar_beverage_depletes_stock_on_close(): void
+    {
+        $this->mock(PaymentMethodSettingsService::class, function ($mock): void {
+            $mock->shouldReceive('isEnabled')->andReturn(true);
+        });
+
+        $restaurant = Outlet::query()->create([
+            'name' => 'Test Restaurant',
+            'type' => 'restaurant',
+            'is_active' => true,
+        ]);
+
+        $bar = Outlet::query()->create([
+            'name' => 'Test Bar',
+            'type' => 'bar',
+            'is_active' => true,
+        ]);
+
+        $barCategory = $bar->menuCategories()->create(['name' => 'Drinks', 'display_order' => 1]);
+        $drink = MenuItem::query()->create([
+            'category_id' => $barCategory->id,
+            'name' => 'Safari Lager',
+            'price' => '8000.00',
+            'is_available' => true,
+        ]);
+
+        $stock = StockItem::query()->create([
+            'outlet_id' => $bar->id,
+            'name' => 'Safari Lager (bottle)',
+            'unit' => 'bottle',
+            'current_stock' => 5,
+            'reorder_level' => 2,
+        ]);
+
+        RecipeIngredient::query()->create([
+            'menu_item_id' => $drink->id,
+            'stock_item_id' => $stock->id,
+            'quantity' => 1,
+            'unit' => 'bottle',
+        ]);
+
+        $orderService = app(OrderService::class);
+        $order = $orderService->create($restaurant, ['covers' => 2], [
+            ['menu_item_id' => $drink->id, 'quantity' => 2],
+        ]);
+
+        $item = $order->items->first();
+        $order = $orderService->updateItemStatus($order, $item, 'sent');
+        $order = $orderService->updateItemStatus($order, $order->items->first(), 'preparing');
+        $order = $orderService->updateItemStatus($order, $order->items->first(), 'ready');
+        $orderService->updateItemStatus($order, $order->items->first(), 'served');
+
+        $orderService->recordDirectPayment(
+            $order->fresh(),
+            'card',
+            Money::of('16000', 'TZS'),
+        );
+
+        $this->assertEquals(3.0, (float) $stock->fresh()->current_stock);
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_item_id' => $stock->id,
+            'movement_type' => 'consumption',
+            'reference_id' => $order->id,
         ]);
     }
 }

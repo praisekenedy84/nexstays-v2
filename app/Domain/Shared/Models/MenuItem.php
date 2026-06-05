@@ -86,4 +86,32 @@ class MenuItem extends Model
     {
         return $this->recipeIngredients()->doesntExist();
     }
+
+    public function sourceOutlet(): ?Outlet
+    {
+        $this->loadMissing('category.outlet');
+
+        return $this->category?->outlet;
+    }
+
+    public function isBeverage(): bool
+    {
+        return $this->sourceOutlet()?->isBar() ?? false;
+    }
+
+    /**
+     * Folio transaction type used when this item is settled.
+     */
+    public function revenueChargeType(): string
+    {
+        return $this->isBeverage() ? 'bar' : 'restaurant';
+    }
+
+    /**
+     * Bar-sourced items deduct beverage stock regardless of which outlet serves the order.
+     */
+    public function tracksBeverageInventory(): bool
+    {
+        return $this->isBeverage();
+    }
 }

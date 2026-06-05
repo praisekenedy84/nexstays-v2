@@ -19,7 +19,8 @@ use Illuminate\Support\Collection;
 class ReportingService
 {
     public function __construct(
-        private readonly FolioService $folioService
+        private readonly FolioService $folioService,
+        private readonly OrderRevenueService $orderRevenue,
     ) {}
 
     /**
@@ -94,25 +95,13 @@ class ReportingService
             ->groupBy('transaction_type')
             ->pluck('total', 'transaction_type');
 
-        // Direct POS cash payments (folio_id IS NULL, linked to an F&B outlet order)
-        $directRows = Payment::query()
-            ->join('orders', 'payments.order_id', '=', 'orders.id')
-            ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
-            ->whereNull('payments.folio_id')
-            ->whereNotNull('payments.order_id')
-            ->where('orders.status', 'closed')
-            ->whereBetween('payments.created_at', [$from, $to])
-            ->whereIn('outlets.type', ['restaurant', 'bar', 'lounge'])
-            ->selectRaw("outlets.type, SUM(payments.amount) as total")
-            ->groupBy('outlets.type')
-            ->pluck('total', 'outlets.type');
+        $directSplit = $this->orderRevenue->directPaymentRevenueSplit($from, $to);
 
         $food = (float) ($folioRows['restaurant'] ?? 0)
-            + (float) ($directRows['restaurant'] ?? 0);
-        $drinks = (float) ($folioRows['bar'] ?? 0)
-            + (float) ($directRows['bar'] ?? 0)
             + (float) ($folioRows['lounge'] ?? 0)
-            + (float) ($directRows['lounge'] ?? 0);
+            + $directSplit['restaurant'];
+        $drinks = (float) ($folioRows['bar'] ?? 0)
+            + $directSplit['bar'];
 
         return [
             'food'   => (string) $food,
@@ -531,36 +520,28 @@ class ReportingService
             ->groupBy('transaction_type')
             ->pluck('total', 'transaction_type');
 
-        $directRev = Payment::query()
-            ->join('orders', 'payments.order_id', '=', 'orders.id')
-            ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
-            ->whereNull('payments.folio_id')
-            ->whereNotNull('payments.order_id')
-            ->where('orders.status', 'closed')
-            ->whereBetween('payments.created_at', [$from, $to])
-            ->whereIn('outlets.type', ['restaurant', 'bar', 'lounge'])
-            ->selectRaw('outlets.type, SUM(payments.amount) as total')
-            ->groupBy('outlets.type')
-            ->pluck('total', 'outlets.type');
+        $directSplit = $this->orderRevenue->directPaymentRevenueSplit($from, $to);
 
-        $foodRev   = (float) ($folioRev['restaurant'] ?? 0) + (float) ($directRev['restaurant'] ?? 0);
-        $drinksRev = (float) ($folioRev['bar'] ?? 0)        + (float) ($directRev['bar'] ?? 0)
-                   + (float) ($folioRev['lounge'] ?? 0)     + (float) ($directRev['lounge'] ?? 0);
+        $foodRev   = (float) ($folioRev['restaurant'] ?? 0)
+                   + (float) ($folioRev['lounge'] ?? 0)
+                   + $directSplit['restaurant'];
+        $drinksRev = (float) ($folioRev['bar'] ?? 0) + $directSplit['bar'];
         $totalRev  = $foodRev + $drinksRev;
 
         // --- Theoretical COGS (qty × menu_item.cost for closed orders) ---
         $cogsRows = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
             ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
+            ->join('menu_categories', 'menu_items.category_id', '=', 'menu_categories.id')
+            ->join('outlets as source_outlets', 'menu_categories.outlet_id', '=', 'source_outlets.id')
             ->where('orders.status', 'closed')
             ->whereNotNull('orders.closed_at')
             ->whereBetween('orders.closed_at', [$from, $to])
-            ->whereIn('outlets.type', ['restaurant', 'bar', 'lounge'])
+            ->whereIn('source_outlets.type', ['restaurant', 'bar', 'lounge'])
             ->where('order_items.status', '!=', 'voided')
-            ->selectRaw("outlets.type, SUM(order_items.quantity * COALESCE(menu_items.cost, 0)) as total")
-            ->groupBy('outlets.type')
-            ->pluck('total', 'outlets.type');
+            ->selectRaw("source_outlets.type, SUM(order_items.quantity * COALESCE(menu_items.cost, 0)) as total")
+            ->groupBy('source_outlets.type')
+            ->pluck('total', 'source_outlets.type');
 
         $foodCogs   = (float) ($cogsRows['restaurant'] ?? 0);
         $drinksCogs = (float) ($cogsRows['bar'] ?? 0) + (float) ($cogsRows['lounge'] ?? 0);
@@ -596,24 +577,24 @@ class ReportingService
         // --- Top 15 selling items by revenue ---
         $topItems = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
-            ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
             ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
             ->leftJoin('menu_categories', 'menu_items.category_id', '=', 'menu_categories.id')
+            ->join('outlets as source_outlets', 'menu_categories.outlet_id', '=', 'source_outlets.id')
             ->where('orders.status', 'closed')
             ->whereNotNull('orders.closed_at')
             ->whereBetween('orders.closed_at', [$from, $to])
-            ->whereIn('outlets.type', ['restaurant', 'bar', 'lounge'])
+            ->whereIn('source_outlets.type', ['restaurant', 'bar', 'lounge'])
             ->where('order_items.status', '!=', 'voided')
             ->selectRaw("
                 order_items.menu_item_id,
                 menu_items.name                                              AS item_name,
                 COALESCE(menu_categories.name, 'Uncategorized')             AS category,
-                outlets.type                                                 AS outlet_type,
+                source_outlets.type                                          AS outlet_type,
                 SUM(order_items.quantity)::integer                           AS qty_sold,
                 SUM(order_items.quantity * order_items.unit_price)           AS revenue,
                 SUM(order_items.quantity * COALESCE(menu_items.cost, 0))    AS cogs
             ")
-            ->groupBy('order_items.menu_item_id', 'menu_items.name', 'menu_categories.name', 'outlets.type')
+            ->groupBy('order_items.menu_item_id', 'menu_items.name', 'menu_categories.name', 'source_outlets.type')
             ->orderByDesc('revenue')
             ->limit(15)
             ->get()

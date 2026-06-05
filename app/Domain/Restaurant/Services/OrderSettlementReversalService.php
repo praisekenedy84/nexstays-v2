@@ -52,7 +52,11 @@ class OrderSettlementReversalService
 
     private function reverseInventoryDeductions(Order $order): void
     {
-        if (! $order->outlet?->tracksBeverageInventory()) {
+        $hasBeverageItems = $order->items
+            ->where('status', '!=', 'voided')
+            ->contains(fn ($item) => $item->menuItem?->tracksBeverageInventory() ?? false);
+
+        if (! $hasBeverageItems) {
             return;
         }
 
