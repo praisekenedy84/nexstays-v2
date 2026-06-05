@@ -62,6 +62,21 @@ class PaymentMethodSettingsService
         return in_array($method, $this->enabledMethods(), true);
     }
 
+    public function labelFor(?string $method): ?string
+    {
+        if ($method === null || $method === '') {
+            return null;
+        }
+
+        return self::METHODS[$method]['label'] ?? ucfirst(str_replace('_', ' ', $method));
+    }
+
+    /** @return list<string> */
+    public function allowedMethodKeys(): array
+    {
+        return array_keys(self::METHODS);
+    }
+
     /** @param list<string> $enabled */
     public function update(array $enabled): void
     {

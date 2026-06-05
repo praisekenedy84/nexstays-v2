@@ -340,10 +340,14 @@
             </tr>
             @if ($reservation->source)
             <tr>
-                <td class="dl">Source</td>
-                <td class="dv">{{ $reservation->source }}</td>
+                <td class="dl">Payment source</td>
+                <td class="dv">{{ app(\App\Domain\Shared\Services\PaymentMethodSettingsService::class)->labelFor($reservation->source) }}</td>
             </tr>
             @endif
+            <tr>
+                <td class="dl">Booked by</td>
+                <td class="dv">{{ $reservation->creator?->name ?? '—' }}</td>
+            </tr>
             @if ($reservation->ota_ref)
             <tr>
                 <td class="dl">OTA Ref</td>

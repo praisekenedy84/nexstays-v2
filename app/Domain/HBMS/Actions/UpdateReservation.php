@@ -31,7 +31,13 @@ class UpdateReservation
                 'rate_plan_id',
                 'special_requests',
                 'deposit_amount',
-            ])->filter(fn ($value) => $value !== null)->all();
+            ])->map(function ($value, $key) {
+                if ($key === 'special_requests' && blank($value)) {
+                    return null;
+                }
+
+                return $value;
+            })->filter(fn ($value, $key) => $value !== null || $key === 'special_requests')->all();
 
             $targetRoomId = $payload['room_id'] ?? $reservation->room_id;
             $targetCheckIn = $payload['check_in_date'] ?? $reservation->check_in_date?->toDateString();

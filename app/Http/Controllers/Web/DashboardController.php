@@ -51,6 +51,11 @@ class DashboardController extends Controller
 
         $todaySales      = $this->divisionSales->liveSummary();
         $mtdSales        = $this->divisionSales->mtdSummary();
+        $todayBookedRooms = $this->divisionSales->todayArrivalBookedRevenue();
+        $mtdBookedRooms   = $this->divisionSales->bookedRoomRevenue(
+            $today->copy()->startOfMonth(),
+            now()->endOfDay(),
+        );
         $recentSnapshots = $this->divisionSales->recentSnapshots(7);
 
         $topProducts = OrderItem::query()
@@ -83,6 +88,8 @@ class DashboardController extends Controller
             'lastReservation',
             'todaySales',
             'mtdSales',
+            'todayBookedRooms',
+            'mtdBookedRooms',
             'recentSnapshots',
             'topProducts',
             'todayFbOrders',

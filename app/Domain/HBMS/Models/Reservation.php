@@ -45,6 +45,7 @@ class Reservation extends Model
         'ota_ref',
         'special_requests',
         'deposit_amount',
+        'created_by',
         'overstay_nights',
         'overstay_rate',
         'overstay_charge',
@@ -121,6 +122,11 @@ class Reservation extends Model
     public function overstaySettledBy(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'overstay_settled_by');
+    }
+
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(\App\Models\User::class, 'created_by');
     }
 
     /**

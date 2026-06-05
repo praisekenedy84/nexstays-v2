@@ -121,6 +121,9 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
                 ->name('reservations.no-show');
             Route::get('/reservations/{reservation}/ticket', [ReservationController::class, 'ticket'])
                 ->name('reservations.ticket');
+            Route::get('/reservations/available-room-types', [ReservationController::class, 'availableRoomTypes'])
+                ->middleware('permission:manage-reservations')
+                ->name('reservations.available-room-types');
             Route::get('/reservations/available-rooms', [ReservationController::class, 'availableRooms'])
                 ->middleware('permission:manage-reservations')
                 ->name('reservations.available-rooms');

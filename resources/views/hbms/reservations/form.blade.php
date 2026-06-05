@@ -45,8 +45,16 @@
                     </select>
                 </div>
                 <div>
-                    <label for="source" class="mb-1.5 block text-xs font-medium text-ink-muted">Source</label>
-                    <input id="source" name="source" value="{{ old('source', $reservation->source ?? 'direct') }}" class="input-field">
+                    <label for="source" class="mb-1.5 block text-xs font-medium text-ink-muted">Payment source</label>
+                    <select id="source" name="source" required class="input-field">
+                        @forelse ($enabledPaymentMethods as $method)
+                            <option value="{{ $method }}" @selected(old('source', $reservation->source) === $method)>
+                                {{ $paymentMethods[$method]['label'] }}
+                            </option>
+                        @empty
+                            <option value="" disabled selected>No payment methods enabled</option>
+                        @endforelse
+                    </select>
                 </div>
             </div>
         @else
@@ -55,36 +63,6 @@
                 · {{ $reservation->guest?->first_name }} {{ $reservation->guest?->last_name }}
             </p>
         @endunless
-
-        <div>
-            <label for="room_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room</label>
-            <select
-                id="room_id"
-                name="room_id"
-                required
-                class="input-field"
-                data-available-rooms-url="{{ route('tenant.reservations.available-rooms') }}"
-                data-exclude-reservation-id="{{ $reservation->id }}"
-            >
-                <option value="">Select room…</option>
-                @foreach ($rooms as $room)
-                    <option
-                        value="{{ $room->id }}"
-                        data-daily-rate="{{ $room->daily_rate ?? 0 }}"
-                        data-room-number="{{ $room->room_number }}"
-                        data-room-type="{{ $room->roomType?->name }}"
-                        data-status="{{ $room->status }}"
-                        @selected(old('room_id', $reservation->room_id) === $room->id)
-                    >
-                        {{ $room->room_number }} — {{ $room->roomType?->name }} ({{ ucfirst(str_replace('_', ' ', $room->status)) }} · @money($room->daily_rate ?? 0))
-                    </option>
-                @endforeach
-            </select>
-            <p class="mt-1 text-xs text-ink-subtle">
-                Room options refresh automatically based on selected stay dates.
-            </p>
-            <p id="room_rate_hint" class="mt-1 text-xs text-ink-subtle"></p>
-        </div>
 
         <div class="grid gap-4 sm:grid-cols-2">
             <div>
@@ -108,6 +86,37 @@
             </div>
         </div>
 
+        <div
+            id="room_selection"
+            class="space-y-4"
+            data-available-room-types-url="{{ route('tenant.reservations.available-room-types') }}"
+            data-available-rooms-url="{{ route('tenant.reservations.available-rooms') }}"
+            data-exclude-reservation-id="{{ $reservation->id }}"
+            data-initial-room-type-id="{{ old('room_type_id', $reservation->room_type_id ?? $reservation->room?->room_type_id) }}"
+            data-initial-room-id="{{ old('room_id', $reservation->room_id) }}"
+        >
+            <div>
+                <label for="room_type_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room type</label>
+                <select id="room_type_id" class="input-field">
+                    <option value="">Select stay dates first…</option>
+                </select>
+                <p id="room_type_availability_hint" class="mt-1 text-xs text-ink-subtle">
+                    Choose check-in and check-out dates to see room types.
+                </p>
+            </div>
+
+            <div>
+                <label for="room_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Room</label>
+                <select id="room_id" name="room_id" required class="input-field">
+                    <option value="">Select a room type first…</option>
+                </select>
+                <p id="room_availability_hint" class="mt-1 text-xs text-ink-subtle">
+                    Choose a room type to see available rooms.
+                </p>
+                <p id="room_rate_hint" class="mt-1 text-xs text-ink-subtle"></p>
+            </div>
+        </div>
+
         <p id="estimated_total" class="rounded-lg bg-slate-50 px-4 py-3 text-sm text-ink-muted"></p>
 
         <div>
@@ -128,69 +137,35 @@
 
 <script>
     (() => {
+        const roomSelection = document.getElementById('room_selection');
+        const roomType = document.getElementById('room_type_id');
         const room = document.getElementById('room_id');
         const checkIn = document.getElementById('check_in_date');
         const checkOut = document.getElementById('check_out_date');
         const rateHint = document.getElementById('room_rate_hint');
+        const roomTypeHint = document.getElementById('room_type_availability_hint');
+        const roomHint = document.getElementById('room_availability_hint');
         const estimatedTotal = document.getElementById('estimated_total');
-        const availabilityEndpoint = room?.dataset.availableRoomsUrl;
-        const excludeReservationId = room?.dataset.excludeReservationId;
-        let latestRequestId = 0;
+        const roomTypesEndpoint = roomSelection?.dataset.availableRoomTypesUrl;
+        const roomsEndpoint = roomSelection?.dataset.availableRoomsUrl;
+        const excludeReservationId = roomSelection?.dataset.excludeReservationId;
+        const initialRoomTypeId = roomSelection?.dataset.initialRoomTypeId || '';
+        const initialRoomId = roomSelection?.dataset.initialRoomId || '';
+        let latestRoomTypesRequestId = 0;
+        let latestRoomsRequestId = 0;
+        let appliedInitialSelection = false;
 
-        if (!room || !checkIn || !checkOut || !estimatedTotal || !availabilityEndpoint) {
+        if (!roomSelection || !roomType || !room || !checkIn || !checkOut || !estimatedTotal || !roomTypesEndpoint || !roomsEndpoint) {
             return;
         }
 
         const formatMoney = (value) =>
             new Intl.NumberFormat('en-TZ', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(value);
 
-        const recalculate = () => {
-            const selectedOption = room.options[room.selectedIndex];
-            const rate = Number(selectedOption?.dataset.dailyRate ?? 0);
-            const inDate = checkIn.value ? new Date(checkIn.value + 'T00:00:00') : null;
-            const outDate = checkOut.value ? new Date(checkOut.value + 'T00:00:00') : null;
-            const nights = inDate && outDate ? Math.max(0, Math.round((outDate - inDate) / 86400000)) : 0;
-            const total = nights * rate;
+        const isDateRangeValid = () =>
+            Boolean(checkIn.value && checkOut.value && checkOut.value > checkIn.value);
 
-            if (selectedOption?.value) {
-                rateHint.textContent = `Daily rate from room: TZS ${formatMoney(rate)}.`;
-            } else {
-                rateHint.textContent = '';
-            }
-
-            if (nights > 0 && selectedOption?.value) {
-                estimatedTotal.textContent = `${nights} night(s) x TZS ${formatMoney(rate)} = TZS ${formatMoney(total)} estimated stay total.`;
-            } else {
-                estimatedTotal.textContent = 'Select room and stay dates to preview total stay amount.';
-            }
-        };
-
-        const renderOptionLabel = (item) => {
-            const statusLabel = String(item.status || '').replaceAll('_', ' ');
-            const rate = Number(item.daily_rate ?? 0);
-            const reason = item.reason === 'reserved_for_selected_dates'
-                ? 'reserved for selected dates'
-                : (item.reason === 'room_status_unavailable' ? 'not bookable by room status' : null);
-
-            return `${item.room_number} — ${item.room_type_name ?? 'Room'} (${statusLabel} · TZS ${formatMoney(rate)})${reason ? ` — ${reason}` : ''}`;
-        };
-
-        const isDateRangeValid = () => {
-            if (!checkIn.value || !checkOut.value) {
-                return false;
-            }
-
-            return checkOut.value > checkIn.value;
-        };
-
-        const refreshAvailableRooms = async () => {
-            if (!isDateRangeValid()) {
-                recalculate();
-                return;
-            }
-
-            const selectedRoomId = room.value;
-            const requestId = ++latestRequestId;
+        const buildDateParams = () => {
             const params = new URLSearchParams({
                 check_in_date: checkIn.value,
                 check_out_date: checkOut.value,
@@ -200,11 +175,92 @@
                 params.set('exclude_reservation_id', excludeReservationId);
             }
 
+            return params;
+        };
+
+        const setSelectEnabled = (select, enabled, clearValue = true) => {
+            select.disabled = !enabled;
+
+            if (!enabled && clearValue) {
+                select.value = '';
+            }
+        };
+
+        const resetSelect = (select, placeholder) => {
+            select.innerHTML = '';
+            const option = document.createElement('option');
+            option.value = '';
+            option.textContent = placeholder;
+            select.appendChild(option);
+        };
+
+        const recalculate = () => {
+            const selectedOption = room.options[room.selectedIndex];
+            const rate = Number(selectedOption?.dataset.dailyRate ?? 0);
+            const inDate = checkIn.value ? new Date(checkIn.value + 'T00:00:00') : null;
+            const outDate = checkOut.value ? new Date(checkOut.value + 'T00:00:00') : null;
+            const nights = inDate && outDate ? Math.max(0, Math.round((outDate - inDate) / 86400000)) : 0;
+            const total = nights * rate;
+
+            rateHint.textContent = selectedOption?.value
+                ? `Daily rate from room: TZS ${formatMoney(rate)}.`
+                : '';
+
+            estimatedTotal.textContent = nights > 0 && selectedOption?.value
+                ? `${nights} night(s) x TZS ${formatMoney(rate)} = TZS ${formatMoney(total)} estimated stay total.`
+                : 'Select stay dates and a room to preview total stay amount.';
+        };
+
+        const updateRoomTypeHint = (roomTypes) => {
+            const typesWithAvailability = roomTypes.filter((item) => item.available_count > 0).length;
+
+            roomTypeHint.textContent = roomTypes.length === 0
+                ? 'No room types are configured.'
+                : (typesWithAvailability === 0
+                    ? 'No room types have availability for the selected dates.'
+                    : `${typesWithAvailability} room type(s) with availability for the selected dates.`);
+        };
+
+        const renderRoomTypeLabel = (item) => {
+            const baseRate = Number(item.base_rate ?? 0);
+            const availability = item.available_count > 0
+                ? `${item.available_count} available`
+                : 'none available';
+
+            return `${item.name} (${availability} · from TZS ${formatMoney(baseRate)})`;
+        };
+
+        const renderRoomLabel = (item) => {
+            const statusLabel = String(item.status || '').replaceAll('_', ' ');
+            const rate = Number(item.daily_rate ?? 0);
+            const reason = item.reason === 'reserved_for_selected_dates'
+                ? 'reserved for selected dates'
+                : (item.reason === 'room_status_unavailable' ? 'not bookable by room status' : null);
+
+            return `${item.room_number} (${statusLabel} · TZS ${formatMoney(rate)})${reason ? ` — ${reason}` : ''}`;
+        };
+
+        const refreshAvailableRooms = async () => {
+            if (!isDateRangeValid() || !roomType.value) {
+                setSelectEnabled(room, false);
+                resetSelect(room, 'Select a room type first…');
+                roomHint.textContent = 'Choose a room type to see available rooms.';
+                rateHint.textContent = '';
+                recalculate();
+                return;
+            }
+
+            setSelectEnabled(room, true);
+            roomHint.textContent = 'Loading available rooms…';
+
+            const selectedRoomId = room.value;
+            const requestId = ++latestRoomsRequestId;
+            const params = buildDateParams();
+            params.set('room_type_id', roomType.value);
+
             try {
-                const response = await fetch(`${availabilityEndpoint}?${params.toString()}`, {
-                    headers: {
-                        'X-Requested-With': 'XMLHttpRequest',
-                    },
+                const response = await fetch(`${roomsEndpoint}?${params.toString()}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
                 });
 
                 if (!response.ok) {
@@ -212,23 +268,18 @@
                 }
 
                 const payload = await response.json();
-                if (requestId !== latestRequestId) {
+                if (requestId !== latestRoomsRequestId) {
                     return;
                 }
 
                 const rooms = Array.isArray(payload.data) ? payload.data : [];
-                room.innerHTML = '';
-
-                const placeholder = document.createElement('option');
-                placeholder.value = '';
-                placeholder.textContent = 'Select room…';
-                room.appendChild(placeholder);
+                resetSelect(room, 'Select room…');
 
                 rooms.forEach((item) => {
                     const option = document.createElement('option');
                     option.value = item.id;
                     option.dataset.dailyRate = item.daily_rate ?? '0';
-                    option.textContent = renderOptionLabel(item);
+                    option.textContent = renderRoomLabel(item);
 
                     const keepSelected = selectedRoomId !== '' && selectedRoomId === item.id;
                     option.disabled = !item.is_available && !keepSelected;
@@ -237,21 +288,125 @@
                     room.appendChild(option);
                 });
 
-                if (selectedRoomId && !rooms.some((item) => item.id === selectedRoomId)) {
+                if (!appliedInitialSelection && initialRoomId && roomType.value === initialRoomTypeId) {
+                    const initialOption = Array.from(room.options).find((option) => option.value === initialRoomId);
+                    if (initialOption) {
+                        room.value = initialRoomId;
+                    }
+                    appliedInitialSelection = true;
+                } else if (selectedRoomId && !rooms.some((item) => item.id === selectedRoomId)) {
                     room.value = '';
                 }
+
+                const availableCount = rooms.filter((item) => item.is_available).length;
+                roomHint.textContent = availableCount === 0
+                    ? 'No rooms of this type are available for the selected dates.'
+                    : `${availableCount} room(s) available in this type.`;
             } catch (error) {
-                rateHint.textContent = error instanceof Error ? error.message : 'Unable to refresh room availability.';
+                roomHint.textContent = error instanceof Error ? error.message : 'Unable to refresh room availability.';
+                rateHint.textContent = '';
             } finally {
                 recalculate();
             }
         };
 
-        [room, checkIn, checkOut].forEach((el) => el.addEventListener('change', recalculate));
-        [checkIn, checkOut].forEach((el) => el.addEventListener('change', refreshAvailableRooms));
-        room.addEventListener('focus', refreshAvailableRooms);
+        const refreshAvailableRoomTypes = async () => {
+            if (!isDateRangeValid()) {
+                setSelectEnabled(roomType, false);
+                resetSelect(roomType, 'Select stay dates first…');
+                setSelectEnabled(room, false);
+                resetSelect(room, 'Select a room type first…');
+                roomTypeHint.textContent = 'Choose check-in and check-out dates to see room types.';
+                roomHint.textContent = 'Choose a room type to see available rooms.';
+                rateHint.textContent = '';
+                recalculate();
+                return;
+            }
 
-        refreshAvailableRooms();
+            setSelectEnabled(roomType, true);
+            roomTypeHint.textContent = 'Loading room types…';
+
+            const selectedRoomTypeId = roomType.value;
+            const requestId = ++latestRoomTypesRequestId;
+            const params = buildDateParams();
+
+            try {
+                const response = await fetch(`${roomTypesEndpoint}?${params.toString()}`, {
+                    headers: { 'X-Requested-With': 'XMLHttpRequest' },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Failed to load room types.');
+                }
+
+                const payload = await response.json();
+                if (requestId !== latestRoomTypesRequestId) {
+                    return;
+                }
+
+                const roomTypes = Array.isArray(payload.data) ? payload.data : [];
+                resetSelect(roomType, 'Select room type…');
+
+                roomTypes.forEach((item) => {
+                    const option = document.createElement('option');
+                    option.value = item.id;
+                    option.textContent = renderRoomTypeLabel(item);
+                    option.disabled = item.available_count === 0
+                        && item.id !== selectedRoomTypeId
+                        && item.id !== initialRoomTypeId;
+                    roomType.appendChild(option);
+                });
+
+                if (!appliedInitialSelection && initialRoomTypeId) {
+                    const initialTypeOption = Array.from(roomType.options).find((option) => option.value === initialRoomTypeId);
+                    if (initialTypeOption) {
+                        roomType.value = initialRoomTypeId;
+                        updateRoomTypeHint(roomTypes);
+                        await refreshAvailableRooms();
+                        return;
+                    }
+
+                    appliedInitialSelection = true;
+                }
+
+                if (selectedRoomTypeId && roomTypes.some((item) => item.id === selectedRoomTypeId)) {
+                    roomType.value = selectedRoomTypeId;
+                    updateRoomTypeHint(roomTypes);
+                    await refreshAvailableRooms();
+                    return;
+                }
+
+                setSelectEnabled(room, false);
+                resetSelect(room, 'Select a room type first…');
+                roomHint.textContent = 'Choose a room type to see available rooms.';
+                rateHint.textContent = '';
+                updateRoomTypeHint(roomTypes);
+            } catch (error) {
+                roomTypeHint.textContent = error instanceof Error ? error.message : 'Unable to refresh room types.';
+                setSelectEnabled(room, false);
+                resetSelect(room, 'Select a room type first…');
+                roomHint.textContent = 'Choose a room type to see available rooms.';
+                rateHint.textContent = '';
+            } finally {
+                recalculate();
+            }
+        };
+
+        const onDatesChanged = () => {
+            appliedInitialSelection = true;
+            roomType.value = '';
+            refreshAvailableRoomTypes();
+        };
+
+        [room, checkIn, checkOut].forEach((el) => el.addEventListener('change', recalculate));
+        [checkIn, checkOut].forEach((el) => el.addEventListener('change', onDatesChanged));
+        roomType.addEventListener('change', refreshAvailableRooms);
+
+        room.closest('form')?.addEventListener('submit', () => {
+            room.disabled = false;
+        });
+
+        refreshAvailableRoomTypes();
         recalculate();
     })();
 </script>

@@ -27,7 +27,7 @@ class ReservationController extends Controller
 {
     use RespondsWithJsonApi;
 
-    private const DEFAULT_INCLUDES = ['guest', 'room', 'roomType', 'ratePlan', 'folio'];
+    private const DEFAULT_INCLUDES = ['guest', 'creator', 'room', 'roomType', 'ratePlan', 'folio'];
 
     public function index(Request $request): JsonResponse
     {

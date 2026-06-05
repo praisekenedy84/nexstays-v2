@@ -43,6 +43,7 @@ class ReservationResource extends JsonResource
                 'room_id' => $this->room_id,
                 'room_type_id' => $this->room_type_id,
                 'rate_plan_id' => $this->rate_plan_id,
+                'created_by' => $this->created_by,
                 'overstay' => $this->overstayIncrease() !== null ? array_merge($this->overstayIncrease(), [
                     'waiver_reason' => $this->overstay_waiver_reason,
                     'settled_at'    => $this->overstay_settled_at?->toIso8601String(),
@@ -71,6 +72,10 @@ class ReservationResource extends JsonResource
                     'name' => $this->roomType->name,
                     'code' => $this->roomType->code,
                 ]),
+                'creator' => $this->whenLoaded('creator', fn () => $this->creator ? [
+                    'id' => $this->creator->id,
+                    'name' => $this->creator->name,
+                ] : null),
                 'folio' => $this->whenLoaded('folio', fn () => $this->folio
                     ? FolioResource::make($this->folio)
                     : null),

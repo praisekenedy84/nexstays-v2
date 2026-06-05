@@ -10,6 +10,7 @@ use App\Domain\Shared\Services\NotificationService;
 use App\Domain\Shared\Services\TextifySmsService;
 use App\Domain\HBMS\Support\BookingReferenceGenerator;
 use DomainException;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\DB;
 
 class CreateReservation
@@ -59,10 +60,11 @@ class CreateReservation
                 'children' => $data['children'] ?? 0,
                 'rate_plan_id' => $data['rate_plan_id'] ?? null,
                 'daily_rate' => (string) ($room->daily_rate ?? $room->roomType?->base_rate ?? 0),
-                'source' => $data['source'] ?? null,
+                'source' => $data['source'] ?? 'cash',
                 'ota_ref' => $data['ota_ref'] ?? null,
-                'special_requests' => $data['special_requests'] ?? null,
+                'special_requests' => filled($data['special_requests'] ?? null) ? $data['special_requests'] : null,
                 'deposit_amount' => $data['deposit_amount'] ?? 0,
+                'created_by' => Auth::id(),
             ]);
 
             if ($reservation->status === 'inquiry') {

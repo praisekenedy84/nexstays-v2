@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\HBMS;
 
+use App\Domain\Shared\Services\PaymentMethodSettingsService;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,9 +29,13 @@ class CreateReservationRequest extends FormRequest
             'check_out_date' => ['required', 'date', 'after:check_in_date'],
             'adults' => ['required', 'integer', 'min:1', 'max:10'],
             'children' => ['sometimes', 'integer', 'min:0', 'max:10'],
-            'source' => ['sometimes', 'string', 'max:50'],
+            'source' => [
+                'required',
+                'string',
+                Rule::in(app(PaymentMethodSettingsService::class)->enabledMethods()),
+            ],
             'ota_ref' => ['sometimes', 'string', 'max:100'],
-            'special_requests' => ['sometimes', 'string', 'max:2000'],
+            'special_requests' => ['nullable', 'string', 'max:2000'],
             'deposit_amount' => ['sometimes', 'numeric', 'min:0'],
             'status' => ['sometimes', 'string', Rule::in(['inquiry', 'confirmed'])],
         ];

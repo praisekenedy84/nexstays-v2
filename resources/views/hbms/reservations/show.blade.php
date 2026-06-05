@@ -59,10 +59,17 @@
                         @csrf
                         <button type="submit" class="btn-outline text-amber-600 hover:border-amber-200 hover:bg-amber-50">No show</button>
                     </form>
-                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" onsubmit="return confirm('Delete this reservation?')">
+                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" onsubmit="return confirm('Permanently delete this reservation? This cannot be undone.')">
                         @csrf
                         @method('DELETE')
                         <button type="submit" class="btn-outline text-red-600 hover:border-red-200 hover:bg-red-50">Delete</button>
+                    </form>
+                @elseif (auth()->user()?->can('force-delete-reservations'))
+                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}"
+                          onsubmit="return confirm('Permanently delete {{ $reservation->booking_ref }}?\n\nThis reservation is {{ str_replace('_', ' ', $reservation->status) }} and may include folio history. This cannot be undone.')">
+                        @csrf
+                        @method('DELETE')
+                        <button type="submit" class="btn-outline text-red-600 hover:border-red-200 hover:bg-red-50">Delete permanently</button>
                     </form>
                 @endif
             @endcan
@@ -105,6 +112,18 @@
                 <div>
                     <dt class="text-xs font-medium uppercase text-ink-muted">Payment mode</dt>
                     <dd class="mt-1 font-medium text-ink">{{ strtoupper($paymentMode) }}</dd>
+                </div>
+                @if ($reservation->source)
+                    <div>
+                        <dt class="text-xs font-medium uppercase text-ink-muted">Payment source</dt>
+                        <dd class="mt-1 font-medium text-ink">
+                            {{ app(\App\Domain\Shared\Services\PaymentMethodSettingsService::class)->labelFor($reservation->source) }}
+                        </dd>
+                    </div>
+                @endif
+                <div>
+                    <dt class="text-xs font-medium uppercase text-ink-muted">Booked by</dt>
+                    <dd class="mt-1 font-medium text-ink">{{ $reservation->creator?->name ?? '—' }}</dd>
                 </div>
                 <div>
                     <dt class="text-xs font-medium uppercase text-ink-muted">Daily rate</dt>

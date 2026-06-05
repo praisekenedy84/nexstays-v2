@@ -51,4 +51,15 @@ class Payment extends Model
     {
         return $this->belongsTo(User::class, 'received_by');
     }
+
+    /**
+     * POS payments and folio payments whose reservation still exists.
+     */
+    public function scopeForReporting($query)
+    {
+        return $query->where(function ($inner) {
+            $inner->whereNull('folio_id')
+                ->orWhereHas('folio.reservation');
+        });
+    }
 }

@@ -65,6 +65,64 @@ class DivisionSalesService
     }
 
     /**
+     * Total stay value for confirmed reservations checking in within a date range.
+     *
+     * @return array{revenue: float, reservation_count: int, room_nights: int}
+     */
+    public function bookedRoomRevenue(Carbon $from, Carbon $to): array
+    {
+        $reservations = Reservation::query()
+            ->whereDate('check_in_date', '>=', $from)
+            ->whereDate('check_in_date', '<=', $to)
+            ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
+            ->get(['check_in_date', 'check_out_date', 'daily_rate']);
+
+        return $this->summarizeBookedReservations($reservations);
+    }
+
+    /**
+     * Stay value for guests arriving today (confirmed or already checked in).
+     *
+     * @return array{revenue: float, reservation_count: int, room_nights: int}
+     */
+    public function todayArrivalBookedRevenue(): array
+    {
+        $today = Carbon::today();
+
+        $reservations = Reservation::query()
+            ->whereDate('check_in_date', $today)
+            ->whereIn('status', ['confirmed', 'checked_in'])
+            ->get(['check_in_date', 'check_out_date', 'daily_rate']);
+
+        return $this->summarizeBookedReservations($reservations);
+    }
+
+    /**
+     * @param  \Illuminate\Support\Collection<int, Reservation>  $reservations
+     * @return array{revenue: float, reservation_count: int, room_nights: int}
+     */
+    private function summarizeBookedReservations($reservations): array
+    {
+        $revenue = 0.0;
+        $roomNights = 0;
+
+        foreach ($reservations as $reservation) {
+            $nights = max(
+                1,
+                Carbon::parse($reservation->check_in_date)->diffInDays(Carbon::parse($reservation->check_out_date))
+            );
+            $roomNights += $nights;
+            $revenue += (float) $reservation->daily_rate * $nights;
+        }
+
+        return [
+            'revenue' => round($revenue, 2),
+            'reservation_count' => $reservations->count(),
+            'room_nights' => $roomNights,
+        ];
+    }
+
+    /**
      * Last N snapshots ordered oldest-first, suitable for trend charts.
      *
      * @return Collection<int, SalesSnapshot>
@@ -100,6 +158,20 @@ class DivisionSalesService
         );
     }
 
+    public function refreshExistingSnapshotsForRange(Carbon $from, Carbon $to): void
+    {
+        $current = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+
+        while ($current->lte($end)) {
+            if (SalesSnapshot::query()->whereDate('snapshot_date', $current)->exists()) {
+                $this->takeSnapshot($current);
+            }
+
+            $current->addDay();
+        }
+    }
+
     /**
      * @return array{
      *     date: string,
@@ -116,6 +188,7 @@ class DivisionSalesService
     {
         // --- Folio-posted charges ---
         $folioRows = FolioTransaction::query()
+            ->forReporting()
             ->whereNull('voided_at')
             ->whereBetween('posted_at', [$from, $to])
             ->where('amount', '>', 0)
@@ -125,6 +198,7 @@ class DivisionSalesService
 
         // Ancillary = any folio charge not in the known structural types
         $ancillaryFolio = FolioTransaction::query()
+            ->forReporting()
             ->whereNull('voided_at')
             ->whereBetween('posted_at', [$from, $to])
             ->whereNotIn('transaction_type', self::KNOWN_FOLIO_TYPES)
@@ -154,6 +228,7 @@ class DivisionSalesService
 
         // --- Total payments collected in range ---
         $paymentsCollected = (float) Payment::query()
+            ->forReporting()
             ->whereBetween('created_at', [$from, $to])
             ->where('status', 'captured')
             ->sum('amount');

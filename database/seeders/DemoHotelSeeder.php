@@ -178,7 +178,8 @@ class DemoHotelSeeder extends Seeder
                 'adults' => 2,
                 'children' => 0,
                 'daily_rate' => $standard->base_rate,
-                'source' => 'walk_in',
+                'source' => 'cash',
+                'created_by' => $admin->id,
             ]
         );
         if ($reservationA->trashed()) {
@@ -196,7 +197,8 @@ class DemoHotelSeeder extends Seeder
                 'adults' => 2,
                 'children' => 1,
                 'daily_rate' => $deluxe->base_rate,
-                'source' => 'phone',
+                'source' => 'card',
+                'created_by' => $admin->id,
             ]
         );
         if ($reservationB->trashed()) {

@@ -19,6 +19,7 @@ class RoleAndPermissionSeeder extends Seeder
     public const PERMISSIONS = [
         'view-reservations',
         'manage-reservations',
+        'force-delete-reservations',
         'check-in-guests',
         'check-out-guests',
         'view-guests',

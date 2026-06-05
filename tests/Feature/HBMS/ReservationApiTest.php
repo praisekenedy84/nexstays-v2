@@ -40,17 +40,21 @@ class ReservationApiTest extends TenantTestCase
             'check_in_date' => now()->addDay()->toDateString(),
             'check_out_date' => now()->addDays(3)->toDateString(),
             'adults' => 2,
+            'source' => 'cash',
         ]);
 
         $response->assertCreated()
             ->assertJsonPath('data.type', 'reservation')
-            ->assertJsonPath('data.attributes.status', 'confirmed');
+            ->assertJsonPath('data.attributes.status', 'confirmed')
+            ->assertJsonPath('data.attributes.created_by', $this->user->id)
+            ->assertJsonPath('data.relationships.creator.name', $this->user->name);
 
         $this->assertDatabaseHas('reservations', [
             'guest_id' => $guest->id,
             'room_type_id' => $roomType->id,
             'room_id' => $room->id,
             'daily_rate' => '215000.00',
+            'created_by' => $this->user->id,
         ]);
 
         $this->assertDatabaseHas('rooms', [

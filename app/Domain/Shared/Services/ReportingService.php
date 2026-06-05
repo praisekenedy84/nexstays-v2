@@ -29,6 +29,7 @@ class ReportingService
     {
         return Folio::query()
             ->with(['reservation.guest', 'reservation.room'])
+            ->whereHas('reservation')
             ->where('status', 'open')
             ->get()
             ->map(function (Folio $folio) {
@@ -85,6 +86,7 @@ class ReportingService
 
         // Folio-posted F&B charges (room charges via folio transactions)
         $folioRows = FolioTransaction::query()
+            ->forReporting()
             ->whereNull('voided_at')
             ->whereBetween('posted_at', [$from, $to])
             ->whereIn('transaction_type', ['restaurant', 'bar', 'lounge'])
@@ -453,6 +455,7 @@ class ReportingService
         $to   ??= now()->endOfDay();
 
         $byMethod = Payment::query()
+            ->forReporting()
             ->whereBetween('created_at', [$from, $to])
             ->where('status', 'captured')
             ->selectRaw('method, COUNT(*)::integer AS count, SUM(amount) AS total')
@@ -466,12 +469,14 @@ class ReportingService
             ]);
 
         $folioTotal  = (float) Payment::query()
+            ->forReporting()
             ->whereBetween('created_at', [$from, $to])
             ->where('status', 'captured')
             ->whereNotNull('folio_id')
             ->sum('amount');
 
         $directTotal = (float) Payment::query()
+            ->forReporting()
             ->whereBetween('created_at', [$from, $to])
             ->where('status', 'captured')
             ->whereNotNull('order_id')
@@ -479,6 +484,7 @@ class ReportingService
             ->sum('amount');
 
         $grandTotal = (float) Payment::query()
+            ->forReporting()
             ->whereBetween('created_at', [$from, $to])
             ->where('status', 'captured')
             ->sum('amount');
@@ -517,6 +523,7 @@ class ReportingService
 
         // --- Revenue (folio charges + direct POS cash) ---
         $folioRev = FolioTransaction::query()
+            ->forReporting()
             ->whereNull('voided_at')
             ->whereBetween('posted_at', [$from, $to])
             ->whereIn('transaction_type', ['restaurant', 'bar', 'lounge'])
@@ -630,7 +637,6 @@ class ReportingService
             ->whereDate('reservations.check_in_date', '>=', $from)
             ->whereDate('reservations.check_in_date', '<=', $to)
             ->whereNotIn('reservations.status', ['cancelled', 'no_show'])
-            ->whereNull('reservations.deleted_at')
             ->selectRaw("
                 reservations.room_type_id,
                 room_types.name                                                                        AS room_type_name,

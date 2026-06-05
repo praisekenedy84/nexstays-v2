@@ -50,11 +50,12 @@
                         @endcan
                         <x-ui.sort-th column="booking_ref" label="Booking ref" :sort="$sort" :dir="$dir" />
                         <th class="px-5 py-3 text-left">Guest</th>
+                        <th class="px-5 py-3 text-left">Booked by</th>
                         <th class="px-5 py-3 text-left">Room / type</th>
                         <x-ui.sort-th column="check_in_date" label="Check-in" :sort="$sort" :dir="$dir" />
                         <x-ui.sort-th column="check_out_date" label="Check-out" :sort="$sort" :dir="$dir" />
                         <th class="min-w-[9.5rem] px-5 py-3 text-left">Status</th>
-                        <th class="px-5 py-3 text-right">Rate / total</th>
+                        <th class="px-5 py-3 text-right">Total</th>
                         <th class="px-5 py-3 text-right"></th>
                     </tr>
                 </thead>
@@ -80,6 +81,9 @@
                             </td>
                             <td class="px-5 py-4">
                                 {{ $reservation->guest?->first_name }} {{ $reservation->guest?->last_name }}
+                            </td>
+                            <td class="px-5 py-4 text-ink-muted">
+                                {{ $reservation->creator?->name ?? '—' }}
                             </td>
                             <td class="px-5 py-4 text-ink-muted">
                                 @if ($reservation->room)
@@ -108,9 +112,9 @@
                                 <x-ui.status-badge :status="$reservation->status" class="whitespace-nowrap px-3 py-1" />
                             </td>
                             <td class="px-5 py-4 text-right">
-                                <p class="font-medium">@money($reservation->daily_rate)</p>
+                                <p class="font-medium">@money($reservation->total_amount)</p>
                                 <p class="text-xs text-ink-muted">
-                                    {{ $reservation->total_nights }} night(s) · @money($reservation->total_amount)
+                                    {{ $reservation->total_nights }} night(s) · @money($reservation->daily_rate) / night
                                 </p>
                             </td>
                             <td class="px-5 py-4 text-right">
@@ -179,7 +183,24 @@
                                             </button>
                                         </form>
                                     @endif
-                                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" class="ml-1 inline" onsubmit="return confirm('Permanently delete this reservation? This cannot be undone.')">
+                                    @if (
+                                        auth()->user()?->can('manage-reservations')
+                                        && (
+                                            in_array($reservation->status, ['inquiry', 'confirmed', 'cancelled', 'no_show'], true)
+                                            || auth()->user()?->can('force-delete-reservations')
+                                        )
+                                    )
+                                    @php
+                                        $deleteConfirmMessage = in_array($reservation->status, ['checked_in', 'checked_out'], true)
+                                            ? sprintf(
+                                                'Permanently delete %s? This reservation is %s and may include folio history. This cannot be undone.',
+                                                $reservation->booking_ref,
+                                                str_replace('_', ' ', $reservation->status)
+                                            )
+                                            : 'Permanently delete this reservation? This cannot be undone.';
+                                    @endphp
+                                    <form method="POST" action="{{ route('tenant.reservations.destroy', $reservation) }}" class="ml-1 inline"
+                                          onsubmit="return confirm(@js($deleteConfirmMessage))">
                                         @csrf
                                         @method('DELETE')
                                         <button
@@ -192,12 +213,13 @@
                                             <span class="sr-only">Delete</span>
                                         </button>
                                     </form>
+                                    @endif
                                 @endcan
                             </td>
                         </tr>
                     @empty
                         <tr>
-                            <td colspan="{{ auth()->user()?->can('manage-reservations') ? 9 : 8 }}" class="px-5 py-12 text-center text-ink-muted">No reservations found.</td>
+                            <td colspan="{{ auth()->user()?->can('manage-reservations') ? 10 : 9 }}" class="px-5 py-12 text-center text-ink-muted">No reservations found.</td>
                         </tr>
                     @endforelse
                 </tbody>

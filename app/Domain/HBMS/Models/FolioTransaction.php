@@ -51,4 +51,12 @@ class FolioTransaction extends Model
     {
         return $this->belongsTo(User::class, 'posted_by');
     }
+
+    /**
+     * Folio charges/payments tied to a reservation that still exists.
+     */
+    public function scopeForReporting($query)
+    {
+        return $query->whereHas('folio.reservation');
+    }
 }

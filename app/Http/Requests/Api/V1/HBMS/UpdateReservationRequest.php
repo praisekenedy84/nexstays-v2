@@ -25,7 +25,7 @@ class UpdateReservationRequest extends FormRequest
             'adults' => ['sometimes', 'integer', 'min:1', 'max:10'],
             'children' => ['sometimes', 'integer', 'min:0', 'max:10'],
             'rate_plan_id' => ['sometimes', 'nullable', 'uuid', 'exists:rate_plans,id'],
-            'special_requests' => ['sometimes', 'nullable', 'string', 'max:2000'],
+            'special_requests' => ['nullable', 'string', 'max:2000'],
             'deposit_amount' => ['sometimes', 'numeric', 'min:0'],
         ];
     }

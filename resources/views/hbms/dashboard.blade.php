@@ -39,8 +39,8 @@
     <section class="card overflow-hidden">
         <div class="flex items-center justify-between border-b border-slate-100 px-6 py-4">
             <div>
-                <h2 class="font-semibold text-ink">Today's revenue</h2>
-                <p class="text-xs text-ink-muted">Live — {{ now()->format('d M Y') }} · {{ $todaySales['room_nights'] }} room night{{ $todaySales['room_nights'] !== 1 ? 's' : '' }} occupied</p>
+                <h2 class="font-semibold text-ink">Today's posted sales</h2>
+                <p class="text-xs text-ink-muted">Live charges &amp; POS · {{ now()->format('d M Y') }} · {{ $todaySales['room_nights'] }} room night{{ $todaySales['room_nights'] !== 1 ? 's' : '' }} occupied</p>
             </div>
             <span class="text-lg font-bold text-ink">
                 {{ $currency }} {{ $fmt($todaySales['total']) }}
@@ -50,10 +50,10 @@
         <div class="grid divide-y divide-slate-100 sm:grid-cols-4 sm:divide-x sm:divide-y-0">
             @php
                 $divisions = [
-                    ['label' => 'Rooms',      'value' => $todaySales['rooms'],      'color' => 'text-indigo-700',  'bg' => 'bg-indigo-50'],
-                    ['label' => 'Restaurant', 'value' => $todaySales['restaurant'], 'color' => 'text-amber-700',   'bg' => 'bg-amber-50'],
-                    ['label' => 'Bar & lounge','value' => $todaySales['bar'],       'color' => 'text-sky-700',     'bg' => 'bg-sky-50'],
-                    ['label' => 'Ancillary',  'value' => $todaySales['ancillary'],  'color' => 'text-violet-700',  'bg' => 'bg-violet-50'],
+                    ['label' => 'Rooms (posted)', 'value' => $todaySales['rooms'],      'color' => 'text-indigo-700',  'bg' => 'bg-indigo-50'],
+                    ['label' => 'Restaurant',     'value' => $todaySales['restaurant'], 'color' => 'text-amber-700',   'bg' => 'bg-amber-50'],
+                    ['label' => 'Bar & lounge',   'value' => $todaySales['bar'],       'color' => 'text-sky-700',     'bg' => 'bg-sky-50'],
+                    ['label' => 'Ancillary',      'value' => $todaySales['ancillary'],  'color' => 'text-violet-700',  'bg' => 'bg-violet-50'],
                 ];
                 $todayMax = max(1, $todaySales['total']);
             @endphp
@@ -71,10 +71,22 @@
             @endforeach
         </div>
 
-        {{-- Payments collected --}}
-        <div class="border-t border-slate-100 bg-slate-50/50 px-6 py-2.5 text-xs text-ink-muted">
-            Payments collected today:
-            <span class="font-semibold text-emerald-700">{{ $currency }} {{ $fmt($todaySales['payments_collected']) }}</span>
+        {{-- Payments collected & confirmed arrivals --}}
+        <div class="space-y-2 border-t border-slate-100 bg-slate-50/50 px-6 py-3 text-xs text-ink-muted">
+            <p>
+                Payments collected today:
+                <span class="font-semibold text-emerald-700">{{ $currency }} {{ $fmt($todaySales['payments_collected']) }}</span>
+            </p>
+            @can('view-reservations')
+                <p>
+                    Confirmed arrivals today:
+                    <span class="font-semibold text-indigo-700">{{ $currency }} {{ $fmt($todayBookedRooms['revenue']) }}</span>
+                    <span class="text-ink-subtle">
+                        · {{ $todayBookedRooms['reservation_count'] }} booking{{ $todayBookedRooms['reservation_count'] !== 1 ? 's' : '' }}
+                        · {{ $todayBookedRooms['room_nights'] }} night{{ $todayBookedRooms['room_nights'] !== 1 ? 's' : '' }}
+                    </span>
+                </p>
+            @endcan
         </div>
     </section>
     @endcanany
@@ -91,12 +103,22 @@
                 </div>
                 <div class="grid gap-4 sm:grid-cols-2">
                     <div>
-                        <p class="text-xs text-ink-muted">Total revenue</p>
+                        <p class="text-xs text-ink-muted">Posted sales</p>
                         <p class="text-xl font-bold text-ink">{{ $currency }} {{ $fmt($mtdSales['total']) }}</p>
                     </div>
-                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm">
+                    @can('view-reservations')
                         <div>
-                            <p class="text-xs text-ink-muted">Rooms</p>
+                            <p class="text-xs text-ink-muted">Confirmed bookings revenue</p>
+                            <p class="text-xl font-bold text-indigo-700">{{ $currency }} {{ $fmt($mtdBookedRooms['revenue']) }}</p>
+                            <p class="mt-0.5 text-xs text-ink-subtle">
+                                {{ $mtdBookedRooms['reservation_count'] }} reservation{{ $mtdBookedRooms['reservation_count'] !== 1 ? 's' : '' }}
+                                · {{ $mtdBookedRooms['room_nights'] }} room nights
+                            </p>
+                        </div>
+                    @endcan
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-sm sm:col-span-2">
+                        <div>
+                            <p class="text-xs text-ink-muted">Rooms (posted)</p>
                             <p class="font-semibold text-indigo-700">{{ $fmt($mtdSales['rooms']) }}</p>
                         </div>
                         <div>
