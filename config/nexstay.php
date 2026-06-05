@@ -101,7 +101,7 @@ return [
                 ['id' => 'restaurant', 'label' => 'Restaurant', 'route' => 'tenant.restaurant.index', 'permission' => 'view-orders'],
                 ['id' => 'bar', 'label' => 'Bar', 'route' => 'tenant.bar.index', 'permission' => 'view-orders'],
                 ['id' => 'lounge', 'label' => 'Lounge', 'route' => 'tenant.lounge.index', 'permission' => 'view-orders'],
-                ['id' => 'fb-orders', 'label' => 'Orders & sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-orders'],
+                ['id' => 'fb-orders', 'label' => 'Sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-orders'],
                 ['id' => 'shift-mine', 'label' => 'My shift', 'route' => 'tenant.shift.mine', 'permission' => 'view-orders'],
                 ['id' => 'shift-all', 'label' => 'Staff shift', 'route' => 'tenant.shift.all', 'permission' => 'view-fb-reports'],
                 ['id' => 'outlets', 'label' => 'Outlets', 'route' => 'tenant.outlets.index', 'permission' => 'view-outlets'],

@@ -1,6 +1,6 @@
 {{--
     Shared POS hub partial — included by restaurant/bar/lounge index views.
-    Expects: $outlet, $myOrders, $allOrders, $activeTill, $outletType, $hasTables (bool)
+    Expects: $outlet, $allOrders, $outletOrders, $activeTill, $outletType, $hasTables (bool)
 --}}
 @php
     $currency = config('nexstay.currency.default', 'TZS');
@@ -139,75 +139,72 @@
             </div>
         @endif
 
-        {{-- My orders --}}
         <div class="mb-4 flex items-center justify-between">
-            <h3 class="font-semibold text-ink">My open orders</h3>
-            <span class="text-xs text-ink-subtle">{{ $myOrders->count() }} active</span>
+            <h3 class="font-semibold text-ink">Today's orders</h3>
+            <span class="text-xs text-ink-subtle">{{ $outletOrders->count() }} total · {{ $allOrders->count() }} active</span>
         </div>
 
-        @forelse ($myOrders as $order)
-            <article class="card mb-3 p-4 transition hover:ring-2 hover:ring-primary/20">
-                <div class="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                        <p class="font-mono text-sm font-semibold text-primary">{{ $order->order_number }}</p>
-                        <p class="text-xs text-ink-muted">
-                            {{ $order->table ? 'Table '.$order->table->table_number.' ·' : '' }}
-                            {{ $order->guest_label ?? 'Walk-in' }} ·
-                            {{ $order->items->count() }} item(s)
-                        </p>
-                        <p class="mt-0.5 text-[11px] text-ink-subtle">
-                            Opened {{ $order->opened_at?->format('H:i') ?? '—' }}
-                            · {{ $order->opened_at?->diffForHumans() ?? '' }}
-                        </p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <span @class([
-                            'rounded-full px-2.5 py-0.5 text-xs font-semibold',
-                            $statusColors[$order->status] ?? 'bg-slate-100 text-slate-600',
-                        ])>{{ str_replace('_', ' ', $order->status) }}</span>
-                        <p class="font-bold text-ink">{{ $currency }} {{ number_format((float) $order->total) }}</p>
-                        <a href="{{ route('tenant.pos.manage', $order) }}" class="btn-primary text-xs">Manage →</a>
-                    </div>
-                </div>
-            </article>
-        @empty
-            <p class="mb-6 text-sm text-ink-muted">You have no active orders. Use the form to open one.</p>
-        @endforelse
-
-        {{-- Other staff orders --}}
-        @php $othersOrders = $allOrders->whereNotIn('id', $myOrders->pluck('id')); @endphp
-        @if ($othersOrders->isNotEmpty())
-            <div class="mb-3 mt-6 flex items-center gap-2">
-                <h3 class="font-semibold text-ink">Other staff orders</h3>
-                <span class="text-xs text-ink-subtle">{{ $othersOrders->count() }} active</span>
-            </div>
-            @foreach ($othersOrders as $order)
-                <article class="card mb-2 p-3 opacity-80">
-                    <div class="flex flex-wrap items-center justify-between gap-2">
-                        <div>
-                            <p class="font-mono text-xs font-semibold text-ink-muted">{{ $order->order_number }}</p>
-                            <p class="text-xs text-ink-subtle">
-                                {{ $order->waiter?->name ?? '—' }} ·
-                                {{ $order->table ? 'Table '.$order->table->table_number.' · ' : '' }}
-                                {{ $order->guest_label ?? 'Walk-in' }}
-                            </p>
-                            <p class="mt-0.5 text-[11px] text-ink-subtle">
-                                Opened {{ $order->opened_at?->format('H:i') ?? '—' }}
-                            </p>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            <span @class([
-                                'rounded-full px-2 py-0.5 text-xs',
-                                $statusColors[$order->status] ?? 'bg-slate-100 text-slate-600',
-                            ])>{{ str_replace('_', ' ', $order->status) }}</span>
-                            <p class="text-sm font-semibold text-ink">{{ $currency }} {{ number_format((float) $order->total) }}</p>
-                            @can('manage-orders')
-                                <a href="{{ route('tenant.pos.manage', $order) }}" class="text-xs text-primary hover:underline">Open</a>
-                            @endcan
-                        </div>
-                    </div>
-                </article>
-            @endforeach
-        @endif
+        <div class="card overflow-hidden">
+            <table class="w-full text-left text-sm">
+                <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-ink-muted">
+                    <tr>
+                        <th class="px-4 py-3">Order</th>
+                        <th class="px-4 py-3">Guest / table</th>
+                        <th class="px-4 py-3">Staff</th>
+                        <th class="px-4 py-3 text-right">Total</th>
+                        <th class="px-4 py-3">Status</th>
+                        <th class="px-4 py-3">Opened</th>
+                        <th class="px-4 py-3 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-100">
+                    @forelse ($outletOrders as $order)
+                        <tr @class([
+                            'hover:bg-slate-50/60',
+                            'bg-primary-soft/30' => $order->waiter_id === auth()->id() && $order->isOpen(),
+                        ])>
+                            <td class="px-4 py-3">
+                                <span class="font-mono text-xs font-semibold text-primary">{{ $order->order_number }}</span>
+                                <span class="block text-[11px] text-ink-subtle">{{ $order->items->count() }} item(s)</span>
+                            </td>
+                            <td class="px-4 py-3 text-xs text-ink-muted">
+                                @if ($order->table)
+                                    T{{ $order->table->table_number }}
+                                @endif
+                                @if ($order->guest_label)
+                                    {{ $order->table ? ' · ' : '' }}{{ $order->guest_label }}
+                                @endif
+                                @if (! $order->table && ! $order->guest_label)
+                                    Walk-in
+                                @endif
+                            </td>
+                            <td class="px-4 py-3 text-xs text-ink-muted">{{ $order->waiter?->name ?? '—' }}</td>
+                            <td class="px-4 py-3 text-right font-semibold">{{ number_format((float) $order->total) }}</td>
+                            <td class="px-4 py-3">
+                                <span @class([
+                                    'inline-block rounded-full px-2 py-0.5 text-xs font-semibold capitalize',
+                                    $statusColors[$order->status] ?? 'bg-slate-100 text-slate-600',
+                                    'bg-slate-200 text-slate-500' => $order->status === 'closed',
+                                    'bg-rose-100 text-rose-700' => $order->status === 'voided',
+                                ])>{{ str_replace('_', ' ', $order->status) }}</span>
+                            </td>
+                            <td class="px-4 py-3 text-xs text-ink-subtle whitespace-nowrap">
+                                {{ $order->opened_at?->format('H:i') ?? '—' }}
+                                @if ($order->closed_at)
+                                    <span class="block">Closed {{ $order->closed_at->format('H:i') }}</span>
+                                @endif
+                            </td>
+                            <td class="px-4 py-3">
+                                @include('modules.pos._order_actions', ['order' => $order])
+                            </td>
+                        </tr>
+                    @empty
+                        <tr>
+                            <td colspan="7" class="px-4 py-10 text-center text-ink-muted">No orders today. Open one using the form.</td>
+                        </tr>
+                    @endforelse
+                </tbody>
+            </table>
+        </div>
     </section>
 </div>

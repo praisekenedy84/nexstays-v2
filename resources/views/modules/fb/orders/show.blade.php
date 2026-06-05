@@ -2,22 +2,27 @@
     $currency = config('nexstay.currency.default', 'TZS');
     $activeItems = $order->items->where('status', '!=', 'voided');
     $payment = $order->payments->first();
+    $outletNav = match($order->outlet?->type) {
+        'bar'    => 'bar',
+        'lounge' => 'lounge',
+        default  => 'restaurant',
+    };
+    $backRoute = match($order->outlet?->type) {
+        'bar'    => route('tenant.bar.index'),
+        'lounge' => route('tenant.lounge.index'),
+        default  => route('tenant.restaurant.index'),
+    };
 @endphp
 
-<x-layouts.app active-nav="fb-orders" :title="$order->order_number" subtitle="Order detail">
+<x-layouts.app :active-nav="$outletNav" :title="$order->order_number" subtitle="Order detail">
     <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
-        <a href="{{ route('tenant.fb.orders.index', request()->only(['from', 'to', 'outlet_id'])) }}" class="text-sm text-primary hover:underline">← Orders & sales</a>
+        <a href="{{ $backRoute }}" class="text-sm text-primary hover:underline">← Back to {{ $order->outlet?->name ?? 'outlet' }}</a>
         <div class="flex flex-wrap gap-2">
-            <a href="{{ route('tenant.pos.orders.receipt', $order) }}" target="_blank" class="btn-outline text-sm">Receipt</a>
+            @if ($order->status === 'closed')
+                <a href="{{ route('tenant.pos.orders.receipt', $order) }}" target="_blank" class="btn-outline text-sm">Receipt</a>
+            @endif
             @if ($canManage && $order->isOpen())
-                <a href="{{ route('tenant.pos.manage', $order) }}" class="btn-primary text-sm">Manage in POS</a>
-            @elseif ($canManage)
-                <form method="POST" action="{{ route('tenant.fb.orders.destroy', $order) }}" class="inline"
-                      onsubmit="return confirm('Permanently delete this order? It will be removed from all reports and cannot be undone.')">
-                    @csrf
-                    @method('DELETE')
-                    <button type="submit" class="btn-outline text-sm text-red-600 border-red-200 hover:bg-red-50">Delete permanently</button>
-                </form>
+                <a href="{{ route('tenant.pos.manage', $order) }}" class="btn-primary text-sm">Manage</a>
             @endif
         </div>
     </div>
@@ -138,6 +143,13 @@
             </tfoot>
         </table>
     </div>
+
+    @if ($canManage)
+        <div class="card mb-6 p-5">
+            <h3 class="mb-3 text-sm font-semibold text-ink">Actions</h3>
+            @include('modules.pos._order_actions', ['order' => $order])
+        </div>
+    @endif
 
     @if ($order->statusLogs->isNotEmpty())
         <div class="card overflow-hidden">

@@ -34,25 +34,18 @@ class FbOrderController extends Controller
 
         $outletId = $request->input('outlet_id');
         $waiterId = $request->input('waiter_id');
-        $status = $request->input('status');
-        $search = trim((string) $request->query('search', ''));
 
-        $baseQuery = Order::query()
-            ->with(['outlet', 'table', 'waiter', 'items', 'payments'])
-            ->where(function ($q) use ($from, $to) {
-                $q->whereBetween('opened_at', [$from, $to])
-                    ->orWhereBetween('closed_at', [$from, $to]);
-            })
+        $ordersQuery = Order::query()
+            ->with(['outlet', 'table', 'waiter', 'payments'])
+            ->where('status', 'closed')
+            ->whereNotNull('closed_at')
+            ->whereBetween('closed_at', [$from, $to])
             ->when($outletId, fn ($q) => $q->where('outlet_id', $outletId))
             ->when($waiterId, fn ($q) => $q->where('waiter_id', $waiterId))
-            ->when($status, fn ($q) => $q->where('status', $status))
-            ->when($search !== '', fn ($q) => $q->where('order_number', 'ilike', "%{$search}%"))
-            ->latest('opened_at');
+            ->latest('closed_at');
 
-        $allForSummary = (clone $baseQuery)->get();
-        $summary = $this->buildSalesSummary($allForSummary);
-
-        $orders = (clone $baseQuery)->paginate(30)->withQueryString();
+        $summary = $this->buildSalesSummary((clone $ordersQuery)->get());
+        $orders = (clone $ordersQuery)->paginate(30)->withQueryString();
 
         $outlets = Outlet::query()->where('is_active', true)->orderBy('name')->get();
 
@@ -76,8 +69,6 @@ class FbOrderController extends Controller
             'to' => $to->toDateString(),
             'outletId' => $outletId,
             'waiterId' => $waiterId,
-            'status' => $status,
-            'search' => $search,
         ]);
     }
 
@@ -111,8 +102,7 @@ class FbOrderController extends Controller
             return back()->with('error', $e->getMessage());
         }
 
-        return redirect()
-            ->route('tenant.fb.orders.index', $request->only(['from', 'to', 'outlet_id', 'waiter_id', 'status', 'search']))
+        return back(fallback: route('tenant.fb.orders.index'))
             ->with('success', "Order {$order->order_number} permanently deleted.");
     }
 
@@ -124,15 +114,12 @@ class FbOrderController extends Controller
      *     mobile_money: float,
      *     folio: float,
      *     total_closed: float,
-     *     open_value: float,
-     *     count_open: int,
-     *     count_closed: int,
-     *     count_voided: int
+     *     count_closed: int
      * }
      */
     private function buildSalesSummary(\Illuminate\Support\Collection $orders): array
     {
-        $closedOrderIds = $orders->where('status', 'closed')->pluck('id');
+        $closedOrderIds = $orders->pluck('id');
 
         $payments = Payment::query()
             ->whereIn('order_id', $closedOrderIds)
@@ -143,11 +130,8 @@ class FbOrderController extends Controller
         $mobile = (float) $payments->where('method', 'mobile_money')->sum('amount');
 
         $folio = (float) $orders
-            ->where('status', 'closed')
             ->filter(fn (Order $o) => $o->folio_id !== null)
             ->sum('total');
-
-        $openOrders = $orders->filter(fn (Order $o) => $o->isOpen());
 
         return [
             'cash' => $cash,
@@ -155,10 +139,7 @@ class FbOrderController extends Controller
             'mobile_money' => $mobile,
             'folio' => $folio,
             'total_closed' => $cash + $card + $mobile + $folio,
-            'open_value' => (float) $openOrders->sum('total'),
-            'count_open' => $openOrders->count(),
-            'count_closed' => $orders->where('status', 'closed')->count(),
-            'count_voided' => $orders->where('status', 'voided')->count(),
+            'count_closed' => $orders->count(),
         ];
     }
 }
