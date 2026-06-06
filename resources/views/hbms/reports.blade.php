@@ -41,6 +41,32 @@
         </section>
     @endcan
 
+    {{-- ===== SALES ===== --}}
+    @canany(['view-reports', 'view-fb-reports', 'view-reservations'])
+        <section class="mb-8">
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Sales</h3>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                <a href="{{ route('tenant.reports.sales-summary') }}"
+                   class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-primary">Summary</p>
+                    <h4 class="mt-1 font-bold text-ink">Sales summary</h4>
+                    <p class="mt-1 text-sm text-ink-muted">Daily, weekly, and monthly posted sales by division — PDF and Excel export.</p>
+                </a>
+
+                @can('view-fb-reports')
+                    <a href="{{ route('tenant.reports.menu-item-sales-summary') }}"
+                       class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Item detail</p>
+                        <h4 class="mt-1 font-bold text-ink">Menu item sales summary</h4>
+                        <p class="mt-1 text-sm text-ink-muted">Quantity, price, tax, and totals by menu item — PDF and Excel export.</p>
+                    </a>
+                @endcan
+
+            </div>
+        </section>
+    @endcanany
+
     {{-- ===== FRONT OFFICE ===== --}}
     @canany(['view-reservations'])
         <section class="mb-8">
@@ -66,6 +92,13 @@
                     <p class="text-xs font-semibold uppercase tracking-wide text-emerald-700">Revenue</p>
                     <h4 class="mt-1 font-bold text-ink">Room reservations finance</h4>
                     <p class="mt-1 text-sm text-ink-muted">Projected room revenue, deposits, and booking status mix.</p>
+                </a>
+
+                <a href="{{ route('tenant.reports.room-reservations-summary') }}"
+                   class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-indigo-700">Detail</p>
+                    <h4 class="mt-1 font-bold text-ink">Room reservations summary</h4>
+                    <p class="mt-1 text-sm text-ink-muted">Guest-by-guest stays grouped by room type and status — PDF and Excel export.</p>
                 </a>
 
                 <a href="{{ route('tenant.reports.room-payments-accounting') }}"

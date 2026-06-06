@@ -38,10 +38,9 @@ class DivisionSalesService
     {
         $date ??= now();
 
-        return $this->rangedSummary(
+        return $this->summaryForRange(
             $date->clone()->startOfDay(),
-            $date->clone()->endOfDay(),
-            $date->toDateString()
+            $date->clone()->endOfDay()
         );
     }
 
@@ -61,11 +60,133 @@ class DivisionSalesService
      */
     public function mtdSummary(): array
     {
-        return $this->rangedSummary(
+        return $this->summaryForRange(
             now()->startOfMonth(),
-            now()->endOfDay(),
-            now()->format('Y-m-01').' – '.now()->toDateString()
+            now()->endOfDay()
         );
+    }
+
+    /**
+     * Posted sales summary for a date range.
+     *
+     * @return array{
+     *     date: string,
+     *     rooms: float,
+     *     restaurant: float,
+     *     bar: float,
+     *     ancillary: float,
+     *     total: float,
+     *     room_nights: int,
+     *     payments_collected: float
+     * }
+     */
+    public function summaryForRange(Carbon $from, Carbon $to): array
+    {
+        $fromDay = $from->copy()->startOfDay();
+        $toDay   = $to->copy()->startOfDay();
+
+        $dateLabel = $fromDay->isSameDay($toDay)
+            ? $fromDay->toDateString()
+            : $fromDay->toDateString().' – '.$toDay->toDateString();
+
+        return $this->rangedSummary($fromDay, $to->copy()->endOfDay(), $dateLabel);
+    }
+
+    /**
+     * Sales summary report for daily, weekly, or monthly periods.
+     *
+     * @return array{
+     *     period: string,
+     *     from: string,
+     *     to: string,
+     *     period_label: string,
+     *     summary: array{
+     *         date: string,
+     *         rooms: float,
+     *         restaurant: float,
+     *         bar: float,
+     *         ancillary: float,
+     *         total: float,
+     *         room_nights: int,
+     *         payments_collected: float
+     *     },
+     *     daily_rows: list<array{
+     *         date: string,
+     *         date_label: string,
+     *         rooms: float,
+     *         restaurant: float,
+     *         bar: float,
+     *         ancillary: float,
+     *         total: float,
+     *         room_nights: int,
+     *         payments_collected: float
+     *     }>
+     * }
+     */
+    public function salesSummaryReport(string $period, ?Carbon $anchor = null): array
+    {
+        $anchor ??= now();
+        $anchor = $anchor->copy()->startOfDay();
+
+        [$from, $to, $periodLabel] = match ($period) {
+            'weekly' => [
+                $anchor->copy()->startOfWeek(Carbon::MONDAY),
+                $anchor->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay(),
+                'Week of '.$anchor->copy()->startOfWeek(Carbon::MONDAY)->format('d M Y'),
+            ],
+            'monthly' => [
+                $anchor->copy()->startOfMonth(),
+                $anchor->copy()->endOfMonth()->endOfDay(),
+                $anchor->format('F Y'),
+            ],
+            default => [
+                $anchor->copy()->startOfDay(),
+                $anchor->copy()->endOfDay(),
+                $anchor->format('d M Y'),
+            ],
+        };
+
+        if ($to->isFuture()) {
+            $to = now()->endOfDay();
+        }
+
+        $summary = $this->summaryForRange($from, $to);
+
+        $dailyRows = [];
+        if ($period !== 'daily') {
+            $current = $from->copy()->startOfDay();
+            $lastDay = $to->copy()->startOfDay();
+
+            while ($current->lte($lastDay)) {
+                $daySummary = $this->summaryForRange(
+                    $current->copy()->startOfDay(),
+                    $current->copy()->endOfDay()
+                );
+
+                $dailyRows[] = [
+                    'date'               => $current->toDateString(),
+                    'date_label'         => $current->format('D, d M Y'),
+                    'rooms'              => $daySummary['rooms'],
+                    'restaurant'         => $daySummary['restaurant'],
+                    'bar'                => $daySummary['bar'],
+                    'ancillary'          => $daySummary['ancillary'],
+                    'total'              => $daySummary['total'],
+                    'room_nights'        => $daySummary['room_nights'],
+                    'payments_collected' => $daySummary['payments_collected'],
+                ];
+
+                $current->addDay();
+            }
+        }
+
+        return [
+            'period'       => $period === 'weekly' || $period === 'monthly' ? $period : 'daily',
+            'from'         => $from->toDateString(),
+            'to'           => $to->toDateString(),
+            'period_label' => $periodLabel,
+            'summary'      => $summary,
+            'daily_rows'   => $dailyRows,
+        ];
     }
 
     /**
@@ -211,13 +332,12 @@ class DivisionSalesService
 
         $directSplit = $this->orderRevenue->directPaymentRevenueSplit($from, $to);
 
-        // --- Room nights occupied during the from-date ---
-        $dateStr    = $from->toDateString();
-        $roomNights = Reservation::query()
-            ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
-            ->where('check_in_date', '<=', $dateStr)
-            ->where('check_out_date', '>', $dateStr)
-            ->count();
+        // --- Room nights occupied in range ---
+        $fromDay = $from->copy()->startOfDay();
+        $toDay   = $to->copy()->startOfDay();
+        $roomNights = $fromDay->isSameDay($toDay)
+            ? $this->occupiedRoomNightsOnDate($fromDay)
+            : $this->occupiedRoomNightsInRange($fromDay, $toDay);
 
         // --- Total payments collected in range ---
         $paymentsCollected = (float) Payment::query()
@@ -245,5 +365,29 @@ class DivisionSalesService
             'room_nights'        => $roomNights,
             'payments_collected' => $paymentsCollected,
         ];
+    }
+
+    private function occupiedRoomNightsOnDate(Carbon $date): int
+    {
+        $dateStr = $date->toDateString();
+
+        return Reservation::query()
+            ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
+            ->where('check_in_date', '<=', $dateStr)
+            ->where('check_out_date', '>', $dateStr)
+            ->count();
+    }
+
+    private function occupiedRoomNightsInRange(Carbon $from, Carbon $to): int
+    {
+        $total   = 0;
+        $current = $from->copy()->startOfDay();
+
+        while ($current->lte($to)) {
+            $total += $this->occupiedRoomNightsOnDate($current);
+            $current->addDay();
+        }
+
+        return $total;
     }
 }

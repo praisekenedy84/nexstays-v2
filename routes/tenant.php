@@ -24,6 +24,7 @@ use App\Http\Controllers\Web\FbOrderController;
 use App\Http\Controllers\Web\DashboardController;
 use App\Http\Controllers\Web\GuestController;
 use App\Http\Controllers\Web\MenuCategoryController;
+use App\Http\Controllers\Web\MenuItemSalesSummaryReportController;
 use App\Http\Controllers\Web\MenuItemController;
 use App\Http\Controllers\Web\RatePlanController;
 use App\Http\Controllers\Web\RoomTypeController;
@@ -35,7 +36,9 @@ use App\Http\Controllers\Web\ReportController;
 use App\Http\Controllers\Web\OccupancyReportController;
 use App\Http\Controllers\Web\PaymentSummaryReportController;
 use App\Http\Controllers\Web\RoomReservationReportController;
+use App\Http\Controllers\Web\RoomReservationsSummaryReportController;
 use App\Http\Controllers\Web\RoomPaymentsAccountingReportController;
+use App\Http\Controllers\Web\SalesSummaryReportController;
 use App\Http\Controllers\Web\ReservationController;
 use App\Http\Controllers\Web\ReservationSettingsController;
 use App\Http\Controllers\Web\RestaurantController;
@@ -195,6 +198,9 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
 
         Route::middleware('permission:view-reports|view-fb-reports|view-reservations')->group(function () {
             Route::get('/reports', ReportController::class)->name('reports');
+            Route::get('/reports/sales-summary', [SalesSummaryReportController::class, 'index'])->name('reports.sales-summary');
+            Route::get('/reports/sales-summary/export-excel', [SalesSummaryReportController::class, 'exportExcel'])->name('reports.sales-summary.export-excel');
+            Route::get('/reports/sales-summary/export-pdf', [SalesSummaryReportController::class, 'exportPdf'])->name('reports.sales-summary.export-pdf');
             Route::get('/reports/fb-revenue', [FbReportController::class, 'index'])->name('reports.fb-revenue');
             Route::get('/reports/fb-revenue/export', [FbReportController::class, 'exportRevenueCsv'])->name('reports.fb-revenue.export');
             Route::get('/reports/fb-revenue/export-excel', [FbReportController::class, 'exportRevenueExcel'])->name('reports.fb-revenue.export-excel');
@@ -203,6 +209,9 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/reports/fb-profitability/export', [FbReportController::class, 'exportProfitabilityCsv'])->name('reports.fb-profitability.export');
             Route::get('/reports/fb-profitability/export-excel', [FbReportController::class, 'exportProfitabilityExcel'])->name('reports.fb-profitability.export-excel');
             Route::get('/reports/fb-profitability/export-pdf', [FbReportController::class, 'exportProfitabilityPdf'])->name('reports.fb-profitability.export-pdf');
+            Route::get('/reports/menu-item-sales-summary', [MenuItemSalesSummaryReportController::class, 'index'])->name('reports.menu-item-sales-summary');
+            Route::get('/reports/menu-item-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'exportExcel'])->name('reports.menu-item-sales-summary.export-excel');
+            Route::get('/reports/menu-item-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'exportPdf'])->name('reports.menu-item-sales-summary.export-pdf');
         });
         Route::middleware('permission:manage-reservations')->group(function () {
             Route::put('/reports/delivery-settings', [ReportDeliverySettingsController::class, 'update'])
@@ -220,6 +229,12 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
                 ->name('reports.room-reservations.export-excel');
             Route::get('/reports/room-reservations/export-pdf', [RoomReservationReportController::class, 'exportPdf'])
                 ->name('reports.room-reservations.export-pdf');
+            Route::get('/reports/room-reservations-summary', [RoomReservationsSummaryReportController::class, 'index'])
+                ->name('reports.room-reservations-summary');
+            Route::get('/reports/room-reservations-summary/export-excel', [RoomReservationsSummaryReportController::class, 'exportExcel'])
+                ->name('reports.room-reservations-summary.export-excel');
+            Route::get('/reports/room-reservations-summary/export-pdf', [RoomReservationsSummaryReportController::class, 'exportPdf'])
+                ->name('reports.room-reservations-summary.export-pdf');
             Route::get('/reports/room-payments-accounting', [RoomPaymentsAccountingReportController::class, 'index'])
                 ->name('reports.room-payments-accounting');
             Route::get('/reports/room-payments-accounting/export', [RoomPaymentsAccountingReportController::class, 'exportCsv'])

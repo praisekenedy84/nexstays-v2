@@ -9,8 +9,11 @@ use App\Domain\HBMS\Models\Folio;
 use App\Domain\HBMS\Models\FolioTransaction;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
+use App\Domain\HBMS\Models\RoomType;
 use App\Domain\Purchases\Models\PurchaseOrder;
+use App\Domain\Shared\Models\MenuCategory;
 use App\Domain\Shared\Models\OrderItem;
+use App\Domain\Shared\Models\Outlet;
 use App\Domain\Till\Models\Payment;
 use Brick\Money\Money;
 use Carbon\Carbon;
@@ -649,5 +652,464 @@ class ReportingService
             'top_items'        => $topItems,
             'top_room_types'   => $topRoomTypes,
         ];
+    }
+
+    /**
+     * Menu item sales summary grouped by division (Food/Drinks) and menu category.
+     *
+     * @return array{
+     *     hotel_name: string,
+     *     from: string,
+     *     to: string,
+     *     outlet_name: string,
+     *     category_filter: string,
+     *     categories: list<array{
+     *         name: string,
+     *         subcategories: list<array{
+     *             name: string,
+     *             items: list<array{
+     *                 name: string,
+     *                 quantity: int,
+     *                 price_avg: float,
+     *                 amount: float,
+     *                 discount: float,
+     *                 net_rate: float,
+     *                 tax: float,
+     *                 total_amount: float
+     *             }>,
+     *             subtotal: array{
+     *                 quantity: int,
+     *                 amount: float,
+     *                 discount: float,
+     *                 net_rate: float,
+     *                 tax: float,
+     *                 total_amount: float
+     *             }
+     *         }>,
+     *         subtotal: array{
+     *             quantity: int,
+     *             amount: float,
+     *             discount: float,
+     *             net_rate: float,
+     *             tax: float,
+     *             total_amount: float
+     *         }
+     *     }>,
+     *     grand_total: array{
+     *         quantity: int,
+     *         amount: float,
+     *         discount: float,
+     *         net_rate: float,
+     *         tax: float,
+     *         total_amount: float
+     *     }
+     * }
+     */
+    public function menuItemSalesSummary(
+        Carbon $from,
+        Carbon $to,
+        ?string $outletId = null,
+        ?string $categoryId = null,
+    ): array {
+        $itemsQuery = OrderItem::query()
+            ->with(['menuItem.category.outlet', 'order.outlet'])
+            ->where('status', '!=', 'voided')
+            ->whereHas('order', function ($query) use ($from, $to, $outletId): void {
+                $query->where('status', 'closed')
+                    ->whereNotNull('closed_at')
+                    ->whereBetween('closed_at', [$from, $to]);
+
+                if ($outletId !== null && $outletId !== '') {
+                    $query->where('outlet_id', $outletId);
+                }
+            });
+
+        if ($categoryId !== null && $categoryId !== '') {
+            $itemsQuery->whereHas('menuItem.category', fn ($query) => $query->where('id', $categoryId));
+        }
+
+        /** @var Collection<int, OrderItem> $items */
+        $items = $itemsQuery->get();
+
+        $orderGrossTotals = [];
+        foreach ($items as $item) {
+            $lineAmount = (float) $item->quantity * (float) $item->unit_price;
+            $orderGrossTotals[$item->order_id] = ($orderGrossTotals[$item->order_id] ?? 0) + $lineAmount;
+        }
+
+        /** @var array<string, array<string, array<string, array<string, float|int>>>> $tree */
+        $tree = [];
+
+        foreach ($items as $item) {
+            $menuItem = $item->menuItem;
+            if ($menuItem === null) {
+                continue;
+            }
+
+            $sourceOutlet = $menuItem->sourceOutlet();
+            $topCategory  = ($sourceOutlet?->isBar() ?? false) ? 'Drinks' : 'Food';
+            $subCategory  = $menuItem->category?->name ?: '-N/A-';
+            $itemKey      = $menuItem->id;
+
+            $amount   = (float) $item->quantity * (float) $item->unit_price;
+            $order    = $item->order;
+            $share    = ($orderGrossTotals[$item->order_id] ?? 0) > 0
+                ? $amount / $orderGrossTotals[$item->order_id]
+                : 0.0;
+            $discount = (float) ($order?->discount_amount ?? 0) * $share;
+            $tax      = (float) ($order?->tax_amount ?? 0) * $share;
+            $netRate  = $amount - $discount - $tax;
+            $total    = $amount - $discount;
+
+            if (! isset($tree[$topCategory][$subCategory][$itemKey])) {
+                $tree[$topCategory][$subCategory][$itemKey] = [
+                    'name'         => $menuItem->name,
+                    'quantity'     => 0,
+                    'amount'       => 0.0,
+                    'discount'     => 0.0,
+                    'net_rate'     => 0.0,
+                    'tax'          => 0.0,
+                    'total_amount' => 0.0,
+                ];
+            }
+
+            $tree[$topCategory][$subCategory][$itemKey]['quantity']     += (int) $item->quantity;
+            $tree[$topCategory][$subCategory][$itemKey]['amount']       += $amount;
+            $tree[$topCategory][$subCategory][$itemKey]['discount']     += $discount;
+            $tree[$topCategory][$subCategory][$itemKey]['net_rate']     += $netRate;
+            $tree[$topCategory][$subCategory][$itemKey]['tax']          += $tax;
+            $tree[$topCategory][$subCategory][$itemKey]['total_amount'] += $total;
+        }
+
+        $categories = [];
+        foreach (['Food', 'Drinks'] as $categoryName) {
+            if (! isset($tree[$categoryName])) {
+                continue;
+            }
+
+            $subcategories = [];
+            ksort($tree[$categoryName]);
+
+            foreach ($tree[$categoryName] as $subCategoryName => $itemRows) {
+                $rows = collect($itemRows)
+                    ->map(function (array $row): array {
+                        $qty = (int) $row['quantity'];
+
+                        return [
+                            'name'         => $row['name'],
+                            'quantity'     => $qty,
+                            'price_avg'    => $qty > 0 ? round($row['amount'] / $qty, 2) : 0.0,
+                            'amount'       => round($row['amount'], 2),
+                            'discount'     => round($row['discount'], 2),
+                            'net_rate'     => round($row['net_rate'], 2),
+                            'tax'          => round($row['tax'], 2),
+                            'total_amount' => round($row['total_amount'], 2),
+                        ];
+                    })
+                    ->sortBy('name')
+                    ->values()
+                    ->all();
+
+                $subcategories[] = [
+                    'name'          => $subCategoryName,
+                    'items'         => $rows,
+                    'subtotal'      => $this->sumMenuItemSalesRows($rows),
+                ];
+            }
+
+            $categorySubtotal = $this->sumMenuItemSalesRows(
+                collect($subcategories)->flatMap(fn (array $sub) => $sub['items'])->all()
+            );
+
+            $categories[] = [
+                'name'          => $categoryName,
+                'subcategories' => $subcategories,
+                'subtotal'      => $categorySubtotal,
+            ];
+        }
+
+        $grandTotal = $this->sumMenuItemSalesRows(
+            collect($categories)->flatMap(
+                fn (array $category) => collect($category['subcategories'])->flatMap(fn (array $sub) => $sub['items'])
+            )->all()
+        );
+
+        $outletName = 'All outlets';
+        if ($outletId !== null && $outletId !== '') {
+            $outletName = Outlet::query()->whereKey($outletId)->value('name') ?? 'Unknown outlet';
+        }
+
+        $categoryFilter = 'All categories';
+        if ($categoryId !== null && $categoryId !== '') {
+            $categoryFilter = MenuCategory::query()->whereKey($categoryId)->value('name') ?? 'Unknown category';
+        }
+
+        return [
+            'hotel_name'      => $this->hotelName(),
+            'from'            => $from->toDateString(),
+            'to'              => $to->toDateString(),
+            'outlet_name'     => $outletName,
+            'category_filter' => $categoryFilter,
+            'categories'      => $categories,
+            'grand_total'     => $grandTotal,
+        ];
+    }
+
+    /**
+     * Room reservations summary grouped by room type and reservation status.
+     *
+     * @return array{
+     *     hotel_name: string,
+     *     from: string,
+     *     to: string,
+     *     room_type_filter: string,
+     *     status_filter: string,
+     *     categories: list<array{
+     *         name: string,
+     *         subcategories: list<array{
+     *             name: string,
+     *             items: list<array{
+     *                 name: string,
+     *                 room_number: string,
+     *                 quantity: int,
+     *                 price_avg: float,
+     *                 amount: float,
+     *                 discount: float,
+     *                 net_rate: float,
+     *                 tax: float,
+     *                 total_amount: float
+     *             }>,
+     *             subtotal: array{
+     *                 quantity: int,
+     *                 amount: float,
+     *                 discount: float,
+     *                 net_rate: float,
+     *                 tax: float,
+     *                 total_amount: float
+     *             }
+     *         }>,
+     *         subtotal: array{
+     *             quantity: int,
+     *             amount: float,
+     *             discount: float,
+     *             net_rate: float,
+     *             tax: float,
+     *             total_amount: float
+     *         }
+     *     }>,
+     *     grand_total: array{
+     *         quantity: int,
+     *         amount: float,
+     *         discount: float,
+     *         net_rate: float,
+     *         tax: float,
+     *         total_amount: float
+     *     }
+     * }
+     */
+    public function roomReservationsSummary(
+        Carbon $from,
+        Carbon $to,
+        ?string $roomTypeId = null,
+        ?string $status = null,
+    ): array {
+        $paymentMode = app(\App\Domain\HBMS\Services\ReservationSettingsService::class)->all()['payment_mode'] ?? 'prepaid';
+
+        $query = Reservation::query()
+            ->with(['guest', 'room', 'roomType', 'folio.payments'])
+            ->whereDate('check_in_date', '>=', $from)
+            ->whereDate('check_in_date', '<=', $to)
+            ->orderBy('check_in_date');
+
+        if ($roomTypeId !== null && $roomTypeId !== '') {
+            $query->where('room_type_id', $roomTypeId);
+        }
+
+        if ($status !== null && $status !== '') {
+            $query->where('status', $status);
+        }
+
+        /** @var array<string, array<string, list<array<string, mixed>>>> $tree */
+        $tree = [];
+
+        foreach ($query->get() as $reservation) {
+            $financials  = $this->reservationFinancials($reservation, $paymentMode);
+            $roomTypeName = $reservation->roomType?->name ?? 'Unassigned room type';
+            $statusName   = $this->reservationStatusLabel((string) $reservation->status);
+            $guestName    = trim(($reservation->guest?->first_name ?? '').' '.($reservation->guest?->last_name ?? '')) ?: 'Guest';
+
+            $tree[$roomTypeName][$statusName][] = [
+                'name'         => sprintf('%s (%s)', $guestName, $reservation->booking_ref),
+                'room_number'  => $reservation->room?->room_number ?? '—',
+                'quantity'     => $financials['nights'],
+                'price_avg'    => round($financials['daily_rate'], 2),
+                'amount'       => round($financials['amount'], 2),
+                'discount'     => round($financials['paid'], 2),
+                'net_rate'     => round($financials['balance'], 2),
+                'tax'          => 0.0,
+                'total_amount' => round($financials['revenue'], 2),
+            ];
+        }
+
+        $categories = [];
+        ksort($tree);
+
+        foreach ($tree as $roomTypeName => $statusGroups) {
+            $subcategories = [];
+
+            foreach ($this->sortedReservationStatusGroups($statusGroups) as $statusName => $items) {
+                usort($items, fn (array $a, array $b): int => strcmp($a['name'], $b['name']));
+
+                $subcategories[] = [
+                    'name'     => $statusName,
+                    'items'    => $items,
+                    'subtotal' => $this->sumGroupedReportRows($items),
+                ];
+            }
+
+            $categoryItems = collect($subcategories)->flatMap(fn (array $sub) => $sub['items'])->all();
+
+            $categories[] = [
+                'name'          => $roomTypeName,
+                'subcategories' => $subcategories,
+                'subtotal'      => $this->sumGroupedReportRows($categoryItems),
+            ];
+        }
+
+        $grandTotal = $this->sumGroupedReportRows(
+            collect($categories)->flatMap(
+                fn (array $category) => collect($category['subcategories'])->flatMap(fn (array $sub) => $sub['items'])
+            )->all()
+        );
+
+        $roomTypeFilter = 'All room types';
+        if ($roomTypeId !== null && $roomTypeId !== '') {
+            $roomTypeFilter = RoomType::query()->whereKey($roomTypeId)->value('name') ?? 'Unknown room type';
+        }
+
+        $statusFilter = 'All statuses';
+        if ($status !== null && $status !== '') {
+            $statusFilter = $this->reservationStatusLabel($status);
+        }
+
+        return [
+            'hotel_name'       => $this->hotelName(),
+            'from'             => $from->toDateString(),
+            'to'               => $to->toDateString(),
+            'room_type_filter' => $roomTypeFilter,
+            'status_filter'    => $statusFilter,
+            'categories'       => $categories,
+            'grand_total'      => $grandTotal,
+        ];
+    }
+
+    /** @return array{nights: int, daily_rate: float, amount: float, paid: float, balance: float, revenue: float} */
+    private function reservationFinancials(Reservation $reservation, string $paymentMode): array
+    {
+        $currency   = config('nexstay.currency.default', 'TZS');
+        $stayNights = max(
+            1,
+            Carbon::parse($reservation->check_in_date)->diffInDays(Carbon::parse($reservation->check_out_date))
+        );
+        $dailyRate = (float) $reservation->daily_rate;
+
+        $gross = Money::of((string) $reservation->daily_rate, $currency)->multipliedBy($stayNights);
+        if ($reservation->status === 'cancelled' && $reservation->cancellation_charge_amount !== null) {
+            $gross = Money::of((string) $reservation->cancellation_charge_amount, $currency);
+        }
+
+        $revenue = $reservation->status === 'inquiry'
+            ? Money::of('0', $currency)
+            : $gross;
+
+        if ($reservation->folio !== null) {
+            $paid = Money::of((string) ($reservation->folio->payments->sum('amount') ?: '0'), $currency);
+        } elseif ($paymentMode === 'prepaid' && $reservation->status !== 'inquiry') {
+            $paid = $gross;
+        } else {
+            $paid = Money::of((string) ($reservation->deposit_amount ?? 0), $currency);
+        }
+
+        return [
+            'nights'     => (int) $stayNights,
+            'daily_rate' => $dailyRate,
+            'amount'     => $gross->getAmount()->toFloat(),
+            'paid'       => $paid->getAmount()->toFloat(),
+            'balance'    => $gross->minus($paid)->getAmount()->toFloat(),
+            'revenue'    => $revenue->getAmount()->toFloat(),
+        ];
+    }
+
+    private function reservationStatusLabel(string $status): string
+    {
+        return match ($status) {
+            'inquiry'     => 'Inquiry',
+            'confirmed'   => 'Confirmed',
+            'checked_in'  => 'Checked in',
+            'checked_out' => 'Checked out',
+            'cancelled'   => 'Cancelled',
+            'no_show'     => 'No show',
+            default       => ucwords(str_replace('_', ' ', $status)),
+        };
+    }
+
+    /** @param array<string, list<array<string, mixed>>> $statusGroups */
+    private function sortedReservationStatusGroups(array $statusGroups): array
+    {
+        $order = ['Confirmed', 'Checked in', 'Checked out', 'Inquiry', 'Cancelled', 'No show'];
+        $sorted = [];
+
+        foreach ($order as $label) {
+            if (isset($statusGroups[$label])) {
+                $sorted[$label] = $statusGroups[$label];
+            }
+        }
+
+        foreach ($statusGroups as $label => $items) {
+            if (! isset($sorted[$label])) {
+                $sorted[$label] = $items;
+            }
+        }
+
+        return $sorted;
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function sumGroupedReportRows(array $rows): array
+    {
+        $quantity = (int) array_sum(array_column($rows, 'quantity'));
+        $amount   = round(array_sum(array_column($rows, 'amount')), 2);
+        $discount = round(array_sum(array_column($rows, 'discount')), 2);
+        $netRate  = round(array_sum(array_column($rows, 'net_rate')), 2);
+        $tax      = round(array_sum(array_column($rows, 'tax')), 2);
+        $total    = round(array_sum(array_column($rows, 'total_amount')), 2);
+
+        return [
+            'quantity'     => $quantity,
+            'amount'       => $amount,
+            'discount'     => $discount,
+            'net_rate'     => $netRate,
+            'tax'          => $tax,
+            'total_amount' => $total,
+        ];
+    }
+
+    /** @param list<array<string, mixed>> $rows */
+    private function sumMenuItemSalesRows(array $rows): array
+    {
+        return $this->sumGroupedReportRows($rows);
+    }
+
+    private function hotelName(): string
+    {
+        if (tenancy()->initialized) {
+            $name = trim((string) (tenancy()->tenant->name ?? ''));
+
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        return (string) config('app.name', 'NexStay');
     }
 }
