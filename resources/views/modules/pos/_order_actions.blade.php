@@ -4,30 +4,32 @@
 @endphp
 
 <div class="flex flex-wrap items-center justify-end gap-0.5">
-    <a
-        href="{{ route('tenant.fb.orders.show', $order) }}"
-        class="{{ $iconBtn }} text-primary hover:bg-slate-100"
-        title="View order"
-        aria-label="View order"
-    >
-        <x-icon name="eye" class="size-4" />
-        <span class="sr-only">View</span>
-    </a>
-
-    @if ($order->status === 'closed')
+    @can('view-order', $order)
         <a
-            href="{{ route('tenant.pos.orders.receipt', $order) }}"
-            target="_blank"
+            href="{{ route('tenant.fb.orders.show', $order) }}"
             class="{{ $iconBtn }} text-primary hover:bg-slate-100"
-            title="Print receipt"
-            aria-label="Print receipt"
+            title="View order"
+            aria-label="View order"
         >
-            <x-icon name="till" class="size-4" />
-            <span class="sr-only">Receipt</span>
+            <x-icon name="eye" class="size-4" />
+            <span class="sr-only">View</span>
         </a>
-    @endif
 
-    @can('manage-orders')
+        @if ($order->status === 'closed')
+            <a
+                href="{{ route('tenant.pos.orders.receipt', $order) }}"
+                target="_blank"
+                class="{{ $iconBtn }} text-primary hover:bg-slate-100"
+                title="Print receipt"
+                aria-label="Print receipt"
+            >
+                <x-icon name="till" class="size-4" />
+                <span class="sr-only">Receipt</span>
+            </a>
+        @endif
+    @endcan
+
+    @can('manage-order', $order)
         @if ($order->isOpen())
             <a
                 href="{{ route('tenant.pos.manage', $order) }}"

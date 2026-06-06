@@ -2,7 +2,11 @@
     $currency = config('nexstay.currency.default', 'TZS');
 @endphp
 
-<x-layouts.app active-nav="fb-orders" title="Sales" subtitle="Completed F&B sales across outlets">
+<x-layouts.app
+    active-nav="fb-orders"
+    title="Sales"
+    :subtitle="$canViewAll ? 'Completed F&B sales across outlets and staff' : 'Your completed F&B sales'"
+>
     <form method="GET" class="mb-6 card flex flex-wrap items-end gap-3 p-4">
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">From</label>
@@ -23,12 +27,16 @@
         </div>
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">Staff</label>
-            <select name="waiter_id" class="input-field min-w-[160px]">
-                <option value="">All staff</option>
-                @foreach ($waiters as $waiter)
-                    <option value="{{ $waiter->id }}" @selected($waiterId === $waiter->id)>{{ $waiter->name }}</option>
-                @endforeach
-            </select>
+            @if ($canViewAll ?? false)
+                <select name="waiter_id" class="input-field min-w-[160px]">
+                    <option value="">All staff</option>
+                    @foreach ($waiters as $waiter)
+                        <option value="{{ $waiter->id }}" @selected($waiterId === $waiter->id)>{{ $waiter->name }}</option>
+                    @endforeach
+                </select>
+            @else
+                <p class="input-field min-w-[160px] bg-slate-50 text-sm text-ink-muted">{{ auth()->user()->name }} (your sales only)</p>
+            @endif
         </div>
         <button type="submit" class="btn-primary">Apply</button>
     </form>
@@ -42,7 +50,7 @@
 
     <div class="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-5">
         <div class="card p-4 text-center">
-            <p class="text-xs text-ink-muted">Total sales</p>
+            <p class="text-xs text-ink-muted">{{ $canViewAll ? 'Total sales' : 'Your total sales' }}</p>
             <p class="mt-1 text-lg font-bold text-ink">{{ $currency }} {{ number_format($summary['total_closed']) }}</p>
         </div>
         <div class="card p-4 text-center">
@@ -65,7 +73,7 @@
 
     <div class="mt-6 card overflow-hidden">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
-            <h3 class="font-semibold text-ink">Completed sales</h3>
+            <h3 class="font-semibold text-ink">{{ $canViewAll ? 'Completed sales' : 'Your completed sales' }}</h3>
             <span class="text-xs text-ink-muted">{{ $summary['count_closed'] }} {{ Str::plural('order', $summary['count_closed']) }}</span>
         </div>
         <table class="w-full text-left text-sm">

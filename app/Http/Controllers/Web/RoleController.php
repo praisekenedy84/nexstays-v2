@@ -31,7 +31,9 @@ class RoleController extends Controller
         'Food & beverage' => [
             'view-outlets', 'manage-outlets',
             'view-menu', 'manage-menu',
-            'view-orders', 'manage-orders',
+            'view-orders', 'view-all-orders',
+            'manage-orders', 'manage-all-orders', 'manage-own-orders',
+            'process-kitchen-orders',
         ],
         'Till' => ['view-till', 'manage-till'],
         'Inventory' => [

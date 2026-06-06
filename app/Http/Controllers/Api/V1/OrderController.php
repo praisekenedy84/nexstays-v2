@@ -8,6 +8,7 @@ use App\Domain\HBMS\Models\Folio;
 use App\Domain\Restaurant\Services\OrderService;
 use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\Outlet;
+use App\Domain\Shared\Services\OrderAuthorizationService;
 use App\Domain\Till\Services\TillSessionService;
 use App\Http\Controllers\Controller;
 use App\Http\Concerns\RespondsWithJsonApi;
@@ -28,6 +29,7 @@ class OrderController extends Controller
     public function __construct(
         private readonly OrderService $orderService,
         private readonly TillSessionService $tillSessionService,
+        private readonly OrderAuthorizationService $orderAuth,
     ) {}
 
     public function index(Request $request, Outlet $outlet): JsonResponse
@@ -60,7 +62,7 @@ class OrderController extends Controller
 
     public function show(Request $request, Order $order): JsonResponse
     {
-        abort_unless($request->user()?->can('view-orders'), 403);
+        abort_unless($this->orderAuth->canView($request->user(), $order), 403);
         $order->load(['items.menuItem', 'table', 'outlet', 'statusLogs']);
 
         return $this->respond(OrderResource::make($order));
@@ -75,7 +77,7 @@ class OrderController extends Controller
 
     public function fire(Request $request, Order $order): JsonResponse
     {
-        abort_unless($request->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage($request->user(), $order), 403);
 
         return $this->respond(OrderResource::make($this->orderService->fire($order)));
     }

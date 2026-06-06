@@ -12,7 +12,7 @@
     $currency    = config('nexstay.currency.default', 'TZS');
     $isOpen      = $order->isOpen();
     $activeItems = $order->items->where('status', '!=', 'voided');
-    $canManage   = auth()->user()?->can('manage-orders');
+    $canManage   = auth()->user()?->can('manage-order', $order);
 
     // Kitchen breakdown
     $pendingItems  = $activeItems->where('status', 'pending');

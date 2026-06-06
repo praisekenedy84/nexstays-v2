@@ -338,7 +338,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/shift/all', [ShiftSummaryController::class, 'all'])->name('shift.all');
         });
 
-        Route::middleware('permission:manage-orders')->group(function () {
+        Route::middleware('permission:manage-orders|manage-all-orders|manage-own-orders')->group(function () {
             Route::delete('/fb/orders/{order}', [FbOrderController::class, 'destroy'])->name('fb.orders.destroy');
             Route::post('/pos/{outlet}/orders', [PosController::class, 'createOrder'])->name('pos.orders.create');
             Route::post('/pos/orders/{order}/items', [PosController::class, 'addItem'])->name('pos.orders.add-item');
@@ -509,12 +509,15 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                 Route::get('/orders/{order}', [ApiOrderController::class, 'show'])->name('orders.show');
             });
 
-            Route::middleware('permission:manage-orders')->group(function () {
+            Route::middleware('permission:manage-orders|manage-all-orders|manage-own-orders')->group(function () {
                 Route::post('/orders/{order}/items', [ApiOrderController::class, 'addItems'])->name('orders.items.store');
-                Route::patch('/orders/{order}/items/status', [ApiOrderController::class, 'updateItemStatus'])->name('orders.items.status');
                 Route::post('/orders/{order}/fire', [ApiOrderController::class, 'fire'])->name('orders.fire');
                 Route::post('/orders/{order}/post-to-folio', [ApiOrderController::class, 'postToFolio'])->name('orders.post-to-folio');
                 Route::post('/orders/{order}/cash-payment', [ApiOrderController::class, 'cashPayment'])->name('orders.cash-payment');
+            });
+
+            Route::middleware('permission:manage-orders|manage-all-orders|manage-own-orders|process-kitchen-orders')->group(function () {
+                Route::patch('/orders/{order}/items/status', [ApiOrderController::class, 'updateItemStatus'])->name('orders.items.status');
             });
 
             Route::prefix('tills')->name('tills.')->group(function () {

@@ -4,13 +4,16 @@ declare(strict_types=1);
 
 namespace App\Http\Requests\Api\V1\Orders;
 
+use App\Domain\Shared\Services\OrderAuthorizationService;
 use Illuminate\Foundation\Http\FormRequest;
 
 class CreateOrderRequest extends FormRequest
 {
     public function authorize(): bool
     {
-        return $this->user()?->can('manage-orders') ?? false;
+        $user = $this->user();
+
+        return $user !== null && app(OrderAuthorizationService::class)->canCreate($user);
     }
 
     /**

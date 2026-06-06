@@ -11,6 +11,7 @@ use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\OrderItem;
 use App\Domain\Shared\Models\Outlet;
 use App\Domain\Shared\Services\FbSettingsService;
+use App\Domain\Shared\Services\OrderAuthorizationService;
 use App\Domain\Shared\Services\PaymentMethodSettingsService;
 use App\Domain\Till\Services\TillSessionService;
 use App\Http\Controllers\Controller;
@@ -28,11 +29,12 @@ class PosController extends Controller
         private readonly TillSessionService $tillService,
         private readonly FbSettingsService $fbSettings,
         private readonly PaymentMethodSettingsService $paymentMethodSettings,
+        private readonly OrderAuthorizationService $orderAuth,
     ) {}
 
     public function createOrder(Request $request, Outlet $outlet): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canCreate(auth()->user()), 403);
 
         $validated = $request->validate([
             'table_id'    => ['nullable', 'uuid', 'exists:outlet_tables,id'],
@@ -58,7 +60,7 @@ class PosController extends Controller
 
     public function manage(Order $order): View
     {
-        abort_unless(auth()->user()?->can('view-orders'), 403);
+        abort_unless($this->orderAuth->canView(auth()->user(), $order), 403);
 
         $order->load([
             'outlet.menuCategories' => fn ($q) => $q->where('is_active', true)->orderBy('display_order'),
@@ -107,7 +109,7 @@ class PosController extends Controller
 
     public function addItem(Request $request, Order $order): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         $validated = $request->validate([
             'menu_item_id' => ['required', 'uuid', 'exists:menu_items,id'],
@@ -130,7 +132,7 @@ class PosController extends Controller
 
     public function voidItem(Order $order, OrderItem $item): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         try {
             $this->orderService->updateItemStatus($order, $item, 'voided', 'voided_by_waiter');
@@ -143,7 +145,7 @@ class PosController extends Controller
 
     public function fire(Order $order): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         try {
             $this->orderService->fire($order);
@@ -156,7 +158,7 @@ class PosController extends Controller
 
     public function settleCash(Request $request, Order $order): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         $validated = $request->validate([
             'tendered' => ['required', 'numeric', 'min:0.01'],
@@ -184,7 +186,7 @@ class PosController extends Controller
 
     public function settleFollio(Request $request, Order $order): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         $validated = $request->validate([
             'folio_id' => ['required', 'uuid', 'exists:folios,id'],
@@ -210,7 +212,7 @@ class PosController extends Controller
 
     public function settleDirectPayment(Request $request, Order $order): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         $enabledMethods = implode(',', $this->paymentMethodSettings->enabledMethods());
 
@@ -258,7 +260,7 @@ class PosController extends Controller
 
     public function cancelOrder(Order $order): RedirectResponse
     {
-        abort_unless(auth()->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
         $backRoute = match ($order->outlet?->type) {
             'bar'    => route('tenant.bar.index'),
@@ -278,7 +280,7 @@ class PosController extends Controller
 
     public function receipt(Order $order): \Illuminate\View\View
     {
-        abort_unless(auth()->user()?->can('view-orders'), 403);
+        abort_unless($this->orderAuth->canView(auth()->user(), $order), 403);
 
         $order->load([
             'outlet',

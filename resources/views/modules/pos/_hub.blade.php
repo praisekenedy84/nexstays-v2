@@ -4,7 +4,7 @@
 --}}
 @php
     $currency = config('nexstay.currency.default', 'TZS');
-    $canManage = auth()->user()?->can('manage-orders');
+    $canCreateOrder = auth()->user()?->can('create-order');
     $statusColors = [
         'open'             => 'bg-slate-100 text-slate-700',
         'sent_to_kitchen'  => 'bg-amber-100 text-amber-800',
@@ -74,7 +74,7 @@
 
     {{-- Left: New order form + tables --}}
     <aside class="space-y-4">
-        @can('manage-orders')
+        @can('create-order')
             <section class="card p-5">
                 <h3 class="mb-4 font-semibold text-ink">New order</h3>
                 <form method="POST" action="{{ route('tenant.pos.orders.create', $outlet) }}" class="space-y-3">

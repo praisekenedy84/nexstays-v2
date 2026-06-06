@@ -32,7 +32,7 @@ class TextifySmsService
             $roomNumber,
             $checkIn,
             $checkOut,
-            (string) config('app.name', 'NexStay')
+            $this->hotelName()
         );
 
         $this->sendSms($recipient, $content, (string) $reservation->id, 'created');
@@ -55,6 +55,19 @@ class TextifySmsService
         );
 
         $this->sendSms($recipient, $content, (string) $reservation->id, 'cancelled');
+    }
+
+    private function hotelName(): string
+    {
+        if (tenancy()->initialized) {
+            $name = trim((string) (tenancy()->tenant->name ?? ''));
+
+            if ($name !== '') {
+                return $name;
+            }
+        }
+
+        return (string) config('app.name', 'NexStay');
     }
 
     private function sendSms(string $receiver, string $content, string $reservationId, string $event): void

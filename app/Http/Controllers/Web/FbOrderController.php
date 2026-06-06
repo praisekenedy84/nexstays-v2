@@ -7,6 +7,7 @@ namespace App\Http\Controllers\Web;
 use App\Domain\Restaurant\Actions\DeleteOrder;
 use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\Outlet;
+use App\Domain\Shared\Services\OrderAuthorizationService;
 use App\Domain\Till\Models\Payment;
 use App\Http\Controllers\Controller;
 use App\Models\User;
@@ -18,12 +19,16 @@ use Illuminate\View\View;
 class FbOrderController extends Controller
 {
     public function __construct(
-        private readonly DeleteOrder $deleteOrder
+        private readonly DeleteOrder $deleteOrder,
+        private readonly OrderAuthorizationService $orderAuth,
     ) {}
 
     public function index(Request $request): View
     {
         abort_unless($request->user()?->can('view-orders'), 403);
+
+        $user = $request->user();
+        $canViewAll = $this->orderAuth->canViewAllSales($user);
 
         $from = $request->filled('from')
             ? Carbon::parse($request->input('from'))->startOfDay()
@@ -33,7 +38,7 @@ class FbOrderController extends Controller
             : now()->endOfDay();
 
         $outletId = $request->input('outlet_id');
-        $waiterId = $request->input('waiter_id');
+        $waiterId = $canViewAll ? $request->input('waiter_id') : $user->id;
 
         $ordersQuery = Order::query()
             ->with(['outlet', 'table', 'waiter', 'payments'])
@@ -43,6 +48,8 @@ class FbOrderController extends Controller
             ->when($outletId, fn ($q) => $q->where('outlet_id', $outletId))
             ->when($waiterId, fn ($q) => $q->where('waiter_id', $waiterId))
             ->latest('closed_at');
+
+        $this->orderAuth->scopeSalesListing($ordersQuery, $user);
 
         $summary = $this->buildSalesSummary((clone $ordersQuery)->get());
         $orders = (clone $ordersQuery)->paginate(30)->withQueryString();
@@ -69,12 +76,13 @@ class FbOrderController extends Controller
             'to' => $to->toDateString(),
             'outletId' => $outletId,
             'waiterId' => $waiterId,
+            'canViewAll' => $canViewAll,
         ]);
     }
 
     public function show(Request $request, Order $order): View
     {
-        abort_unless($request->user()?->can('view-orders'), 403);
+        abort_unless($this->orderAuth->canView($request->user(), $order), 403);
 
         $order->load([
             'outlet',
@@ -87,14 +95,14 @@ class FbOrderController extends Controller
             'statusLogs' => fn ($q) => $q->limit(20),
         ]);
 
-        $canManage = $request->user()?->can('manage-orders') ?? false;
+        $canManage = $this->orderAuth->canManage($request->user(), $order);
 
         return view('modules.fb.orders.show', compact('order', 'canManage'));
     }
 
     public function destroy(Request $request, Order $order): RedirectResponse
     {
-        abort_unless($request->user()?->can('manage-orders'), 403);
+        abort_unless($this->orderAuth->canManage($request->user(), $order), 403);
 
         try {
             $this->deleteOrder->execute($order);

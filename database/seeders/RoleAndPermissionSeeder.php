@@ -40,7 +40,11 @@ class RoleAndPermissionSeeder extends Seeder
         'view-menu',
         'manage-menu',
         'view-orders',
+        'view-all-orders',
         'manage-orders',
+        'manage-all-orders',
+        'manage-own-orders',
+        'process-kitchen-orders',
         'view-till',
         'manage-till',
         'view-inventory',
@@ -121,7 +125,8 @@ class RoleAndPermissionSeeder extends Seeder
         ]);
 
         $fbStaff = [
-            'view-outlets', 'manage-outlets', 'view-menu', 'manage-menu', 'view-orders', 'manage-orders',
+            'view-outlets', 'manage-outlets', 'view-menu', 'manage-menu',
+            'view-orders', 'view-all-orders', 'manage-all-orders',
             'view-folios', 'post-folio-charges', 'view-till', 'manage-till',
             'view-inventory', 'manage-inventory',
             'view-purchases', 'manage-purchases',
@@ -131,23 +136,27 @@ class RoleAndPermissionSeeder extends Seeder
         Role::findByName('fb_manager', self::GUARD)->syncPermissions(array_merge($fbStaff, ['view-reports']));
 
         Role::findByName('waiter', self::GUARD)->syncPermissions([
-            'view-outlets', 'view-menu', 'view-orders', 'manage-orders', 'view-folios', 'post-folio-charges',
+            'view-outlets', 'view-menu', 'view-orders', 'manage-own-orders',
+            'view-folios', 'post-folio-charges',
         ]);
 
         Role::findByName('bartender', self::GUARD)->syncPermissions([
-            'view-outlets', 'view-menu', 'view-orders', 'manage-orders', 'view-till', 'manage-till',
+            'view-outlets', 'view-menu', 'view-orders', 'manage-own-orders',
+            'view-till', 'manage-till',
         ]);
 
         Role::findByName('lounge_staff', self::GUARD)->syncPermissions([
-            'view-outlets', 'view-menu', 'view-orders', 'manage-orders',
+            'view-outlets', 'view-menu', 'view-orders', 'manage-own-orders',
         ]);
 
         Role::findByName('head_chef', self::GUARD)->syncPermissions([
-            'view-outlets', 'view-menu', 'view-orders', 'view-inventory', 'manage-inventory',
+            'view-outlets', 'view-menu', 'view-orders', 'process-kitchen-orders',
+            'view-inventory', 'manage-inventory',
         ]);
 
         Role::findByName('finance', self::GUARD)->syncPermissions([
             'view-reservations', 'view-guests', 'view-folios', 'view-reports', 'view-fb-reports',
+            'view-orders', 'view-all-orders',
             'view-till', 'view-inventory', 'run-night-audit',
             'view-purchases', 'view-expenditures', 'manage-expenditures', 'view-debts',
             'manage-rate-plans', 'manage-room-types', 'view-rooms',

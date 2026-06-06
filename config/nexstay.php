@@ -124,6 +124,7 @@ return [
             'label' => 'Finance',
             'icon' => 'wallet',
             'children' => [
+                ['id' => 'fb-sales', 'label' => 'F&B sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-all-orders'],
                 ['id' => 'debts', 'label' => 'Outstanding debts', 'route' => 'tenant.debts.index', 'permission' => 'view-debts'],
                 ['id' => 'ancillary', 'label' => 'Extra services', 'route' => 'tenant.ancillary-services.index', 'permission' => 'view-ancillary-services'],
                 ['id' => 'expenditures', 'label' => 'Expenditures', 'route' => 'tenant.expenditures.index', 'permission' => 'view-expenditures'],
