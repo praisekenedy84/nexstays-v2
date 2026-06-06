@@ -50,6 +50,28 @@ class DeleteOrderTest extends TenantTestCase
         $this->assertDatabaseMissing('order_items', ['order_id' => $order->id]);
     }
 
+    public function test_it_blocks_deleting_closed_orders(): void
+    {
+        $outlet = Outlet::query()->create([
+            'name' => 'Test Restaurant',
+            'type' => 'restaurant',
+            'is_active' => true,
+        ]);
+
+        $order = Order::query()->create([
+            'outlet_id' => $outlet->id,
+            'order_number' => 'ORD-CLOSED-DEL',
+            'status' => 'closed',
+            'total' => '5000.00',
+            'closed_at' => now(),
+        ]);
+
+        $this->expectException(\DomainException::class);
+        $this->expectExceptionMessage('Void the order before permanently deleting it.');
+
+        app(DeleteOrder::class)->execute($order);
+    }
+
     public function test_it_blocks_deleting_open_orders(): void
     {
         $outlet = Outlet::query()->create([

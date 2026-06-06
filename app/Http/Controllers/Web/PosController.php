@@ -268,14 +268,20 @@ class PosController extends Controller
             default  => route('tenant.restaurant.index'),
         };
 
+        $wasClosed = $order->status === 'closed';
+
         try {
             $this->orderService->cancel($order);
         } catch (\DomainException $e) {
             return back()->with('error', $e->getMessage());
         }
 
+        $message = $wasClosed
+            ? "Order {$order->order_number} has been voided and removed from sales reports."
+            : "Order {$order->order_number} has been cancelled.";
+
         return back(fallback: $backRoute)
-            ->with('success', "Order {$order->order_number} has been cancelled.");
+            ->with('success', $message);
     }
 
     public function receipt(Order $order): \Illuminate\View\View

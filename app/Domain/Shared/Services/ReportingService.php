@@ -710,17 +710,22 @@ class ReportingService
         Carbon $to,
         ?string $outletId = null,
         ?string $categoryId = null,
+        ?string $outletType = null,
     ): array {
         $itemsQuery = OrderItem::query()
             ->with(['menuItem.category.outlet', 'order.outlet'])
             ->where('status', '!=', 'voided')
-            ->whereHas('order', function ($query) use ($from, $to, $outletId): void {
+            ->whereHas('order', function ($query) use ($from, $to, $outletId, $outletType): void {
                 $query->where('status', 'closed')
                     ->whereNotNull('closed_at')
                     ->whereBetween('closed_at', [$from, $to]);
 
                 if ($outletId !== null && $outletId !== '') {
                     $query->where('outlet_id', $outletId);
+                }
+
+                if ($outletType !== null && $outletType !== '') {
+                    $query->whereHas('outlet', fn ($outletQuery) => $outletQuery->where('type', $outletType));
                 }
             });
 
@@ -837,6 +842,10 @@ class ReportingService
         $outletName = 'All outlets';
         if ($outletId !== null && $outletId !== '') {
             $outletName = Outlet::query()->whereKey($outletId)->value('name') ?? 'Unknown outlet';
+        } elseif ($outletType === 'bar') {
+            $outletName = 'All bar outlets';
+        } elseif ($outletType === 'lounge') {
+            $outletName = 'All lounge outlets';
         }
 
         $categoryFilter = 'All categories';
@@ -844,12 +853,20 @@ class ReportingService
             $categoryFilter = MenuCategory::query()->whereKey($categoryId)->value('name') ?? 'Unknown category';
         }
 
+        $reportTitle = match ($outletType) {
+            'bar'    => 'Bar item sales summary',
+            'lounge' => 'Lounge item sales summary',
+            default  => 'Menu Item Sales Summary',
+        };
+
         return [
             'hotel_name'      => $this->hotelName(),
             'from'            => $from->toDateString(),
             'to'              => $to->toDateString(),
             'outlet_name'     => $outletName,
+            'outlet_type'     => $outletType,
             'category_filter' => $categoryFilter,
+            'report_title'    => $reportTitle,
             'categories'      => $categories,
             'grand_total'     => $grandTotal,
         ];

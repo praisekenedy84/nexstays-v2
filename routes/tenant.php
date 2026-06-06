@@ -201,6 +201,12 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/reports/sales-summary', [SalesSummaryReportController::class, 'index'])->name('reports.sales-summary');
             Route::get('/reports/sales-summary/export-excel', [SalesSummaryReportController::class, 'exportExcel'])->name('reports.sales-summary.export-excel');
             Route::get('/reports/sales-summary/export-pdf', [SalesSummaryReportController::class, 'exportPdf'])->name('reports.sales-summary.export-pdf');
+            Route::get('/reports/bar-sales-summary', [MenuItemSalesSummaryReportController::class, 'barIndex'])->name('reports.bar-sales-summary');
+            Route::get('/reports/bar-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'barExportExcel'])->name('reports.bar-sales-summary.export-excel');
+            Route::get('/reports/bar-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'barExportPdf'])->name('reports.bar-sales-summary.export-pdf');
+            Route::get('/reports/lounge-sales-summary', [MenuItemSalesSummaryReportController::class, 'loungeIndex'])->name('reports.lounge-sales-summary');
+            Route::get('/reports/lounge-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'loungeExportExcel'])->name('reports.lounge-sales-summary.export-excel');
+            Route::get('/reports/lounge-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'loungeExportPdf'])->name('reports.lounge-sales-summary.export-pdf');
             Route::get('/reports/fb-revenue', [FbReportController::class, 'index'])->name('reports.fb-revenue');
             Route::get('/reports/fb-revenue/export', [FbReportController::class, 'exportRevenueCsv'])->name('reports.fb-revenue.export');
             Route::get('/reports/fb-revenue/export-excel', [FbReportController::class, 'exportRevenueExcel'])->name('reports.fb-revenue.export-excel');

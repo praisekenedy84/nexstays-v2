@@ -67,21 +67,7 @@
                     <span class="sr-only">Void</span>
                 </button>
             </form>
-            <form method="POST" action="{{ route('tenant.fb.orders.destroy', $order) }}" class="inline"
-                  onsubmit="return confirm('Permanently delete order {{ $order->order_number }}? Stock will be restored and the record will be removed entirely.')">
-                @csrf
-                @method('DELETE')
-                <button
-                    type="submit"
-                    class="{{ $iconBtn }} text-red-600 hover:bg-red-50"
-                    title="Delete order permanently"
-                    aria-label="Delete order permanently"
-                >
-                    <x-icon name="trash" class="size-4" />
-                    <span class="sr-only">Delete</span>
-                </button>
-            </form>
-        @elseif ($order->status === 'voided')
+            @can('delete-order', $order)
             <form method="POST" action="{{ route('tenant.fb.orders.destroy', $order) }}" class="inline"
                   onsubmit="return confirm('Permanently delete order {{ $order->order_number }}? This cannot be undone.')">
                 @csrf
@@ -96,6 +82,24 @@
                     <span class="sr-only">Delete</span>
                 </button>
             </form>
+            @endcan
+        @elseif ($order->status === 'voided')
+            @can('delete-order', $order)
+            <form method="POST" action="{{ route('tenant.fb.orders.destroy', $order) }}" class="inline"
+                  onsubmit="return confirm('Permanently delete order {{ $order->order_number }}? This cannot be undone.')">
+                @csrf
+                @method('DELETE')
+                <button
+                    type="submit"
+                    class="{{ $iconBtn }} text-red-600 hover:bg-red-50"
+                    title="Delete order permanently"
+                    aria-label="Delete order permanently"
+                >
+                    <x-icon name="trash" class="size-4" />
+                    <span class="sr-only">Delete</span>
+                </button>
+            </form>
+            @endcan
         @endif
     @endcan
 </div>

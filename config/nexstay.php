@@ -137,6 +137,8 @@ return [
             'children' => [
                 ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reservations'],
                 ['id' => 'sales-summary-report', 'label' => 'Sales summary', 'route' => 'tenant.reports.sales-summary', 'permission' => 'view-reports'],
+                ['id' => 'bar-sales-summary-report', 'label' => 'Bar item sales', 'route' => 'tenant.reports.bar-sales-summary', 'permission' => 'view-fb-reports'],
+                ['id' => 'lounge-sales-summary-report', 'label' => 'Lounge item sales', 'route' => 'tenant.reports.lounge-sales-summary', 'permission' => 'view-fb-reports'],
                 ['id' => 'menu-item-sales-summary-report', 'label' => 'Menu item sales', 'route' => 'tenant.reports.menu-item-sales-summary', 'permission' => 'view-fb-reports'],
                 ['id' => 'occupancy-report', 'label' => 'Occupancy', 'route' => 'tenant.reports.occupancy', 'permission' => 'view-reservations'],
                 ['id' => 'room-reservation-reports', 'label' => 'Room reservations finance', 'route' => 'tenant.reports.room-reservations', 'permission' => 'view-reservations'],

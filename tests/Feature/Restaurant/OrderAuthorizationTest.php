@@ -41,7 +41,7 @@ class OrderAuthorizationTest extends TenantTestCase
         $this->assertDatabaseHas('orders', ['id' => $order->id]);
     }
 
-    public function test_waiter_can_delete_own_order(): void
+    public function test_waiter_cannot_delete_own_voided_order(): void
     {
         $this->user->syncRoles([]);
         $this->user->givePermissionTo(['view-orders', 'manage-own-orders']);
@@ -64,9 +64,102 @@ class OrderAuthorizationTest extends TenantTestCase
         $this->web()
             ->actingAs($this->user, 'web')
             ->delete(route('tenant.fb.orders.destroy', $order))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id]);
+    }
+
+    public function test_waiter_cannot_delete_own_closed_order(): void
+    {
+        $this->user->syncRoles([]);
+        $this->user->givePermissionTo(['view-orders', 'manage-own-orders']);
+
+        $outlet = Outlet::query()->create([
+            'name' => 'Test Bar',
+            'type' => 'bar',
+            'is_active' => true,
+        ]);
+
+        $order = Order::query()->create([
+            'outlet_id' => $outlet->id,
+            'waiter_id' => $this->user->id,
+            'order_number' => 'ORD-CLOSED-1',
+            'status' => 'closed',
+            'total' => '5000.00',
+            'closed_at' => now(),
+        ]);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->delete(route('tenant.fb.orders.destroy', $order))
+            ->assertForbidden();
+
+        $this->assertDatabaseHas('orders', ['id' => $order->id, 'status' => 'closed']);
+    }
+
+    public function test_manager_can_delete_voided_order(): void
+    {
+        $outlet = Outlet::query()->create([
+            'name' => 'Test Bar',
+            'type' => 'bar',
+            'is_active' => true,
+        ]);
+
+        $order = Order::query()->create([
+            'outlet_id' => $outlet->id,
+            'waiter_id' => $this->user->id,
+            'order_number' => 'ORD-MGR-DEL-1',
+            'status' => 'voided',
+            'total' => '5000.00',
+            'closed_at' => now(),
+        ]);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->delete(route('tenant.fb.orders.destroy', $order))
             ->assertRedirect();
 
         $this->assertDatabaseMissing('orders', ['id' => $order->id]);
+    }
+
+    public function test_voided_order_appears_in_staff_sales_list_but_not_totals(): void
+    {
+        $this->user->syncRoles([]);
+        $this->user->givePermissionTo(['view-orders', 'manage-own-orders']);
+
+        $outlet = Outlet::query()->create([
+            'name' => 'Test Restaurant',
+            'type' => 'restaurant',
+            'is_active' => true,
+        ]);
+
+        Order::query()->create([
+            'outlet_id' => $outlet->id,
+            'waiter_id' => $this->user->id,
+            'order_number' => 'ORD-VOID-LIST',
+            'status' => 'voided',
+            'total' => '9000.00',
+            'closed_at' => now(),
+        ]);
+
+        Order::query()->create([
+            'outlet_id' => $outlet->id,
+            'waiter_id' => $this->user->id,
+            'order_number' => 'ORD-CLOSED-LIST',
+            'status' => 'closed',
+            'total' => '12000.00',
+            'closed_at' => now(),
+        ]);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.fb.orders.index'));
+
+        $response->assertOk();
+        $response->assertSee('ORD-VOID-LIST');
+        $response->assertSee('ORD-CLOSED-LIST');
+        $response->assertSee('12,000');
+        $response->assertDontSee('21,000');
     }
 
     public function test_sales_list_shows_only_own_orders_without_view_all_permission(): void

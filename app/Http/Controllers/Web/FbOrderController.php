@@ -42,7 +42,7 @@ class FbOrderController extends Controller
 
         $ordersQuery = Order::query()
             ->with(['outlet', 'table', 'waiter', 'payments'])
-            ->where('status', 'closed')
+            ->whereIn('status', ['closed', 'voided'])
             ->whereNotNull('closed_at')
             ->whereBetween('closed_at', [$from, $to])
             ->when($outletId, fn ($q) => $q->where('outlet_id', $outletId))
@@ -102,7 +102,7 @@ class FbOrderController extends Controller
 
     public function destroy(Request $request, Order $order): RedirectResponse
     {
-        abort_unless($this->orderAuth->canManage($request->user(), $order), 403);
+        abort_unless($this->orderAuth->canDelete($request->user(), $order), 403);
 
         try {
             $this->deleteOrder->execute($order);
@@ -127,7 +127,8 @@ class FbOrderController extends Controller
      */
     private function buildSalesSummary(\Illuminate\Support\Collection $orders): array
     {
-        $closedOrderIds = $orders->pluck('id');
+        $closedOrders = $orders->where('status', 'closed');
+        $closedOrderIds = $closedOrders->pluck('id');
 
         $payments = Payment::query()
             ->whereIn('order_id', $closedOrderIds)
@@ -137,7 +138,7 @@ class FbOrderController extends Controller
         $card = (float) $payments->where('method', 'card')->sum('amount');
         $mobile = (float) $payments->where('method', 'mobile_money')->sum('amount');
 
-        $folio = (float) $orders
+        $folio = (float) $closedOrders
             ->filter(fn (Order $o) => $o->folio_id !== null)
             ->sum('total');
 
@@ -147,7 +148,8 @@ class FbOrderController extends Controller
             'mobile_money' => $mobile,
             'folio' => $folio,
             'total_closed' => $cash + $card + $mobile + $folio,
-            'count_closed' => $orders->count(),
+            'count_closed' => $closedOrders->count(),
+            'count_voided' => $orders->where('status', 'voided')->count(),
         ];
     }
 }

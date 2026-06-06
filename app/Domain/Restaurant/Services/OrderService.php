@@ -355,6 +355,10 @@ class OrderService
 
             $this->syncOrderStatusFromItems($order);
 
+            if ($toStatus === 'voided') {
+                return $this->recalculate($order);
+            }
+
             return $order->fresh(['items.menuItem']);
         });
     }

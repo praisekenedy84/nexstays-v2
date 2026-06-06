@@ -6,6 +6,7 @@ namespace App\Domain\Shared\Services;
 
 use App\Domain\HBMS\Models\FolioTransaction;
 use App\Domain\HBMS\Models\Reservation;
+use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\SalesSnapshot;
 use App\Domain\Till\Models\Payment;
 use Carbon\Carbon;
@@ -186,6 +187,110 @@ class DivisionSalesService
             'period_label' => $periodLabel,
             'summary'      => $summary,
             'daily_rows'   => $dailyRows,
+        ];
+    }
+
+    /**
+     * Bar or lounge POS sales summary (closed orders at outlets of the given type).
+     *
+     * @return array{
+     *     outlet_type: string,
+     *     outlet_type_label: string,
+     *     period: string,
+     *     from: string,
+     *     to: string,
+     *     period_label: string,
+     *     summary: array{
+     *         date: string,
+     *         total: float,
+     *         order_count: int,
+     *         folio_sales: float,
+     *         direct_sales: float,
+     *         payments_collected: float,
+     *         cash: float,
+     *         card: float,
+     *         mobile_money: float
+     *     },
+     *     daily_rows: list<array{
+     *         date: string,
+     *         date_label: string,
+     *         total: float,
+     *         order_count: int,
+     *         folio_sales: float,
+     *         direct_sales: float,
+     *         payments_collected: float,
+     *         cash: float,
+     *         card: float,
+     *         mobile_money: float
+     *     }>
+     * }
+     */
+    public function outletTypeSalesSummaryReport(string $outletType, string $period, ?Carbon $anchor = null): array
+    {
+        if (! in_array($outletType, ['bar', 'lounge'], true)) {
+            throw new \InvalidArgumentException("Unsupported outlet type: {$outletType}");
+        }
+
+        $anchor ??= now();
+        $anchor = $anchor->copy()->startOfDay();
+
+        [$from, $to, $periodLabel] = match ($period) {
+            'weekly' => [
+                $anchor->copy()->startOfWeek(Carbon::MONDAY),
+                $anchor->copy()->endOfWeek(Carbon::SUNDAY)->endOfDay(),
+                'Week of '.$anchor->copy()->startOfWeek(Carbon::MONDAY)->format('d M Y'),
+            ],
+            'monthly' => [
+                $anchor->copy()->startOfMonth(),
+                $anchor->copy()->endOfMonth()->endOfDay(),
+                $anchor->format('F Y'),
+            ],
+            default => [
+                $anchor->copy()->startOfDay(),
+                $anchor->copy()->endOfDay(),
+                $anchor->format('d M Y'),
+            ],
+        };
+
+        if ($to->isFuture()) {
+            $to = now()->endOfDay();
+        }
+
+        $summary = $this->outletTypeSummaryForRange($from, $to, $outletType);
+
+        $dailyRows = [];
+        if ($period !== 'daily') {
+            $current = $from->copy()->startOfDay();
+            $lastDay = $to->copy()->startOfDay();
+
+            while ($current->lte($lastDay)) {
+                $daySummary = $this->outletTypeSummaryForRange(
+                    $current->copy()->startOfDay(),
+                    $current->copy()->endOfDay(),
+                    $outletType
+                );
+
+                $dailyRows[] = array_merge(
+                    [
+                        'date'       => $current->toDateString(),
+                        'date_label' => $current->format('D, d M Y'),
+                    ],
+                    $this->outletTypeDailyRowFromSummary($daySummary)
+                );
+
+                $current->addDay();
+            }
+        }
+
+        return [
+            'outlet_type'       => $outletType,
+            'outlet_type_label' => ucfirst($outletType),
+            'period'            => $period === 'weekly' || $period === 'monthly' ? $period : 'daily',
+            'from'              => $from->toDateString(),
+            'to'                => $to->toDateString(),
+            'period_label'      => $periodLabel,
+            'summary'           => $summary,
+            'daily_rows'        => $dailyRows,
         ];
     }
 
@@ -389,5 +494,96 @@ class DivisionSalesService
         }
 
         return $total;
+    }
+
+    /**
+     * @return array{
+     *     date: string,
+     *     total: float,
+     *     order_count: int,
+     *     folio_sales: float,
+     *     direct_sales: float,
+     *     payments_collected: float,
+     *     cash: float,
+     *     card: float,
+     *     mobile_money: float
+     * }
+     */
+    private function outletTypeSummaryForRange(Carbon $from, Carbon $to, string $outletType): array
+    {
+        $fromDay = $from->copy()->startOfDay();
+        $toDay   = $to->copy()->startOfDay();
+
+        $dateLabel = $fromDay->isSameDay($toDay)
+            ? $fromDay->toDateString()
+            : $fromDay->toDateString().' – '.$toDay->toDateString();
+
+        $ordersBase = Order::query()
+            ->where('status', 'closed')
+            ->whereNotNull('closed_at')
+            ->whereBetween('closed_at', [$from, $to])
+            ->whereHas('outlet', fn ($query) => $query->where('type', $outletType));
+
+        $totalSales  = (float) (clone $ordersBase)->sum('total');
+        $orderCount  = (int) (clone $ordersBase)->count();
+        $folioSales  = (float) (clone $ordersBase)->whereNotNull('folio_id')->sum('total');
+        $directSales = $totalSales - $folioSales;
+
+        $paymentRows = Payment::query()
+            ->join('orders', 'payments.order_id', '=', 'orders.id')
+            ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
+            ->where('orders.status', 'closed')
+            ->whereBetween('orders.closed_at', [$from, $to])
+            ->where('outlets.type', $outletType)
+            ->where('payments.status', 'captured')
+            ->selectRaw("
+                SUM(CASE WHEN payments.method = 'cash' THEN payments.amount ELSE 0 END) AS cash,
+                SUM(CASE WHEN payments.method = 'card' THEN payments.amount ELSE 0 END) AS card,
+                SUM(CASE WHEN payments.method = 'mobile_money' THEN payments.amount ELSE 0 END) AS mobile_money
+            ")
+            ->first();
+
+        $cash   = (float) ($paymentRows->cash ?? 0);
+        $card   = (float) ($paymentRows->card ?? 0);
+        $mobile = (float) ($paymentRows->mobile_money ?? 0);
+
+        return [
+            'date'               => $dateLabel,
+            'total'              => $totalSales,
+            'order_count'        => $orderCount,
+            'folio_sales'        => $folioSales,
+            'direct_sales'       => $directSales,
+            'payments_collected' => $cash + $card + $mobile,
+            'cash'               => $cash,
+            'card'               => $card,
+            'mobile_money'       => $mobile,
+        ];
+    }
+
+    /**
+     * @param  array<string, mixed>  $summary
+     * @return array{
+     *     total: float,
+     *     order_count: int,
+     *     folio_sales: float,
+     *     direct_sales: float,
+     *     payments_collected: float,
+     *     cash: float,
+     *     card: float,
+     *     mobile_money: float
+     * }
+     */
+    private function outletTypeDailyRowFromSummary(array $summary): array
+    {
+        return [
+            'total'              => $summary['total'],
+            'order_count'        => $summary['order_count'],
+            'folio_sales'        => $summary['folio_sales'],
+            'direct_sales'       => $summary['direct_sales'],
+            'payments_collected' => $summary['payments_collected'],
+            'cash'               => $summary['cash'],
+            'card'               => $summary['card'],
+            'mobile_money'       => $summary['mobile_money'],
+        ];
     }
 }

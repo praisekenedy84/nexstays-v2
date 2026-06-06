@@ -40,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
 
         Gate::define('view-order', fn (?User $user, Order $order) => $user !== null && $orderAuth()->canView($user, $order));
         Gate::define('manage-order', fn (?User $user, Order $order) => $user !== null && $orderAuth()->canManage($user, $order));
+        Gate::define('delete-order', fn (?User $user, Order $order) => $user !== null && $orderAuth()->canDelete($user, $order));
         Gate::define('create-order', fn (?User $user) => $user !== null && $orderAuth()->canCreate($user));
     }
 }

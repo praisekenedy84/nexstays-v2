@@ -21,57 +21,24 @@ class SalesSummaryReportController extends Controller
 
     public function index(Request $request): View
     {
-        [$period, $date, $report] = $this->buildReport($request);
+        [$period, $date, $report] = $this->buildPropertyReport($request);
 
         return view('modules.reports.sales-summary', compact('report', 'period', 'date'));
     }
 
     public function exportExcel(Request $request): StreamedResponse
     {
-        $report   = $this->buildReport($request)[2];
+        $report   = $this->buildPropertyReport($request)[2];
         $filename = sprintf('sales-summary-%s-%s-to-%s.xls', $report['period'], $report['from'], $report['to']);
 
         return response()->streamDownload(function () use ($report): void {
-            $currency = config('nexstay.currency.default', 'TZS');
-
-            echo '<table border="1">';
-            echo '<tr><th colspan="8"><strong>Sales Summary</strong></th></tr>';
-            echo '<tr><td colspan="8">Period: '.e($report['period_label']).' ('.e($report['from']).' — '.e($report['to']).')</td></tr>';
-            echo '<tr><td colspan="8"></td></tr>';
-
-            echo '<tr><th>Division</th><th>Amount ('.e($currency).')</th></tr>';
-            foreach ($this->divisionRows($report['summary']) as $row) {
-                echo '<tr><td>'.e($row['label']).'</td><td>'.e(number_format($row['amount'], 0)).'</td></tr>';
-            }
-            echo '<tr><td><strong>Total posted sales</strong></td><td><strong>'.e(number_format($report['summary']['total'], 0)).'</strong></td></tr>';
-            echo '<tr><td>Payments collected</td><td>'.e(number_format($report['summary']['payments_collected'], 0)).'</td></tr>';
-            echo '<tr><td>Room nights occupied</td><td>'.e($report['summary']['room_nights']).'</td></tr>';
-
-            if ($report['daily_rows'] !== []) {
-                echo '<tr><td colspan="8"></td></tr>';
-                echo '<tr><th>Date</th><th>Rooms</th><th>Restaurant</th><th>Bar &amp; lounge</th><th>Ancillary</th><th>Total</th><th>Payments</th><th>Room nights</th></tr>';
-
-                foreach ($report['daily_rows'] as $row) {
-                    echo '<tr>';
-                    echo '<td>'.e($row['date_label']).'</td>';
-                    echo '<td>'.e(number_format($row['rooms'], 0)).'</td>';
-                    echo '<td>'.e(number_format($row['restaurant'], 0)).'</td>';
-                    echo '<td>'.e(number_format($row['bar'], 0)).'</td>';
-                    echo '<td>'.e(number_format($row['ancillary'], 0)).'</td>';
-                    echo '<td>'.e(number_format($row['total'], 0)).'</td>';
-                    echo '<td>'.e(number_format($row['payments_collected'], 0)).'</td>';
-                    echo '<td>'.e($row['room_nights']).'</td>';
-                    echo '</tr>';
-                }
-            }
-
-            echo '</table>';
+            echo $this->renderPropertyExcelTable($report);
         }, $filename, ['Content-Type' => 'application/vnd.ms-excel; charset=UTF-8']);
     }
 
     public function exportPdf(Request $request): Response
     {
-        $report   = $this->buildReport($request)[2];
+        $report   = $this->buildPropertyReport($request)[2];
         $filename = sprintf('sales-summary-%s-%s-to-%s.pdf', $report['period'], $report['from'], $report['to']);
 
         return Pdf::loadView('modules.reports.pdf.sales-summary', compact('report'))
@@ -80,14 +47,19 @@ class SalesSummaryReportController extends Controller
     }
 
     /** @return array{0: string, 1: Carbon, 2: array} */
-    private function buildReport(Request $request): array
+    private function buildPropertyReport(Request $request): array
     {
         $period = $this->resolvePeriod($request);
-        $date   = $request->filled('date')
-            ? Carbon::parse($request->input('date'))->startOfDay()
-            : now()->startOfDay();
+        $date   = $this->resolveDate($request);
 
         return [$period, $date, $this->divisionSales->salesSummaryReport($period, $date)];
+    }
+
+    private function resolveDate(Request $request): Carbon
+    {
+        return $request->filled('date')
+            ? Carbon::parse($request->input('date'))->startOfDay()
+            : now()->startOfDay();
     }
 
     private function resolvePeriod(Request $request): string
@@ -95,6 +67,49 @@ class SalesSummaryReportController extends Controller
         $period = $request->input('period', 'daily');
 
         return in_array($period, ['daily', 'weekly', 'monthly'], true) ? $period : 'daily';
+    }
+
+    private function renderPropertyExcelTable(array $report): string
+    {
+        $currency = config('nexstay.currency.default', 'TZS');
+
+        ob_start();
+
+        echo '<table border="1">';
+        echo '<tr><th colspan="8"><strong>Sales Summary</strong></th></tr>';
+        echo '<tr><td colspan="8">Period: '.e($report['period_label']).' ('.e($report['from']).' — '.e($report['to']).')</td></tr>';
+        echo '<tr><td colspan="8"></td></tr>';
+        echo '<tr><th>Division</th><th>Amount ('.e($currency).')</th></tr>';
+
+        foreach ($this->divisionRows($report['summary']) as $row) {
+            echo '<tr><td>'.e($row['label']).'</td><td>'.e(number_format($row['amount'], 0)).'</td></tr>';
+        }
+
+        echo '<tr><td><strong>Total posted sales</strong></td><td><strong>'.e(number_format($report['summary']['total'], 0)).'</strong></td></tr>';
+        echo '<tr><td>Payments collected</td><td>'.e(number_format($report['summary']['payments_collected'], 0)).'</td></tr>';
+        echo '<tr><td>Room nights occupied</td><td>'.e($report['summary']['room_nights']).'</td></tr>';
+
+        if ($report['daily_rows'] !== []) {
+            echo '<tr><td colspan="8"></td></tr>';
+            echo '<tr><th>Date</th><th>Rooms</th><th>Restaurant</th><th>Bar &amp; lounge</th><th>Ancillary</th><th>Total</th><th>Payments</th><th>Room nights</th></tr>';
+
+            foreach ($report['daily_rows'] as $row) {
+                echo '<tr>';
+                echo '<td>'.e($row['date_label']).'</td>';
+                echo '<td>'.e(number_format($row['rooms'], 0)).'</td>';
+                echo '<td>'.e(number_format($row['restaurant'], 0)).'</td>';
+                echo '<td>'.e(number_format($row['bar'], 0)).'</td>';
+                echo '<td>'.e(number_format($row['ancillary'], 0)).'</td>';
+                echo '<td>'.e(number_format($row['total'], 0)).'</td>';
+                echo '<td>'.e(number_format($row['payments_collected'], 0)).'</td>';
+                echo '<td>'.e($row['room_nights']).'</td>';
+                echo '</tr>';
+            }
+        }
+
+        echo '</table>';
+
+        return (string) ob_get_clean();
     }
 
     /** @return list<array{label: string, amount: float}> */

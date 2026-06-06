@@ -55,6 +55,19 @@ class OrderAuthorizationService
         return $this->ownsOrder($user, $order);
     }
 
+    /**
+     * Permanent deletion is manager-only and limited to voided orders.
+     * Staff must void settled orders instead of deleting them.
+     */
+    public function canDelete(User $user, Order $order): bool
+    {
+        if (! $this->canManageAny($user)) {
+            return false;
+        }
+
+        return $order->status === 'voided';
+    }
+
     public function canCreate(User $user): bool
     {
         return $this->canManageAny($user) || $user->can('manage-own-orders');

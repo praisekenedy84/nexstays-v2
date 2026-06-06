@@ -1,6 +1,6 @@
 @extends('modules.reports.pdf.layout')
 
-@section('title', 'Menu Item Sales Summary')
+@section('title', $report['report_title'] ?? 'Menu Item Sales Summary')
 @section('period', $report['from'].' To '.$report['to'].' · '.$report['outlet_name'].' · '.$report['category_filter'])
 
 @section('content')

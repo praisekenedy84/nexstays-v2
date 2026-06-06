@@ -42,7 +42,8 @@
     </form>
 
     <p class="mb-4 text-sm text-ink-muted">
-        Settled orders only. Manage open orders from
+        Settled and voided orders for your shift. Sales totals include closed orders only — voided orders stay visible here but are excluded from reports.
+        Manage open orders from
         <a href="{{ route('tenant.restaurant.index') }}" class="text-primary hover:underline">Restaurant</a>,
         <a href="{{ route('tenant.bar.index') }}" class="text-primary hover:underline">Bar</a>, or
         <a href="{{ route('tenant.lounge.index') }}" class="text-primary hover:underline">Lounge</a>.
@@ -74,7 +75,7 @@
     <div class="mt-6 card overflow-hidden">
         <div class="flex items-center justify-between border-b border-slate-100 px-5 py-3">
             <h3 class="font-semibold text-ink">{{ $canViewAll ? 'Completed sales' : 'Your completed sales' }}</h3>
-            <span class="text-xs text-ink-muted">{{ $summary['count_closed'] }} {{ Str::plural('order', $summary['count_closed']) }}</span>
+            <span class="text-xs text-ink-muted">{{ $summary['count_closed'] }} settled@if ($summary['count_voided'] > 0) · {{ $summary['count_voided'] }} voided@endif</span>
         </div>
         <table class="w-full text-left text-sm">
             <thead class="bg-slate-50 text-xs font-semibold uppercase tracking-wide text-ink-muted">
@@ -84,6 +85,7 @@
                     <th class="px-5 py-3">Guest / table</th>
                     <th class="px-5 py-3">Staff</th>
                     <th class="px-5 py-3 text-right">Total</th>
+                    <th class="px-5 py-3">Status</th>
                     <th class="px-5 py-3">Payment</th>
                     <th class="px-5 py-3">Closed</th>
                     <th class="px-5 py-3 text-right">Actions</th>
@@ -101,7 +103,7 @@
                             default => 'Paid',
                         };
                     @endphp
-                    <tr class="hover:bg-slate-50/60">
+                    <tr @class(['hover:bg-slate-50/60', 'opacity-70' => $order->status === 'voided'])>
                         <td class="px-5 py-3">
                             <a href="{{ route('tenant.fb.orders.show', $order) }}" class="font-mono text-xs font-semibold text-primary hover:underline">
                                 {{ $order->order_number }}
@@ -121,6 +123,9 @@
                         </td>
                         <td class="px-5 py-3 text-xs text-ink-muted">{{ $order->waiter?->name ?? '—' }}</td>
                         <td class="px-5 py-3 text-right font-semibold">{{ number_format((float) $order->total) }}</td>
+                        <td class="px-5 py-3">
+                            <x-ui.status-badge :status="$order->status" />
+                        </td>
                         <td class="px-5 py-3 text-xs">{{ $paymentLabel }}</td>
                         <td class="px-5 py-3 text-xs text-ink-subtle whitespace-nowrap">
                             {{ $order->closed_at?->format('d M Y, H:i') ?? '—' }}
@@ -131,7 +136,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="8" class="px-5 py-12 text-center text-ink-muted">No completed sales in this period.</td>
+                        <td colspan="9" class="px-5 py-12 text-center text-ink-muted">No settled or voided orders in this period.</td>
                     </tr>
                 @endforelse
             </tbody>

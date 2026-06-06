@@ -55,6 +55,20 @@
                 </a>
 
                 @can('view-fb-reports')
+                    <a href="{{ route('tenant.reports.bar-sales-summary') }}"
+                       class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-sky-700">Bar</p>
+                        <h4 class="mt-1 font-bold text-ink">Bar item sales summary</h4>
+                        <p class="mt-1 text-sm text-ink-muted">Quantity, price, tax, and totals by bar menu item — PDF and Excel export.</p>
+                    </a>
+
+                    <a href="{{ route('tenant.reports.lounge-sales-summary') }}"
+                       class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                        <p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Lounge</p>
+                        <h4 class="mt-1 font-bold text-ink">Lounge item sales summary</h4>
+                        <p class="mt-1 text-sm text-ink-muted">Quantity, price, tax, and totals by lounge menu item — PDF and Excel export.</p>
+                    </a>
+
                     <a href="{{ route('tenant.reports.menu-item-sales-summary') }}"
                        class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
                         <p class="text-xs font-semibold uppercase tracking-wide text-amber-700">Item detail</p>
