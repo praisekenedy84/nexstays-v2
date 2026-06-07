@@ -10,6 +10,7 @@ use App\Domain\Shared\Models\OrderItem;
 use App\Domain\Shared\Services\DivisionSalesService;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
+use Illuminate\Http\Request;
 use Illuminate\View\View;
 
 class DashboardController extends Controller
@@ -18,9 +19,9 @@ class DashboardController extends Controller
         private readonly DivisionSalesService $divisionSales,
     ) {}
 
-    public function __invoke(): View
+    public function __invoke(Request $request): View
     {
-        $today = Carbon::today();
+        $today = now()->startOfDay();
 
         $todayArrivals = Reservation::query()
             ->whereDate('check_in_date', $today)
@@ -58,6 +59,10 @@ class DashboardController extends Controller
         );
         $recentSnapshots = $this->divisionSales->recentSnapshots(7);
 
+        [$trendFrom, $trendTo] = $this->resolveTrendRange($request);
+        $revenueTrend = $this->divisionSales->revenueTrend($trendFrom, $trendTo);
+        $trendIsHourly = $this->divisionSales->revenueTrendIsHourly($trendFrom, $trendTo);
+
         $topProducts = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('outlets', 'orders.outlet_id', '=', 'outlets.id')
@@ -91,8 +96,40 @@ class DashboardController extends Controller
             'todayBookedRooms',
             'mtdBookedRooms',
             'recentSnapshots',
+            'revenueTrend',
+            'trendFrom',
+            'trendTo',
+            'trendIsHourly',
             'topProducts',
             'todayFbOrders',
         ));
+    }
+
+    /** @return array{0: Carbon, 1: Carbon} */
+    private function resolveTrendRange(Request $request): array
+    {
+        $today = now()->startOfDay();
+
+        if ($request->filled('from') && $request->filled('to')) {
+            $from = Carbon::parse($request->input('from'))->startOfDay();
+            $to = Carbon::parse($request->input('to'))->startOfDay();
+        } else {
+            $from = $today->copy()->subDays(29);
+            $to = $today->copy();
+        }
+
+        if ($from->gt($to)) {
+            [$from, $to] = [$to, $from];
+        }
+
+        if ($to->gt($today)) {
+            $to = $today->copy();
+        }
+
+        if ($from->gt($to)) {
+            $from = $to->copy();
+        }
+
+        return [$from, $to];
     }
 }

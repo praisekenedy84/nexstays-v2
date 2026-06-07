@@ -58,6 +58,7 @@ use App\Http\Controllers\Web\PosController;
 use App\Http\Controllers\Web\ProfileController;
 use App\Http\Controllers\Web\RoleController;
 use App\Http\Controllers\Web\ShiftSummaryController;
+use App\Http\Controllers\Web\SyncTimezoneController;
 use App\Http\Controllers\Web\UserController;
 use App\Http\Controllers\Web\NotificationController;
 use App\Http\Controllers\Api\V1\ReportController as ApiReportController;
@@ -84,10 +85,11 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
 
     // Authenticated & tenant-scoped: tenancy is initialized first (from session),
     // then the auth guard can resolve the user from the tenant schema.
-    Route::middleware([InitializeTenancyBySession::class, 'auth:web'])->group(function () {
+    Route::middleware([InitializeTenancyBySession::class, 'auth:web', 'app.timezone'])->group(function () {
         Route::get('/', fn () => redirect()->route('tenant.dashboard'));
         Route::post('/logout', [WebAuthController::class, 'destroy'])->name('logout');
         Route::get('/csrf-token', fn () => response()->json(['token' => csrf_token()]))->name('csrf.token');
+        Route::post('/timezone', SyncTimezoneController::class)->name('timezone.sync');
         Route::get('/dashboard', DashboardController::class)->name('dashboard');
 
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
@@ -365,6 +367,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::post('/pos/orders/{order}/items', [PosController::class, 'addItem'])->name('pos.orders.add-item');
             Route::post('/pos/orders/{order}/items/{item}/void', [PosController::class, 'voidItem'])->name('pos.orders.void-item');
             Route::post('/pos/orders/{order}/fire', [PosController::class, 'fire'])->name('pos.orders.fire');
+            Route::post('/pos/orders/{order}/serve', [PosController::class, 'serve'])->name('pos.orders.serve');
             Route::post('/pos/orders/{order}/settle-cash', [PosController::class, 'settleCash'])->name('pos.orders.settle-cash');
             Route::post('/pos/orders/{order}/settle-folio', [PosController::class, 'settleFollio'])->name('pos.orders.settle-folio');
             Route::post('/pos/orders/{order}/settle-direct', [PosController::class, 'settleDirectPayment'])->name('pos.orders.settle-direct');
@@ -465,7 +468,7 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
             ->name('availability.index');
 
         // Authenticated tenant routes.
-        Route::middleware('auth:sanctum')->group(function () {
+        Route::middleware(['auth:sanctum', 'app.timezone'])->group(function () {
             Route::post('/auth/logout', [AuthController::class, 'logout'])->name('auth.logout');
             Route::get('/auth/me', [AuthController::class, 'me'])->name('auth.me');
 

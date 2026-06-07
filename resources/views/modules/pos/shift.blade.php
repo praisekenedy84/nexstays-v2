@@ -5,9 +5,8 @@
     <form method="GET" class="mb-6 flex items-end gap-3">
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">Date</label>
-            <input type="date" name="date" value="{{ $date }}" class="input-field w-auto">
+            <input type="date" name="date" value="{{ $date }}" class="input-field w-auto" onchange="this.form.submit()">
         </div>
-        <button type="submit" class="btn-primary">View</button>
         <a href="{{ route('tenant.restaurant.index') }}" class="btn-outline">← POS</a>
     </form>
 

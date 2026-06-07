@@ -24,11 +24,12 @@
                 </label>
                 <label class="flex flex-col gap-1 text-sm">
                     <span class="font-medium text-ink">Timezone</span>
-                    <select name="timezone" class="input-field">
+                    <select name="timezone" id="report-timezone" class="input-field">
                         @foreach(\DateTimeZone::listIdentifiers() as $tz)
-                            <option value="{{ $tz }}" @selected(old('timezone', $deliverySettings['timezone'] ?? config('app.timezone')) === $tz)>{{ $tz }}</option>
+                            <option value="{{ $tz }}" @selected(old('timezone', $deliverySettings['timezone'] ?? app(\App\Domain\Shared\Services\TimezoneService::class)->resolve()) === $tz)>{{ $tz }}</option>
                         @endforeach
                     </select>
+                    <span class="text-xs text-ink-muted" id="report-timezone-hint"></span>
                 </label>
                 <div class="flex flex-wrap gap-3 md:col-span-3">
                     <button type="submit" class="btn-primary">Save email settings</button>
@@ -178,4 +179,25 @@
         </section>
     @endcan
 
+    @push('scripts')
+        <script>
+            (function () {
+                const select = document.getElementById('report-timezone');
+                const hint = document.getElementById('report-timezone-hint');
+                if (!select || !hint) return;
+
+                const browserTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+                if (!browserTimezone) return;
+
+                hint.textContent = 'Detected on this device: ' + browserTimezone;
+
+                const hasOption = Array.from(select.options).some((option) => option.value === browserTimezone);
+                if (!hasOption) return;
+
+                if (!select.value || select.value === '{{ app(\App\Domain\Shared\Services\TimezoneService::class)->fallback() }}') {
+                    select.value = browserTimezone;
+                }
+            })();
+        </script>
+    @endpush
 </x-layouts.app>

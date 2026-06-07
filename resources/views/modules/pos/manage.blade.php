@@ -311,14 +311,23 @@
 
             @if ($isOpen && $canManage && $activeItems->isNotEmpty())
 
-                {{-- Fire to kitchen --}}
+                {{-- Fire to kitchen (restaurant/lounge) or serve (bar) --}}
                 @if ($order->status === 'open')
-                    <form method="POST" action="{{ route('tenant.pos.orders.fire', $order) }}">
-                        @csrf
-                        <button type="submit" class="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600">
-                            Fire to kitchen 🔥
-                        </button>
-                    </form>
+                    @if ($order->outlet->isBar())
+                        <form method="POST" action="{{ route('tenant.pos.orders.serve', $order) }}">
+                            @csrf
+                            <button type="submit" class="w-full rounded-xl bg-emerald-600 px-4 py-3 text-sm font-semibold text-white transition hover:bg-emerald-700">
+                                Serve order
+                            </button>
+                        </form>
+                    @else
+                        <form method="POST" action="{{ route('tenant.pos.orders.fire', $order) }}">
+                            @csrf
+                            <button type="submit" class="w-full rounded-xl bg-amber-500 px-4 py-3 text-sm font-semibold text-white transition hover:bg-amber-600">
+                                Fire to kitchen 🔥
+                            </button>
+                        </form>
+                    @endif
                 @endif
 
                 {{-- ===== SETTLE: CASH ===== --}}

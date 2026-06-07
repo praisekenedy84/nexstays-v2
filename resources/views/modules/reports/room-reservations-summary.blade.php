@@ -22,7 +22,7 @@
         <x-ui.date-range-filter :from="$from->format('Y-m-d')" :to="$to->format('Y-m-d')">
             <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-ink-muted">Room type</label>
-                <select name="room_type_id" class="input-field w-auto min-w-[180px]">
+                <select name="room_type_id" class="input-field w-auto min-w-[180px]" onchange="this.form.submit()">
                     <option value="">All room types</option>
                     @foreach ($roomTypes as $roomType)
                         <option value="{{ $roomType->id }}" @selected($roomTypeId === $roomType->id)>{{ $roomType->name }}</option>
@@ -31,7 +31,7 @@
             </div>
             <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-ink-muted">Status</label>
-                <select name="status" class="input-field w-auto min-w-[180px]">
+                <select name="status" class="input-field w-auto min-w-[180px]" onchange="this.form.submit()">
                     <option value="">All statuses</option>
                     @foreach ($statuses as $key => $label)
                         <option value="{{ $key }}" @selected($status === $key)>{{ $label }}</option>

@@ -24,7 +24,7 @@
         <x-ui.date-range-filter :from="$from->format('Y-m-d')" :to="$to->format('Y-m-d')">
             <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-ink-muted">{{ $outletTypeLabel }} outlet</label>
-                <select name="outlet_id" class="input-field w-auto min-w-[180px]">
+                <select name="outlet_id" class="input-field w-auto min-w-[180px]" onchange="this.form.submit()">
                     <option value="">All {{ strtolower($outletTypeLabel) }} outlets</option>
                     @foreach ($outlets as $outlet)
                         <option value="{{ $outlet->id }}" @selected($outletId === $outlet->id)>{{ $outlet->name }}</option>
@@ -33,7 +33,7 @@
             </div>
             <div class="flex flex-col gap-1">
                 <label class="text-xs font-medium text-ink-muted">Menu category</label>
-                <select name="category_id" class="input-field w-auto min-w-[180px]">
+                <select name="category_id" class="input-field w-auto min-w-[180px]" onchange="this.form.submit()">
                     <option value="">All categories</option>
                     @foreach ($categories as $category)
                         <option value="{{ $category->id }}" @selected($categoryId === $category->id)>

@@ -10,15 +10,15 @@
     <form method="GET" class="mb-6 card flex flex-wrap items-end gap-3 p-4">
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">From</label>
-            <input type="date" name="from" value="{{ $from }}" class="input-field w-auto">
+            <input type="date" name="from" value="{{ $from }}" class="input-field w-auto" onchange="this.form.submit()">
         </div>
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">To</label>
-            <input type="date" name="to" value="{{ $to }}" class="input-field w-auto">
+            <input type="date" name="to" value="{{ $to }}" class="input-field w-auto" onchange="this.form.submit()">
         </div>
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">Outlet</label>
-            <select name="outlet_id" class="input-field min-w-[160px]">
+            <select name="outlet_id" class="input-field min-w-[160px]" onchange="this.form.submit()">
                 <option value="">All outlets</option>
                 @foreach ($outlets as $outlet)
                     <option value="{{ $outlet->id }}" @selected($outletId === $outlet->id)>{{ $outlet->name }}</option>
@@ -28,7 +28,7 @@
         <div>
             <label class="mb-1 block text-xs font-medium text-ink-muted">Staff</label>
             @if ($canViewAll ?? false)
-                <select name="waiter_id" class="input-field min-w-[160px]">
+                <select name="waiter_id" class="input-field min-w-[160px]" onchange="this.form.submit()">
                     <option value="">All staff</option>
                     @foreach ($waiters as $waiter)
                         <option value="{{ $waiter->id }}" @selected($waiterId === $waiter->id)>{{ $waiter->name }}</option>
@@ -38,7 +38,6 @@
                 <p class="input-field min-w-[160px] bg-slate-50 text-sm text-ink-muted">{{ auth()->user()->name }} (your sales only)</p>
             @endif
         </div>
-        <button type="submit" class="btn-primary">Apply</button>
     </form>
 
     <p class="mb-4 text-sm text-ink-muted">

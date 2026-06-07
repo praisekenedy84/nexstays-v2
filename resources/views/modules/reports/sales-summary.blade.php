@@ -37,10 +37,9 @@
                         Date
                     @endif
                 </label>
-                <input type="date" name="date" value="{{ $date->format('Y-m-d') }}" class="input-field w-auto">
+                <input type="date" name="date" value="{{ $date->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
             </div>
             <input type="hidden" name="period" value="{{ $period }}">
-            <button type="submit" class="btn-primary">Update</button>
 
             <div class="inline-flex overflow-hidden rounded-lg border border-slate-200 bg-white shadow-sm dark:border-slate-700 dark:bg-slate-800">
                 <a href="{{ route('tenant.reports.sales-summary.export-excel', $ep) }}"

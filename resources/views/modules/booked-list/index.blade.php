@@ -7,9 +7,8 @@
         @foreach (request()->except(['from', 'to', 'page']) as $key => $val)
             <input type="hidden" name="{{ $key }}" value="{{ $val }}">
         @endforeach
-        <input type="date" name="from" value="{{ $from->format('Y-m-d') }}" class="input-field w-auto">
-        <input type="date" name="to" value="{{ $to->format('Y-m-d') }}" class="input-field w-auto">
-        <button type="submit" class="btn-primary">Filter</button>
+        <input type="date" name="from" value="{{ $from->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
+        <input type="date" name="to" value="{{ $to->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
     </form>
 
     <div class="card overflow-hidden">

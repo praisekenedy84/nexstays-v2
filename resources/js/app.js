@@ -63,6 +63,35 @@ document.querySelectorAll('[data-filter-tabs]').forEach((group) => {
 
 window.refreshLucideIcons = renderLucideIcons;
 
+// Sync browser timezone to the server (used for local-time operations and scheduling).
+(function () {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    if (!timezone) return;
+
+    const storageKey = 'nexstay-timezone-synced';
+    if (localStorage.getItem(storageKey) === timezone) return;
+
+    const csrf = document.querySelector('meta[name="csrf-token"]')?.content;
+    if (!csrf) return;
+
+    fetch('/timezone', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            Accept: 'application/json',
+            'X-CSRF-TOKEN': csrf,
+        },
+        body: JSON.stringify({ timezone }),
+        credentials: 'same-origin',
+    })
+        .then((response) => {
+            if (response.ok) {
+                localStorage.setItem(storageKey, timezone);
+            }
+        })
+        .catch(() => {});
+})();
+
 // Dark / light mode toggle
 (function () {
     const btn = document.getElementById('theme-toggle');

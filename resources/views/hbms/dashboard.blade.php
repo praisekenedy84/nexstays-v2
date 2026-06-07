@@ -34,6 +34,78 @@
         </x-ui.kpi-card>
     </div>
 
+    {{-- ===== HOTEL REVENUE TREND ===== --}}
+    @canany(['view-reports', 'view-fb-reports', 'view-reservations'])
+    <section class="card overflow-hidden">
+        <form method="GET" action="{{ route('tenant.dashboard') }}">
+            <div class="flex flex-wrap items-start justify-between gap-2 border-b border-slate-100 px-4 py-3">
+                <div>
+                    <h2 class="text-sm font-semibold text-ink">Hotel revenue</h2>
+                    <p class="text-xs text-ink-muted">
+                        @if ($trendIsHourly)
+                            Hourly posted sales · {{ $trendFrom->format('d M Y') }}
+                        @else
+                            Daily posted sales · {{ $trendFrom->format('d M Y') }} – {{ $trendTo->format('d M Y') }}
+                        @endif
+                        @if ($trendTo->isToday() && ! $trendIsHourly)
+                            · includes live data for today
+                        @endif
+                    </p>
+                </div>
+                @if (count($revenueTrend) > 0)
+                    @php
+                        if ($trendIsHourly) {
+                            $avgPoints = collect($revenueTrend);
+                            if ($trendFrom->isToday()) {
+                                $avgPoints = $avgPoints->take((int) now()->format('G') + 1);
+                            }
+                            $trendAvg = (float) ($avgPoints->avg('total') ?? 0);
+                        } else {
+                            $trendAvg = array_sum(array_column($revenueTrend, 'total')) / count($revenueTrend);
+                        }
+                    @endphp
+                    <div class="text-right">
+                        <p class="text-[10px] uppercase tracking-wide text-ink-muted">{{ $trendIsHourly ? 'Hourly average' : 'Daily average' }}</p>
+                        <p class="text-base font-bold text-ink">{{ $currency }} {{ $fmt($trendAvg) }}</p>
+                    </div>
+                @endif
+            </div>
+
+            <div class="border-b border-slate-100 px-4 py-2">
+                @php
+                    $trendPresets = [
+                        'today'         => 'Today',
+                        'yesterday'     => 'Yesterday',
+                        'this_month'    => 'This month',
+                        'last_30_days'  => 'Last 30 days',
+                    ];
+                @endphp
+                <x-ui.date-range-filter
+                    :from="$trendFrom->format('Y-m-d')"
+                    :to="$trendTo->format('Y-m-d')"
+                    :today="now()->format('Y-m-d')"
+                    :showReportsLink="false"
+                    :presets="$trendPresets"
+                    compact
+                />
+            </div>
+
+            <div class="px-3 py-3 sm:px-4">
+                <x-ui.line-chart
+                    :labels="array_column($revenueTrend, 'label')"
+                    :values="array_column($revenueTrend, 'total')"
+                    :currency="$currency"
+                    :height="150"
+                    :labelInterval="$trendIsHourly ? 3 : null"
+                    compact
+                >
+                    No revenue data for this period.
+                </x-ui.line-chart>
+            </div>
+        </form>
+    </section>
+    @endcanany
+
     {{-- ===== ROW 2: TODAY'S REVENUE BY DIVISION ===== --}}
     @canany(['view-reports', 'view-fb-reports', 'view-reservations'])
     <section class="card overflow-hidden">
@@ -136,32 +208,10 @@
                     </div>
                 </div>
 
-                {{-- 7-day trend from snapshots --}}
                 @if ($recentSnapshots->isNotEmpty())
-                    @php $snapMax = max(1, $recentSnapshots->max(fn ($s) => (float) $s->total)); @endphp
-                    <div class="mt-5 border-t border-slate-100 pt-4">
-                        <p class="mb-3 text-xs font-medium text-ink-muted uppercase tracking-wide">
-                            {{ $recentSnapshots->count() }}-day revenue trend
-                        </p>
-                        <div class="flex items-end gap-1.5 h-16">
-                            @foreach ($recentSnapshots as $snap)
-                                @php
-                                    $barPct  = round((float) $snap->total / $snapMax * 100);
-                                    $barH    = max(4, $barPct);
-                                    $dayLbl  = \Carbon\Carbon::parse($snap->snapshot_date)->format('D');
-                                @endphp
-                                <div class="group relative flex flex-1 flex-col items-center justify-end gap-1"
-                                     title="{{ $dayLbl }}: {{ $currency }} {{ number_format((float) $snap->total) }}">
-                                    <div class="w-full rounded-t bg-primary/70 transition group-hover:bg-primary"
-                                         style="height: {{ $barH }}%"></div>
-                                    <span class="text-[10px] text-ink-muted">{{ $dayLbl }}</span>
-                                </div>
-                            @endforeach
-                        </div>
-                        <p class="mt-1 text-xs text-ink-subtle">
-                            Snapshots written nightly by the night audit. Today's bar reflects live data once the audit runs.
-                        </p>
-                    </div>
+                    <p class="mt-4 border-t border-slate-100 pt-4 text-xs text-ink-subtle">
+                        See the hotel revenue chart above for the daily trend.
+                    </p>
                 @else
                     <p class="mt-4 text-xs text-ink-subtle">
                         No trend data yet — snapshots are written nightly by the night audit.

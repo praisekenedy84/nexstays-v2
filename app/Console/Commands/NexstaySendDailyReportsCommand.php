@@ -6,6 +6,7 @@ namespace App\Console\Commands;
 
 use App\Domain\Shared\Actions\SendDailyReportEmail;
 use App\Domain\Shared\Services\ReportDeliverySettingsService;
+use App\Domain\Shared\Services\TimezoneService;
 use App\Models\Tenant;
 use Illuminate\Console\Command;
 use Throwable;
@@ -26,6 +27,7 @@ class NexstaySendDailyReportsCommand extends Command
         Tenant::query()->cursor()->each(function (Tenant $tenant) use ($force, &$sent, &$skipped, &$failed): void {
             try {
                 $tenant->run(function () use ($force, $tenant, &$sent, &$skipped): void {
+                    app(TimezoneService::class)->apply(tenant: $tenant);
                     $settingsService = app(ReportDeliverySettingsService::class);
 
                     if (! $force && ! $settingsService->dueForDispatch(now())) {

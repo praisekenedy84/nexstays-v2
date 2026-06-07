@@ -156,6 +156,19 @@ class PosController extends Controller
         return back()->with('success', 'Order sent to kitchen.');
     }
 
+    public function serve(Order $order): RedirectResponse
+    {
+        abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
+
+        try {
+            $this->orderService->serve($order);
+        } catch (\DomainException $e) {
+            return back()->with('error', $e->getMessage());
+        }
+
+        return back()->with('success', 'Order served.');
+    }
+
     public function settleCash(Request $request, Order $order): RedirectResponse
     {
         abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);

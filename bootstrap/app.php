@@ -24,6 +24,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'role_or_permission' => \Spatie\Permission\Middleware\RoleOrPermissionMiddleware::class,
             'tenant.session' => \App\Http\Middleware\InitializeTenancyBySession::class,
             'tenant.token' => \App\Http\Middleware\InitializeTenancyByToken::class,
+            'app.timezone' => \App\Http\Middleware\SetApplicationTimezone::class,
         ]);
 
         // InitializeTenancyBySession must run after StartSession (needs the session store)

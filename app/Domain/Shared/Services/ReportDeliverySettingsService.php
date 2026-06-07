@@ -9,6 +9,9 @@ use Carbon\CarbonInterface;
 
 class ReportDeliverySettingsService
 {
+    public function __construct(
+        private readonly TimezoneService $timezoneService
+    ) {}
     /**
      * @return array{
      *     recipient_email: string,
@@ -34,7 +37,7 @@ class ReportDeliverySettingsService
         return [
             'recipient_email' => (string) ($stored['recipient_email'] ?? $defaults['recipient_email']),
             'send_time' => (string) ($stored['send_time'] ?? $defaults['send_time']),
-            'timezone' => (string) ($stored['timezone'] ?? $defaults['timezone']),
+            'timezone' => $this->timezoneService->normalize((string) ($stored['timezone'] ?? $defaults['timezone'])),
             'last_sent_on' => isset($stored['last_sent_on']) ? (string) $stored['last_sent_on'] : null,
         ];
     }
@@ -59,7 +62,7 @@ class ReportDeliverySettingsService
         $data['report_delivery_settings'] = [
             'recipient_email' => strtolower(trim($settings['recipient_email'])),
             'send_time' => $settings['send_time'],
-            'timezone' => $settings['timezone'],
+            'timezone' => $this->timezoneService->normalize($settings['timezone']),
             'last_sent_on' => $current['last_sent_on'],
         ];
 
@@ -95,7 +98,7 @@ class ReportDeliverySettingsService
         $data['report_delivery_settings'] = [
             'recipient_email' => $settings['recipient_email'],
             'send_time' => $settings['send_time'],
-            'timezone' => $settings['timezone'],
+            'timezone' => $this->timezoneService->normalize($settings['timezone']),
             'last_sent_on' => $sentAt->copy()->setTimezone($settings['timezone'])->toDateString(),
         ];
 
@@ -115,7 +118,7 @@ class ReportDeliverySettingsService
         return [
             'recipient_email' => (string) config('nexstay.reports.delivery.recipient_email', ''),
             'send_time' => (string) config('nexstay.reports.delivery.send_time', '08:00'),
-            'timezone' => (string) config('nexstay.reports.delivery.timezone', config('app.timezone', 'UTC')),
+            'timezone' => $this->timezoneService->resolve(tenant: tenant()),
             'last_sent_on' => null,
         ];
     }

@@ -121,6 +121,11 @@ class OrderService
     {
         return DB::transaction(function () use ($order) {
             throw_if(! $order->isOpen(), \DomainException::class, 'Cannot fire a closed order.');
+            throw_if(
+                $order->outlet->isBar(),
+                \DomainException::class,
+                'Bar orders are served directly — use Serve order instead.'
+            );
             $order->load('items');
 
             foreach ($order->items->where('status', 'pending') as $item) {
@@ -135,6 +140,43 @@ class OrderService
             $previousStatus = $order->status;
             $order->update(['status' => 'sent_to_kitchen']);
             $this->logOrderTransition($order, $previousStatus, 'sent_to_kitchen', 'fired_to_kitchen');
+
+            return $order->fresh(['items.menuItem']);
+        });
+    }
+
+    public function serve(Order $order): Order
+    {
+        return DB::transaction(function () use ($order) {
+            throw_if(! $order->isOpen(), \DomainException::class, 'Cannot serve a closed order.');
+            throw_if(
+                ! $order->outlet->isBar(),
+                \DomainException::class,
+                'Serve order is only available for bar orders.'
+            );
+
+            $order->load('items');
+            $pendingItems = $order->items->where('status', 'pending');
+
+            throw_if(
+                $pendingItems->isEmpty(),
+                \DomainException::class,
+                'No pending items to serve.'
+            );
+
+            $previousStatus = (string) $order->status;
+
+            foreach ($pendingItems as $item) {
+                $item->update([
+                    'status' => 'served',
+                    'served_at' => now(),
+                ]);
+
+                $this->logOrderItemTransition($order, $item, 'pending', 'served', 'served_by_waiter');
+            }
+
+            $order->update(['status' => 'served']);
+            $this->logOrderTransition($order, $previousStatus, 'served', 'served_by_waiter');
 
             return $order->fresh(['items.menuItem']);
         });
@@ -491,7 +533,7 @@ class OrderService
         throw_if(
             $pendingCount > 0,
             \DomainException::class,
-            'Cannot settle an order while there are pending items. Fire or void all pending items first.'
+            'Cannot settle an order while there are pending items. Complete or void all pending items first.'
         );
     }
 

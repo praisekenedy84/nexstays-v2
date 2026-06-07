@@ -3,6 +3,11 @@
 declare(strict_types=1);
 
 return [
+    'timezone' => [
+        'fallback' => env('NEXSTAY_TIMEZONE_FALLBACK', 'Africa/Dar_es_Salaam'),
+        'default' => env('APP_TIMEZONE', env('NEXSTAY_TIMEZONE_FALLBACK', 'Africa/Dar_es_Salaam')),
+    ],
+
     'api_docs' => [
         'enabled' => filter_var(env('API_DOCS_ENABLED', env('APP_ENV', 'production') === 'local'), FILTER_VALIDATE_BOOL),
         'default_tenant_host' => env('API_DOCS_TENANT_HOST', 'http://demo.localhost:8000'),
@@ -40,7 +45,7 @@ return [
         'delivery' => [
             'recipient_email' => env('NEXSTAY_REPORT_EMAIL', ''),
             'send_time' => env('NEXSTAY_REPORT_SEND_TIME', '08:00'),
-            'timezone' => env('NEXSTAY_REPORT_TIMEZONE', env('APP_TIMEZONE', 'UTC')),
+            'timezone' => env('NEXSTAY_REPORT_TIMEZONE', env('APP_TIMEZONE', env('NEXSTAY_TIMEZONE_FALLBACK', 'Africa/Dar_es_Salaam'))),
         ],
     ],
 

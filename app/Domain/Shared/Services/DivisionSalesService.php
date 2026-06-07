@@ -7,10 +7,12 @@ namespace App\Domain\Shared\Services;
 use App\Domain\HBMS\Models\FolioTransaction;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\Shared\Models\Order;
+use App\Domain\Shared\Models\OrderItem;
 use App\Domain\Shared\Models\SalesSnapshot;
 use App\Domain\Till\Models\Payment;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class DivisionSalesService
 {
@@ -317,7 +319,7 @@ class DivisionSalesService
      */
     public function todayArrivalBookedRevenue(): array
     {
-        $today = Carbon::today();
+        $today = now()->startOfDay();
 
         $reservations = Reservation::query()
             ->whereDate('check_in_date', $today)
@@ -365,6 +367,200 @@ class DivisionSalesService
             ->get()
             ->reverse()
             ->values();
+    }
+
+    /**
+     * Daily or hourly revenue points for trend charts, oldest first.
+     * Single-day ranges return 24 hourly buckets; multi-day ranges return one point per day.
+     *
+     * @return list<array{
+     *     date: string,
+     *     label: string,
+     *     total: float,
+     *     rooms: float,
+     *     restaurant: float,
+     *     bar: float,
+     *     ancillary: float,
+     *     is_live: bool,
+     *     granularity: 'hour'|'day'
+     * }>
+     */
+    public function revenueTrend(Carbon $from, Carbon $to): array
+    {
+        $start = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+        $today = now()->startOfDay();
+
+        if ($start->gt($end)) {
+            [$start, $end] = [$end, $start];
+        }
+
+        if ($end->gt($today)) {
+            $end = $today->copy();
+        }
+
+        if ($start->gt($end)) {
+            $start = $end->copy();
+        }
+
+        if ($start->isSameDay($end)) {
+            return $this->revenueTrendHourly($start);
+        }
+
+        $maxDays = 366;
+        if ($start->diffInDays($end) >= $maxDays) {
+            $start = $end->copy()->subDays($maxDays - 1);
+        }
+
+        $snapshots = SalesSnapshot::query()
+            ->whereDate('snapshot_date', '>=', $start)
+            ->whereDate('snapshot_date', '<=', $end)
+            ->get()
+            ->keyBy(fn (SalesSnapshot $snap) => $snap->snapshot_date->toDateString());
+
+        $liveToday = null;
+        $points = [];
+        $current = $start->copy();
+
+        while ($current->lte($end)) {
+            $dateStr = $current->toDateString();
+            $isToday = $current->isSameDay($today);
+
+            if ($isToday) {
+                $liveToday ??= $this->liveSummary();
+                $points[] = [
+                    'date'       => $dateStr,
+                    'label'      => 'Today · '.$current->format('d M'),
+                    'total'      => $liveToday['total'],
+                    'rooms'      => $liveToday['rooms'],
+                    'restaurant' => $liveToday['restaurant'],
+                    'bar'        => $liveToday['bar'],
+                    'ancillary'  => $liveToday['ancillary'],
+                    'is_live'    => true,
+                    'granularity' => 'day',
+                ];
+            } elseif ($snapshots->has($dateStr)) {
+                $snap = $snapshots->get($dateStr);
+                $points[] = [
+                    'date'       => $dateStr,
+                    'label'      => $current->format('d M'),
+                    'total'      => (float) $snap->total,
+                    'rooms'      => (float) $snap->rooms,
+                    'restaurant' => (float) $snap->restaurant,
+                    'bar'        => (float) $snap->bar,
+                    'ancillary'  => (float) $snap->ancillary,
+                    'is_live'    => false,
+                    'granularity' => 'day',
+                ];
+            } else {
+                $daySummary = $this->liveSummary($current);
+                $points[] = [
+                    'date'       => $dateStr,
+                    'label'      => $current->format('d M'),
+                    'total'      => $daySummary['total'],
+                    'rooms'      => $daySummary['rooms'],
+                    'restaurant' => $daySummary['restaurant'],
+                    'bar'        => $daySummary['bar'],
+                    'ancillary'  => $daySummary['ancillary'],
+                    'is_live'    => false,
+                    'granularity' => 'day',
+                ];
+            }
+
+            $current->addDay();
+        }
+
+        return $points;
+    }
+
+    public function revenueTrendIsHourly(Carbon $from, Carbon $to): bool
+    {
+        $start = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+
+        if ($start->gt($end)) {
+            [$start, $end] = [$end, $start];
+        }
+
+        return $start->isSameDay($end);
+    }
+
+    /**
+     * @return list<array{
+     *     date: string,
+     *     label: string,
+     *     total: float,
+     *     rooms: float,
+     *     restaurant: float,
+     *     bar: float,
+     *     ancillary: float,
+     *     is_live: bool,
+     *     granularity: 'hour'
+     * }>
+     */
+    private function revenueTrendHourly(Carbon $date): array
+    {
+        $dayStart = $date->copy()->startOfDay();
+        $dayEnd = $date->copy()->endOfDay();
+        $folioHourSql = $this->sqlHourExpression('posted_at');
+        $paymentHourSql = $this->sqlHourExpression('payments.created_at');
+
+        $folioByHour = FolioTransaction::query()
+            ->forReporting()
+            ->whereNull('voided_at')
+            ->whereBetween('posted_at', [$dayStart, $dayEnd])
+            ->where('amount', '>', 0)
+            ->where('transaction_type', '!=', 'payment')
+            ->selectRaw("{$folioHourSql} as hour_key, SUM(amount) as total")
+            ->groupByRaw($folioHourSql)
+            ->pluck('total', 'hour_key')
+            ->mapWithKeys(fn ($total, $hour) => [(int) $hour => (float) $total]);
+
+        $directByHour = OrderItem::query()
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->whereNull('payments.folio_id')
+            ->whereNotNull('payments.order_id')
+            ->where('payments.status', 'captured')
+            ->where('orders.status', 'closed')
+            ->where('order_items.status', '!=', 'voided')
+            ->whereBetween('payments.created_at', [$dayStart, $dayEnd])
+            ->selectRaw("{$paymentHourSql} as hour_key, SUM(order_items.quantity * order_items.unit_price) as total")
+            ->groupByRaw($paymentHourSql)
+            ->pluck('total', 'hour_key')
+            ->mapWithKeys(fn ($total, $hour) => [(int) $hour => (float) $total]);
+
+        $currentHour = (int) now()->format('G');
+        $isToday = $date->isToday();
+        $points = [];
+
+        for ($hour = 0; $hour < 24; $hour++) {
+            $isFutureHour = $isToday && $hour > $currentHour;
+            $total = $isFutureHour
+                ? 0.0
+                : (float) ($folioByHour[$hour] ?? 0) + (float) ($directByHour[$hour] ?? 0);
+
+            $points[] = [
+                'date'        => $date->toDateString().sprintf(' %02d:00', $hour),
+                'label'       => sprintf('%02d:00', $hour),
+                'total'       => $total,
+                'rooms'       => 0.0,
+                'restaurant'  => 0.0,
+                'bar'         => 0.0,
+                'ancillary'   => 0.0,
+                'is_live'     => $isToday && $hour === $currentHour,
+                'granularity' => 'hour',
+            ];
+        }
+
+        return $points;
+    }
+
+    private function sqlHourExpression(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql'
+            ? "EXTRACT(HOUR FROM {$column})::integer"
+            : "CAST(strftime('%H', {$column}) AS INTEGER)";
     }
 
     /**
