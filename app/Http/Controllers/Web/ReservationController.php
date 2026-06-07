@@ -12,6 +12,7 @@ use App\Domain\HBMS\Actions\DeleteReservationPermanently;
 use App\Domain\HBMS\Actions\PostOverstayCharge;
 use App\Domain\HBMS\Actions\SettleOverstay;
 use App\Domain\HBMS\Actions\UpdateReservation;
+use App\Domain\HBMS\Models\Guest;
 use App\Domain\HBMS\Models\RatePlan;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
@@ -75,7 +76,7 @@ class ReservationController extends Controller
                 'children' => 0,
                 'source' => $enabledPaymentMethods[0] ?? 'cash',
             ]),
-            'guests' => collect(),
+            'guests' => Guest::query()->orderBy('last_name')->orderBy('first_name')->get(),
             'ratePlans' => RatePlan::query()->where('is_active', true)->get(),
             'paymentMethods' => PaymentMethodSettingsService::METHODS,
             'enabledPaymentMethods' => $enabledPaymentMethods,
@@ -266,7 +267,7 @@ class ReservationController extends Controller
     {
         return view('hbms.reservations.form', [
             'reservation' => $reservation,
-            'guests' => collect(),
+            'guests' => Guest::query()->orderBy('last_name')->orderBy('first_name')->get(),
             'ratePlans' => RatePlan::query()->where('is_active', true)->get(),
         ]);
     }
