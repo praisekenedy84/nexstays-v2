@@ -92,6 +92,33 @@ window.refreshLucideIcons = renderLucideIcons;
         .catch(() => {});
 })();
 
+// Disable double-submit and show immediate feedback on form posts.
+document.querySelectorAll('form[method="POST"], form[method="post"]').forEach((form) => {
+    if (form.dataset.noBusy === 'true' || form.classList.contains('pos-add-item-form')) {
+        return;
+    }
+
+    form.addEventListener('submit', () => {
+        const submitButtons = form.querySelectorAll('button[type="submit"], input[type="submit"]');
+
+        submitButtons.forEach((button) => {
+            if (button.disabled) {
+                return;
+            }
+
+            button.disabled = true;
+
+            if (button.tagName === 'BUTTON' && !button.dataset.busyLabel) {
+                button.dataset.busyLabel = button.textContent?.trim() ?? '';
+                button.textContent = 'Saving…';
+            }
+        });
+
+        form.dataset.busy = 'true';
+        form.classList.add('opacity-80', 'pointer-events-none');
+    });
+});
+
 // Dark / light mode toggle
 (function () {
     const btn = document.getElementById('theme-toggle');

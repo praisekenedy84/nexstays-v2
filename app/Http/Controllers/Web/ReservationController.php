@@ -12,7 +12,6 @@ use App\Domain\HBMS\Actions\DeleteReservationPermanently;
 use App\Domain\HBMS\Actions\PostOverstayCharge;
 use App\Domain\HBMS\Actions\SettleOverstay;
 use App\Domain\HBMS\Actions\UpdateReservation;
-use App\Domain\HBMS\Models\Guest;
 use App\Domain\HBMS\Models\RatePlan;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
@@ -76,7 +75,7 @@ class ReservationController extends Controller
                 'children' => 0,
                 'source' => $enabledPaymentMethods[0] ?? 'cash',
             ]),
-            'guests' => Guest::query()->orderBy('last_name')->get(),
+            'guests' => collect(),
             'ratePlans' => RatePlan::query()->where('is_active', true)->get(),
             'paymentMethods' => PaymentMethodSettingsService::METHODS,
             'enabledPaymentMethods' => $enabledPaymentMethods,
@@ -99,14 +98,16 @@ class ReservationController extends Controller
             $validated['exclude_reservation_id'] ?? null,
         );
 
-        $data = RoomType::query()
-            ->orderBy('name')
+        $roomTypes = RoomType::query()->orderBy('name')->get();
+
+        $roomsByType = Room::query()
+            ->orderBy('room_number')
             ->get()
-            ->map(function (RoomType $roomType) use ($reservedRoomIds): array {
-                $rooms = Room::query()
-                    ->where('room_type_id', $roomType->id)
-                    ->orderBy('room_number')
-                    ->get();
+            ->groupBy('room_type_id');
+
+        $data = $roomTypes
+            ->map(function (RoomType $roomType) use ($roomsByType, $reservedRoomIds): array {
+                $rooms = $roomsByType->get($roomType->id, collect());
 
                 $availableCount = $rooms
                     ->filter(fn (Room $room) => $this->isRoomAvailableForDates($room, $reservedRoomIds))
@@ -265,7 +266,7 @@ class ReservationController extends Controller
     {
         return view('hbms.reservations.form', [
             'reservation' => $reservation,
-            'guests' => Guest::query()->orderBy('last_name')->get(),
+            'guests' => collect(),
             'ratePlans' => RatePlan::query()->where('is_active', true)->get(),
         ]);
     }

@@ -17,6 +17,7 @@ use App\Domain\Till\Services\TillSessionService;
 use App\Http\Controllers\Controller;
 use Brick\Math\RoundingMode;
 use Brick\Money\Money;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -107,7 +108,7 @@ class PosController extends Controller
         ));
     }
 
-    public function addItem(Request $request, Order $order): RedirectResponse
+    public function addItem(Request $request, Order $order): RedirectResponse|JsonResponse
     {
         abort_unless($this->orderAuth->canManage(auth()->user(), $order), 403);
 
@@ -118,13 +119,24 @@ class PosController extends Controller
         ]);
 
         try {
-            $this->orderService->addItems($order, [[
+            $order = $this->orderService->addItems($order, [[
                 'menu_item_id' => $validated['menu_item_id'],
                 'quantity'     => (int) $validated['quantity'],
                 'notes'        => $validated['notes'] ?? null,
             ]]);
         } catch (\DomainException $e) {
+            if ($request->expectsJson()) {
+                return response()->json(['message' => $e->getMessage()], 422);
+            }
+
             return back()->with('error', $e->getMessage());
+        }
+
+        if ($request->expectsJson()) {
+            return response()->json([
+                'message' => 'Item added.',
+                'panel' => view('modules.pos._order-panel', $this->orderPanelViewData($order))->render(),
+            ]);
         }
 
         return back()->with('success', 'Item added.');
@@ -312,5 +324,57 @@ class PosController extends Controller
         $payment = $order->payments->first();
 
         return view('modules.pos.receipt', compact('order', 'payment'));
+    }
+
+    /** @return array<string, mixed> */
+    private function orderPanelViewData(Order $order): array
+    {
+        $order->load([
+            'items.menuItem.category.outlet',
+            'outlet',
+            'table',
+            'waiter',
+        ]);
+
+        $backRoute = match ($order->outlet->type) {
+            'bar'    => route('tenant.bar.index'),
+            'lounge' => route('tenant.lounge.index'),
+            default  => route('tenant.restaurant.index'),
+        };
+
+        $currency = config('nexstay.currency.default', 'TZS');
+        $isOpen = $order->isOpen();
+        $canManage = $this->orderAuth->canManage(auth()->user(), $order);
+        $activeTill = $this->tillService->activeForOutlet($order->outlet_id);
+        $allowsDirect = $this->fbSettings->allowsDirect();
+        $allowsFolio = $this->fbSettings->allowsFolio();
+        $enabledMethods = $this->paymentMethodSettings->enabledMethods();
+
+        $openFolios = $allowsFolio
+            ? Folio::query()
+                ->with(['reservation.guest', 'reservation.room'])
+                ->where('status', 'open')
+                ->get()
+                ->sortBy(fn ($f) => ($f->reservation?->guest?->last_name ?? ''))
+            : collect();
+
+        $showCash = $allowsDirect && in_array('cash', $enabledMethods, true);
+        $showMobileMoney = $allowsDirect && in_array('mobile_money', $enabledMethods, true);
+        $showCard = $allowsDirect && in_array('card', $enabledMethods, true);
+        $showFolio = $allowsFolio;
+
+        return compact(
+            'order',
+            'backRoute',
+            'currency',
+            'isOpen',
+            'canManage',
+            'activeTill',
+            'openFolios',
+            'showCash',
+            'showMobileMoney',
+            'showCard',
+            'showFolio',
+        );
     }
 }

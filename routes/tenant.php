@@ -142,6 +142,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
         });
 
         Route::middleware('permission:view-guests|manage-guests')->group(function () {
+            Route::get('/guests/search', [GuestController::class, 'search'])->name('guests.search');
             Route::resource('guests', GuestController::class)->except(['show']);
         });
 
@@ -419,6 +420,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
         });
 
         // Notifications (all authenticated staff)
+        Route::get('/notifications/preview', [NotificationController::class, 'preview'])->name('notifications.preview');
         Route::get('/notifications', [NotificationController::class, 'index'])->name('notifications.index');
         Route::post('/notifications/read-all', [NotificationController::class, 'markAllRead'])->name('notifications.read-all');
         Route::post('/notifications/{notification}/read', [NotificationController::class, 'markRead'])->name('notifications.read');

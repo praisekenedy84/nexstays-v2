@@ -4,10 +4,10 @@ declare(strict_types=1);
 
 namespace App\Domain\HBMS\Actions;
 
+use App\Domain\HBMS\Jobs\SendReservationSmsJob;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
 use App\Domain\Shared\Services\NotificationService;
-use App\Domain\Shared\Services\TextifySmsService;
 use App\Domain\HBMS\Support\BookingReferenceGenerator;
 use DomainException;
 use Illuminate\Support\Facades\Auth;
@@ -16,7 +16,6 @@ use Illuminate\Support\Facades\DB;
 class CreateReservation
 {
     public function __construct(
-        private readonly TextifySmsService $smsService,
         private readonly NotificationService $notificationService,
     ) {}
 
@@ -78,7 +77,7 @@ class CreateReservation
             return $reservation;
         });
 
-        $this->smsService->sendReservationCreated($reservation);
+        SendReservationSmsJob::dispatch((string) $reservation->id, 'created');
 
         $guest = $reservation->guest;
         $this->notificationService->notify(

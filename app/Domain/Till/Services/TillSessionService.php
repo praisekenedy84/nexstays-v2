@@ -45,13 +45,17 @@ class TillSessionService
         });
     }
 
-    public function activeForOutlet(?string $outletId): ?TillSession
+    public function activeForOutlet(?string $outletId, bool $withMovements = false): ?TillSession
     {
-        return TillSession::query()
-            ->with('movements')
+        $query = TillSession::query()
             ->where('outlet_id', $outletId)
-            ->where('status', 'open')
-            ->first();
+            ->where('status', 'open');
+
+        if ($withMovements) {
+            $query->with('movements');
+        }
+
+        return $query->first();
     }
 
     public function systemCash(TillSession $session): Money

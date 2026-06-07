@@ -4,9 +4,9 @@ declare(strict_types=1);
 
 namespace App\Domain\HBMS\Actions;
 
+use App\Domain\HBMS\Jobs\SendReservationSmsJob;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Services\ReservationSettingsService;
-use App\Domain\Shared\Services\TextifySmsService;
 use Brick\Math\RoundingMode;
 use Brick\Money\Money;
 use DomainException;
@@ -18,7 +18,6 @@ class CancelReservation
 
     public function __construct(
         private readonly ReservationSettingsService $settingsService,
-        private readonly TextifySmsService $smsService
     ) {}
 
     public function execute(Reservation $reservation): Reservation
@@ -88,7 +87,7 @@ class CancelReservation
         });
 
         if ($updatedReservation instanceof Reservation) {
-            $this->smsService->sendReservationCancelled($updatedReservation);
+            SendReservationSmsJob::dispatch((string) $updatedReservation->id, 'cancelled');
         }
 
         return $updatedReservation;

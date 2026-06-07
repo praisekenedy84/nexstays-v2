@@ -15,15 +15,17 @@
 
         @unless ($isEdit)
             <div>
-                <label for="guest_id" class="mb-1.5 block text-xs font-medium text-ink-muted">Guest</label>
-                <select id="guest_id" name="guest_id" required class="input-field">
-                    <option value="">Select guest…</option>
-                    @foreach ($guests as $guest)
-                        <option value="{{ $guest->id }}" @selected(old('guest_id', $reservation->guest_id) === $guest->id)>
-                            {{ $guest->last_name }}, {{ $guest->first_name }}
-                        </option>
-                    @endforeach
-                </select>
+                <label for="guest_search" class="mb-1.5 block text-xs font-medium text-ink-muted">Guest</label>
+                <input type="hidden" id="guest_id" name="guest_id" value="{{ old('guest_id', $reservation->guest_id) }}" required>
+                <input type="search"
+                       id="guest_search"
+                       autocomplete="off"
+                       placeholder="Search by name, email, or phone…"
+                       data-guest-search-url="{{ route('tenant.guests.search') }}"
+                       class="input-field"
+                       value="">
+                <ul id="guest_search_results" class="mt-1 hidden max-h-48 overflow-y-auto rounded-lg border border-slate-200 bg-white shadow-sm"></ul>
+                <p id="guest_search_hint" class="mt-1 text-xs text-ink-subtle">Type at least 2 characters to search guests.</p>
             </div>
 
             <div>
@@ -398,8 +400,18 @@
             refreshAvailableRoomTypes();
         };
 
+        const debounce = (fn, delayMs) => {
+            let timer = null;
+            return (...args) => {
+                clearTimeout(timer);
+                timer = setTimeout(() => fn(...args), delayMs);
+            };
+        };
+
+        const onDatesChangedDebounced = debounce(onDatesChanged, 300);
+
         [room, checkIn, checkOut].forEach((el) => el.addEventListener('change', recalculate));
-        [checkIn, checkOut].forEach((el) => el.addEventListener('change', onDatesChanged));
+        [checkIn, checkOut].forEach((el) => el.addEventListener('change', onDatesChangedDebounced));
         roomType.addEventListener('change', refreshAvailableRooms);
 
         room.closest('form')?.addEventListener('submit', () => {
@@ -408,5 +420,109 @@
 
         refreshAvailableRoomTypes();
         recalculate();
+    })();
+
+    (() => {
+        const guestInput = document.getElementById('guest_search');
+        const guestId = document.getElementById('guest_id');
+        const results = document.getElementById('guest_search_results');
+        const hint = document.getElementById('guest_search_hint');
+        const endpoint = guestInput?.dataset.guestSearchUrl;
+
+        if (!guestInput || !guestId || !results || !endpoint) {
+            return;
+        }
+
+        let latestRequestId = 0;
+
+        const hideResults = () => {
+            results.classList.add('hidden');
+            results.innerHTML = '';
+        };
+
+        const selectGuest = (guest) => {
+            guestId.value = guest.id;
+            guestInput.value = guest.label;
+            hint.textContent = guest.phone ? `Selected · ${guest.phone}` : 'Guest selected.';
+            hideResults();
+        };
+
+        const renderResults = (items) => {
+            results.innerHTML = '';
+
+            if (!items.length) {
+                const empty = document.createElement('li');
+                empty.className = 'px-3 py-2 text-sm text-ink-muted';
+                empty.textContent = 'No guests found.';
+                results.appendChild(empty);
+                results.classList.remove('hidden');
+                return;
+            }
+
+            items.forEach((guest) => {
+                const item = document.createElement('li');
+                item.className = 'cursor-pointer px-3 py-2 text-sm hover:bg-slate-50';
+                item.textContent = guest.phone ? `${guest.label} · ${guest.phone}` : guest.label;
+                item.addEventListener('mousedown', (event) => {
+                    event.preventDefault();
+                    selectGuest(guest);
+                });
+                results.appendChild(item);
+            });
+
+            results.classList.remove('hidden');
+        };
+
+        const searchGuests = async () => {
+            const query = guestInput.value.trim();
+
+            if (query.length < 2) {
+                guestId.value = '';
+                hint.textContent = 'Type at least 2 characters to search guests.';
+                hideResults();
+                return;
+            }
+
+            const requestId = ++latestRequestId;
+            hint.textContent = 'Searching…';
+
+            try {
+                const response = await fetch(`${endpoint}?q=${encodeURIComponent(query)}`, {
+                    headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                });
+
+                if (!response.ok) {
+                    throw new Error('Guest search failed.');
+                }
+
+                const payload = await response.json();
+                if (requestId !== latestRequestId) {
+                    return;
+                }
+
+                renderResults(Array.isArray(payload.data) ? payload.data : []);
+                hint.textContent = 'Select a guest from the results.';
+            } catch (error) {
+                hint.textContent = error instanceof Error ? error.message : 'Guest search failed.';
+                hideResults();
+            }
+        };
+
+        const debouncedSearch = ((fn, delayMs) => {
+            let timer = null;
+            return () => {
+                clearTimeout(timer);
+                timer = setTimeout(fn, delayMs);
+            };
+        })(searchGuests, 250);
+
+        guestInput.addEventListener('input', () => {
+            guestId.value = '';
+            debouncedSearch();
+        });
+
+        guestInput.addEventListener('blur', () => {
+            setTimeout(hideResults, 150);
+        });
     })();
 </script>

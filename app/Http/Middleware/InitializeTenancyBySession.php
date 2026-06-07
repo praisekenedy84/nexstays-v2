@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Models\Tenant;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Symfony\Component\HttpFoundation\Response;
 
 class InitializeTenancyBySession
@@ -19,7 +20,11 @@ class InitializeTenancyBySession
             return redirect()->route('tenant.login');
         }
 
-        $tenant = Tenant::find($tenantId);
+        $tenant = Cache::remember(
+            "central_tenant:{$tenantId}",
+            60,
+            fn () => Tenant::find($tenantId)
+        );
 
         if (! $tenant) {
             $request->session()->forget('tenant_id');

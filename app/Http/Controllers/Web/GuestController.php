@@ -8,6 +8,7 @@ use App\Domain\HBMS\Models\Guest;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\V1\HBMS\StoreGuestRequest;
 use App\Http\Requests\Web\UpdateGuestRequest;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -31,6 +32,36 @@ class GuestController extends Controller
             ->withQueryString();
 
         return view('hbms.guests.index', compact('guests', 'search', 'sort', 'dir'));
+    }
+
+    public function search(Request $request): JsonResponse
+    {
+        abort_unless($request->user()?->can('view-guests') || $request->user()?->can('manage-guests'), 403);
+
+        $query = trim((string) $request->query('q', ''));
+
+        if (mb_strlen($query) < 2) {
+            return response()->json(['data' => []]);
+        }
+
+        $guests = Guest::query()
+            ->where(fn ($inner) => $inner
+                ->where('first_name', 'ilike', "%{$query}%")
+                ->orWhere('last_name', 'ilike', "%{$query}%")
+                ->orWhere('email', 'ilike', "%{$query}%")
+                ->orWhere('phone', 'ilike', "%{$query}%"))
+            ->orderBy('last_name')
+            ->orderBy('first_name')
+            ->limit(15)
+            ->get(['id', 'first_name', 'last_name', 'phone']);
+
+        return response()->json([
+            'data' => $guests->map(fn (Guest $guest) => [
+                'id' => $guest->id,
+                'label' => trim("{$guest->last_name}, {$guest->first_name}"),
+                'phone' => $guest->phone,
+            ])->values()->all(),
+        ]);
     }
 
     public function create(): View

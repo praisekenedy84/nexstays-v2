@@ -6,8 +6,9 @@ namespace App\Domain\Inventory\Listeners;
 
 use App\Domain\Inventory\Services\InventoryDeductionService;
 use App\Domain\Restaurant\Events\OrderClosed;
+use Illuminate\Contracts\Queue\ShouldQueue;
 
-class DeductInventoryOnOrderClose
+class DeductInventoryOnOrderClose implements ShouldQueue
 {
     public function __construct(
         private readonly InventoryDeductionService $inventoryDeduction
