@@ -54,19 +54,11 @@
                 </div>
                 @if (count($revenueTrend) > 0)
                     @php
-                        if ($trendIsHourly) {
-                            $avgPoints = collect($revenueTrend);
-                            if ($trendFrom->isToday()) {
-                                $avgPoints = $avgPoints->take((int) now()->format('G') + 1);
-                            }
-                            $trendAvg = (float) ($avgPoints->avg('total') ?? 0);
-                        } else {
-                            $trendAvg = array_sum(array_column($revenueTrend, 'total')) / count($revenueTrend);
-                        }
+                        $trendTotal = (float) array_sum(array_column($revenueTrend, 'total'));
                     @endphp
                     <div class="text-right">
-                        <p class="text-[10px] uppercase tracking-wide text-ink-muted">{{ $trendIsHourly ? 'Hourly average' : 'Daily average' }}</p>
-                        <p class="text-base font-bold text-ink">{{ $currency }} {{ $fmt($trendAvg) }}</p>
+                        <p class="text-[10px] uppercase tracking-wide text-ink-muted">Total sales</p>
+                        <p class="text-base font-bold text-ink">{{ $currency }} {{ $fmt($trendTotal) }}</p>
                     </div>
                 @endif
             </div>
