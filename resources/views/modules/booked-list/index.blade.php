@@ -3,12 +3,27 @@
         <x-ui.search-bar :value="$search" placeholder="Booking ref or guest name…" />
     </div>
 
-    <form method="GET" class="mb-4 flex flex-wrap gap-3">
-        @foreach (request()->except(['from', 'to', 'page']) as $key => $val)
+    <form method="GET" class="mb-4 flex flex-wrap items-end gap-3">
+        @foreach (request()->except(['date_field', 'from', 'to', 'page']) as $key => $val)
             <input type="hidden" name="{{ $key }}" value="{{ $val }}">
         @endforeach
-        <input type="date" name="from" value="{{ $from->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
-        <input type="date" name="to" value="{{ $to->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
+        <div>
+            <label class="mb-1 block text-xs font-medium text-ink-muted">Date filter</label>
+            <select name="date_field" class="input-field w-auto" onchange="this.form.submit()">
+                <option value="check_in_date" @selected($dateField === 'check_in_date')>Reservation check-in date</option>
+                <option value="checked_in_at" @selected($dateField === 'checked_in_at')>Checked-in date</option>
+                <option value="check_out_date" @selected($dateField === 'check_out_date')>Reservation check-out date</option>
+                <option value="checked_out_at" @selected($dateField === 'checked_out_at')>Checked-out date</option>
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-medium text-ink-muted">From</label>
+            <input type="date" name="from" value="{{ $from->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-medium text-ink-muted">To</label>
+            <input type="date" name="to" value="{{ $to->format('Y-m-d') }}" class="input-field w-auto" onchange="this.form.submit()">
+        </div>
     </form>
 
     <div class="card overflow-hidden">
@@ -28,7 +43,14 @@
                 <tbody class="divide-y divide-slate-100">
                     @forelse ($bookings as $b)
                         <tr class="{{ $b->status === 'checked_in' ? 'bg-emerald-50/40' : 'hover:bg-slate-50/50' }}">
-                            <td class="px-5 py-4 font-medium">{{ $b->check_in_date->format('d M Y') }}</td>
+                            <td class="px-5 py-4 font-medium">
+                                <p>{{ $b->check_in_date->format('d M Y') }}</p>
+                                @if ($b->checked_in_at)
+                                    <p class="mt-0.5 text-[11px] font-normal text-emerald-600" title="Checked in at {{ $b->checked_in_at->format('d M Y H:i') }}">
+                                        ↳ {{ $b->checked_in_at->format('d M Y H:i') }}
+                                    </p>
+                                @endif
+                            </td>
                             <td class="px-5 py-4 font-mono text-xs font-semibold text-primary">{{ $b->booking_ref }}</td>
                             <td class="px-5 py-4">{{ $b->guest?->first_name }} {{ $b->guest?->last_name }}</td>
                             <td class="px-5 py-4 text-ink-muted">
@@ -39,7 +61,14 @@
                                     <span class="text-xs text-amber-600">(unassigned)</span>
                                 @endif
                             </td>
-                            <td class="px-5 py-4 text-ink-muted">{{ $b->check_out_date->format('d M Y') }}</td>
+                            <td class="px-5 py-4 text-ink-muted">
+                                <p>{{ $b->check_out_date->format('d M Y') }}</p>
+                                @if ($b->checked_out_at)
+                                    <p class="mt-0.5 text-[11px] text-sky-600" title="Checked out at {{ $b->checked_out_at->format('d M Y H:i') }}">
+                                        ↳ {{ $b->checked_out_at->format('d M Y H:i') }}
+                                    </p>
+                                @endif
+                            </td>
                             <td class="px-5 py-4"><x-ui.status-badge :status="$b->status" /></td>
                             <td class="px-5 py-4 text-right">
                                 <div class="flex items-center justify-end gap-1.5">

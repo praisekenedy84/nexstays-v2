@@ -16,7 +16,11 @@ class TenantResolver
 {
     public function find(string $tenantId): ?Tenant
     {
-        return Cache::remember(
+        // Use the default store explicitly: if tenancy is already initialized
+        // (e.g. a long-running worker, or a re-entrant lookup), the `cache`
+        // binding is Stancl's tenant-scoped CacheManager, which forces every
+        // call through tags() — unsupported by the database/file cache stores.
+        return Cache::store(config('cache.default'))->remember(
             "central_tenant:{$tenantId}",
             60,
             fn () => Tenant::find($tenantId)

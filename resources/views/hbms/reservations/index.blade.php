@@ -26,6 +26,32 @@
         @endforeach
     </div>
 
+    <form method="GET" class="mb-6 flex flex-wrap items-end gap-3">
+        @foreach (request()->except(['date_field', 'date_from', 'date_to', 'page']) as $key => $val)
+            <input type="hidden" name="{{ $key }}" value="{{ $val }}">
+        @endforeach
+        <div>
+            <label class="mb-1 block text-xs font-medium text-ink-muted">Date filter</label>
+            <select name="date_field" class="input-field w-auto" onchange="this.form.submit()">
+                <option value="check_in_date" @selected($dateField === 'check_in_date')>Reservation check-in date</option>
+                <option value="checked_in_at" @selected($dateField === 'checked_in_at')>Checked-in date</option>
+                <option value="check_out_date" @selected($dateField === 'check_out_date')>Reservation check-out date</option>
+                <option value="checked_out_at" @selected($dateField === 'checked_out_at')>Checked-out date</option>
+            </select>
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-medium text-ink-muted">From</label>
+            <input type="date" name="date_from" value="{{ $dateFrom }}" class="input-field w-auto" onchange="this.form.submit()">
+        </div>
+        <div>
+            <label class="mb-1 block text-xs font-medium text-ink-muted">To</label>
+            <input type="date" name="date_to" value="{{ $dateTo }}" class="input-field w-auto" onchange="this.form.submit()">
+        </div>
+        @if ($dateFrom || $dateTo)
+            <a href="{{ route('tenant.reservations.index', array_merge(request()->except(['date_field', 'date_from', 'date_to', 'page']))) }}" class="btn-outline">Clear dates</a>
+        @endif
+    </form>
+
     <div class="card overflow-hidden">
         @can('manage-reservations')
             <form id="bulk-reservation-action-form" method="POST" action="{{ route('tenant.reservations.bulk-action') }}" class="flex flex-wrap items-center gap-3 border-b border-slate-100 bg-slate-50/60 px-5 py-3">
@@ -96,7 +122,7 @@
                                 <p class="text-ink-muted">{{ $reservation->check_in_date->format('d M Y') }}</p>
                                 @if ($reservation->checked_in_at)
                                     <p class="mt-0.5 text-[11px] text-emerald-600" title="Checked in at {{ $reservation->checked_in_at->format('d M Y H:i') }}">
-                                        ↳ {{ $reservation->checked_in_at->format('H:i') }}
+                                        ↳ {{ $reservation->checked_in_at->format('d M Y H:i') }}
                                     </p>
                                 @endif
                             </td>
@@ -104,7 +130,7 @@
                                 <p class="text-ink-muted">{{ $reservation->check_out_date->format('d M Y') }}</p>
                                 @if ($reservation->checked_out_at)
                                     <p class="mt-0.5 text-[11px] text-sky-600" title="Checked out at {{ $reservation->checked_out_at->format('d M Y H:i') }}">
-                                        ↳ {{ $reservation->checked_out_at->format('H:i') }}
+                                        ↳ {{ $reservation->checked_out_at->format('d M Y H:i') }}
                                     </p>
                                 @endif
                             </td>

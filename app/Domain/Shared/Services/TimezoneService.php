@@ -7,7 +7,6 @@ namespace App\Domain\Shared\Services;
 use App\Models\Tenant;
 use App\Models\User;
 use DateTimeZone;
-use Exception;
 
 class TimezoneService
 {
@@ -37,7 +36,7 @@ class TimezoneService
             new DateTimeZone($timezone);
 
             return $timezone;
-        } catch (Exception) {
+        } catch (\Throwable) {
             return $this->fallback();
         }
     }

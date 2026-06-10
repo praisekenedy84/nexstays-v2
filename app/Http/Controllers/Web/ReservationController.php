@@ -43,10 +43,17 @@ class ReservationController extends Controller
         $dir    = $request->query('direction') === 'asc' ? 'asc' : 'desc';
         $search = trim((string) $request->query('search', ''));
 
+        $dateField = in_array($request->query('date_field'), ['check_in_date', 'checked_in_at', 'check_out_date', 'checked_out_at'], true)
+            ? $request->query('date_field')
+            : 'check_in_date';
+        $dateFrom = $request->filled('date_from') ? $request->input('date_from') : null;
+        $dateTo   = $request->filled('date_to') ? $request->input('date_to') : null;
+
         $reservations = Reservation::query()
             ->with(['guest', 'creator', 'room', 'roomType'])
             ->when($status && $status !== 'all', fn ($q) => $q->where('status', $status))
-            ->when($request->filled('check_in_date'), fn ($q) => $q->whereDate('check_in_date', $request->input('check_in_date')))
+            ->when($dateFrom, fn ($q) => $q->whereDate($dateField, '>=', $dateFrom))
+            ->when($dateTo, fn ($q) => $q->whereDate($dateField, '<=', $dateTo))
             ->when($search, fn ($q) => $q->where(fn ($inner) => $inner
                 ->where('booking_ref', 'ilike', "%{$search}%")
                 ->orWhereHas('guest', fn ($gq) => $gq
@@ -61,7 +68,7 @@ class ReservationController extends Controller
             ->groupBy('status')
             ->pluck('total', 'status');
 
-        return view('hbms.reservations.index', compact('reservations', 'status', 'statusCounts', 'sort', 'dir', 'search'));
+        return view('hbms.reservations.index', compact('reservations', 'status', 'statusCounts', 'sort', 'dir', 'search', 'dateField', 'dateFrom', 'dateTo'));
     }
 
     public function create(): View

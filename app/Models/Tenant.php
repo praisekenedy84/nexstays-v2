@@ -19,7 +19,12 @@ class Tenant extends BaseTenant implements TenantWithDatabase
     {
         // Bust the central-tenant lookup cache so a suspension takes effect
         // immediately instead of waiting for the cached entry to expire.
-        static::saved(fn (self $tenant) => Cache::forget("central_tenant:{$tenant->id}"));
-        static::deleted(fn (self $tenant) => Cache::forget("central_tenant:{$tenant->id}"));
+        //
+        // Use the default store explicitly: while tenancy is initialized, the
+        // `cache` binding is Stancl's tenant-scoped CacheManager, which forces
+        // every call through tags() — unsupported by the database/file cache
+        // stores and would throw BadMethodCallException on every tenant save.
+        static::saved(fn (self $tenant) => Cache::store(config('cache.default'))->forget("central_tenant:{$tenant->id}"));
+        static::deleted(fn (self $tenant) => Cache::store(config('cache.default'))->forget("central_tenant:{$tenant->id}"));
     }
 }
