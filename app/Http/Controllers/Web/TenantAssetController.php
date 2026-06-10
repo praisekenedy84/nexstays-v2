@@ -19,20 +19,24 @@ class TenantAssetController extends Controller
 
         tenancy()->initialize($tenant);
 
-        $disk = (string) config('filesystems.default', 'public');
-        $disk = $disk === 'local' ? 'public' : $disk;
+        try {
+            $disk = (string) config('filesystems.default', 'public');
+            $disk = $disk === 'local' ? 'public' : $disk;
 
-        $root = config("filesystems.disks.{$disk}.root");
+            $root = config("filesystems.disks.{$disk}.root");
 
-        abort_if($root === null, 404);
+            abort_if($root === null, 404);
 
-        $allowedRoot = realpath($root);
-        abort_if($allowedRoot === false, 404);
+            $allowedRoot = realpath($root);
+            abort_if($allowedRoot === false, 404);
 
-        $fullPath = realpath("{$allowedRoot}/{$path}");
-        abort_if($fullPath === false, 404);
-        abort_unless(str_starts_with($fullPath, $allowedRoot), 404);
+            $fullPath = realpath("{$allowedRoot}/{$path}");
+            abort_if($fullPath === false, 404);
+            abort_unless(str_starts_with($fullPath, $allowedRoot), 404);
 
-        return response()->file($fullPath);
+            return response()->file($fullPath);
+        } finally {
+            tenancy()->end();
+        }
     }
 }

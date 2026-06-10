@@ -42,4 +42,28 @@ class CheckInGuestTest extends TenantTestCase
 
         app(CheckInGuest::class)->execute($reservation);
     }
+
+    /**
+     * Regression proxy for HBMS-1: re-checking-in a reservation that is already
+     * checked_in (sequential, simulating a double-submit) must remain rejected
+     * once the reservation row is locked for the duration of the transaction.
+     */
+    public function test_it_rejects_check_in_for_already_checked_in_reservation(): void
+    {
+        $roomType = RoomType::factory()->create();
+        $room = Room::factory()->create([
+            'room_type_id' => $roomType->id,
+            'status' => 'blocked',
+        ]);
+        $reservation = Reservation::factory()->create([
+            'room_type_id' => $roomType->id,
+            'room_id' => $room->id,
+        ]);
+
+        app(CheckInGuest::class)->execute($reservation);
+
+        $this->expectException(DomainException::class);
+
+        app(CheckInGuest::class)->execute($reservation->fresh());
+    }
 }

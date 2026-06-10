@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\Shared\Services\TenantResolver;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\LoginRequest;
 use App\Models\Tenant;
@@ -11,11 +12,18 @@ use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Log;
 use Illuminate\View\View;
+use Throwable;
 
 class AuthController extends Controller
 {
+    public function __construct(private readonly TenantResolver $tenantResolver)
+    {
+    }
+
     public function create(): View|RedirectResponse
     {
         // Recover an existing session without a subdomain: if the session already
@@ -23,10 +31,25 @@ class AuthController extends Controller
         $tenantId = session('tenant_id');
 
         if ($tenantId) {
-            $tenant = Tenant::find($tenantId);
+            $tenant = $this->tenantResolver->find($tenantId);
 
-            if ($tenant) {
-                tenancy()->initialize($tenant);
+            if ($tenant && ! $this->tenantResolver->isSuspended($tenant)) {
+                try {
+                    tenancy()->initialize($tenant);
+                } catch (Throwable $e) {
+                    Log::error('Tenancy initialization failed while loading the login page.', [
+                        'tenant_id' => $tenant->id,
+                        'exception' => $e->getMessage(),
+                    ]);
+
+                    if (tenancy()->initialized) {
+                        tenancy()->end();
+                    }
+
+                    session()->forget('tenant_id');
+
+                    return view('auth.login');
+                }
 
                 if (Auth::check()) {
                     return redirect()->route('tenant.dashboard');
@@ -47,7 +70,22 @@ class AuthController extends Controller
                 ->withErrors(['property_code' => 'Property code not found. Please check with your manager.']);
         }
 
-        tenancy()->initialize($tenant);
+        try {
+            tenancy()->initialize($tenant);
+        } catch (Throwable $e) {
+            Log::error('Tenancy initialization failed during login.', [
+                'tenant_id' => $tenant->id,
+                'exception' => $e->getMessage(),
+            ]);
+
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
+
+            return back()
+                ->withInput($request->only('username', 'property_code'))
+                ->withErrors(['property_code' => 'We could not connect to your property. Please try again or contact NexStay support.']);
+        }
 
         $user = User::findByLoginIdentifier($request->validated('username'));
 
@@ -62,6 +100,11 @@ class AuthController extends Controller
         $request->session()->regenerate();
         $request->session()->put('tenant_id', $tenant->id);
 
+        // Marks that this browser had an active login, so an idle session
+        // timeout can be distinguished from "never logged in" and reported
+        // to the user with a clearer message.
+        Cookie::queue(Cookie::make('nexstay_active', '1', (int) config('session.lifetime')));
+
         return redirect()->intended(route('tenant.dashboard'));
     }
 
@@ -71,6 +114,8 @@ class AuthController extends Controller
 
         $request->session()->invalidate();
         $request->session()->regenerateToken();
+
+        Cookie::queue(Cookie::forget('nexstay_active'));
 
         return redirect()->route('tenant.login');
     }

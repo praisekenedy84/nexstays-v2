@@ -19,6 +19,16 @@ class ImpersonateController extends Controller
         $tenant = Tenant::findOrFail($tenantId);
 
         tenancy()->initialize($tenant);
+
+        abort_unless(
+            tenancy()->initialized && tenant('id') === $tenant->id,
+            500,
+            'Tenancy was not initialized for the expected tenant.'
+        );
+
+        // User::getConnectionName() resolves to the tenant connection, so this
+        // re-fetch is scoped to the schema we just initialized tenancy for —
+        // a user belonging to a different tenant's schema cannot be found here.
         $user = User::findOrFail($userId);
 
         $request->session()->put('tenant_id', $tenant->id);
@@ -34,6 +44,7 @@ class ImpersonateController extends Controller
         ]);
 
         Auth::guard('web')->login($user);
+        $request->session()->regenerate();
 
         tenancy()->end();
 

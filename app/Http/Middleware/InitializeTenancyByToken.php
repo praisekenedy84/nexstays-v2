@@ -22,7 +22,7 @@ class InitializeTenancyByToken
 
         $tenant = Tenant::find($tenantId);
 
-        if (! $tenant) {
+        if (! $tenant || ! empty($tenant->suspended_at)) {
             return response()->json([
                 'error' => [
                     'code' => 'TENANT_NOT_FOUND',
@@ -46,7 +46,13 @@ class InitializeTenancyByToken
         $plainText = $request->bearerToken();
 
         if ($plainText !== null) {
-            $pat = PersonalAccessToken::where('token', hash('sha256', $plainText))->first();
+            $pat = PersonalAccessToken::findToken($plainText);
+
+            if ($pat && $pat->expires_at !== null && $pat->expires_at->isPast()) {
+                // Expired token → let auth:sanctum reject it with a 401 without
+                // switching the tenant DB connection first.
+                return null;
+            }
 
             if ($pat && $pat->tenant_id) {
                 return (string) $pat->tenant_id;

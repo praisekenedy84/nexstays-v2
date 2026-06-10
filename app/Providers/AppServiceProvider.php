@@ -7,9 +7,12 @@ use App\Domain\Shared\Services\OrderAuthorizationService;
 use App\Models\PersonalAccessToken;
 use App\Models\User;
 use App\Support\HbmsNavigation;
+use Illuminate\Cache\RateLimiting\Limit;
+use Illuminate\Http\Request;
 use Illuminate\Pagination\Paginator;
 use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Gate;
+use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\Facades\View;
 use Illuminate\Support\ServiceProvider;
 use Laravel\Sanctum\Sanctum;
@@ -42,5 +45,11 @@ class AppServiceProvider extends ServiceProvider
         Gate::define('manage-order', fn (?User $user, Order $order) => $user !== null && $orderAuth()->canManage($user, $order));
         Gate::define('delete-order', fn (?User $user, Order $order) => $user !== null && $orderAuth()->canDelete($user, $order));
         Gate::define('create-order', fn (?User $user) => $user !== null && $orderAuth()->canCreate($user));
+
+        RateLimiter::for('login', function (Request $request) {
+            $key = strtolower((string) $request->input('property_code')).'|'.$request->ip();
+
+            return Limit::perMinute(5)->by($key);
+        });
     }
 }

@@ -81,7 +81,9 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
 
     // Login: no tenancy needed yet, controller initializes it after property_code lookup.
     Route::get('/login', [WebAuthController::class, 'create'])->name('login');
-    Route::post('/login', [WebAuthController::class, 'store'])->name('login.store');
+    Route::post('/login', [WebAuthController::class, 'store'])
+        ->middleware('throttle:login')
+        ->name('login.store');
 
     // Authenticated & tenant-scoped: tenancy is initialized first (from session),
     // then the auth guard can resolve the user from the tenant schema.
@@ -460,7 +462,9 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
     })->name('health');
 
     // Login resolves the tenant from property_code inside the controller.
-    Route::post('/auth/login', [AuthController::class, 'login'])->name('auth.login');
+    Route::post('/auth/login', [AuthController::class, 'login'])
+        ->middleware('throttle:login')
+        ->name('auth.login');
 
     // Tenant context required (token → tenant_id, or X-Tenant-Id header for public endpoints).
     Route::middleware([InitializeTenancyByToken::class])->group(function () {

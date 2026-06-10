@@ -8,7 +8,10 @@ use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
 use App\Domain\HBMS\Models\RoomType;
 use App\Domain\HBMS\Actions\CheckInGuest;
+use App\Domain\HBMS\Actions\PostOverstayCharge;
+use App\Domain\HBMS\Actions\SettleOverstay;
 use App\Domain\Shared\Services\FolioService;
+use DomainException;
 use Tests\TenantTestCase;
 
 class OverstayTest extends TenantTestCase
@@ -126,5 +129,40 @@ class OverstayTest extends TenantTestCase
 
         $response->assertRedirect(route('tenant.reservations.show', $reservation));
         $response->assertSessionHas('error');
+    }
+
+    /**
+     * Regression proxy for HBMS-2: posting the overstay charge a second time
+     * (sequential, simulating a double-submit) must remain rejected once the
+     * checks are moved inside a locked transaction.
+     */
+    public function test_posting_overstay_charge_twice_is_rejected(): void
+    {
+        $reservation = $this->overstayedReservation();
+
+        app(PostOverstayCharge::class)->execute($reservation);
+
+        $this->expectException(DomainException::class);
+
+        app(PostOverstayCharge::class)->execute($reservation->fresh());
+    }
+
+    /**
+     * HBMS-3: if overstay_settlement is "pending" but overstay_charge has been
+     * corrupted to null, settling must fail with a clean DomainException
+     * instead of an uncaught Brick\Money NumberFormatException.
+     */
+    public function test_settling_overstay_with_corrupted_null_charge_throws_domain_exception(): void
+    {
+        $reservation = $this->overstayedReservation();
+
+        app(PostOverstayCharge::class)->execute($reservation);
+
+        $reservation->refresh();
+        $reservation->update(['overstay_charge' => null]);
+
+        $this->expectException(DomainException::class);
+
+        app(SettleOverstay::class)->execute($reservation->fresh(), 'paid', 'cash');
     }
 }

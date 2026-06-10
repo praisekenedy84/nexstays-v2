@@ -9,6 +9,7 @@ use App\Domain\Inventory\Models\RecipeIngredient;
 use App\Domain\Inventory\Models\StockItem;
 use App\Domain\Inventory\Services\InventoryDeductionService;
 use App\Domain\Restaurant\Services\OrderService;
+use App\Domain\Restaurant\Services\OrderSettlementReversalService;
 use App\Domain\Shared\Models\MenuItem;
 use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Models\OrderItem;
@@ -175,6 +176,76 @@ class OrderInventoryTest extends TenantTestCase
             'movement_type' => 'consumption',
             'reference_id' => $order->id,
         ]);
+    }
+
+    /**
+     * INV-6: when a deduction clamps current_stock to 0 because of a shortage
+     * (only 5 of the required 10 units were available), reversing the
+     * settlement must restore only the 5 units actually taken — not the full
+     * 10 that were required, which would over-restore stock above its true
+     * pre-order level.
+     */
+    public function test_reversal_does_not_over_restore_stock_after_shortage(): void
+    {
+        $outlet = Outlet::query()->create([
+            'name' => 'Test Bar',
+            'type' => 'bar',
+            'is_active' => true,
+        ]);
+
+        $category = $outlet->menuCategories()->create(['name' => 'Drinks', 'display_order' => 1]);
+        $menuItem = MenuItem::query()->create([
+            'category_id' => $category->id,
+            'name' => 'Dawa',
+            'price' => '15000.00',
+        ]);
+
+        $stock = StockItem::query()->create([
+            'outlet_id' => $outlet->id,
+            'name' => 'Gin (750ml)',
+            'unit' => 'ml',
+            'current_stock' => 5,
+            'reorder_level' => 1,
+        ]);
+
+        RecipeIngredient::query()->create([
+            'menu_item_id' => $menuItem->id,
+            'stock_item_id' => $stock->id,
+            'quantity' => 10,
+            'unit' => 'ml',
+        ]);
+
+        $order = Order::query()->create([
+            'outlet_id' => $outlet->id,
+            'order_number' => 'ORD-INV-SHORTAGE-1',
+            'status' => 'closed',
+            'waiter_id' => $this->user->id,
+            'total' => '15000.00',
+            'closed_at' => now(),
+        ]);
+
+        OrderItem::query()->create([
+            'order_id' => $order->id,
+            'menu_item_id' => $menuItem->id,
+            'quantity' => 1,
+            'unit_price' => '15000.00',
+            'status' => 'served',
+        ]);
+
+        app(InventoryDeductionService::class)->deductForOrder($order);
+
+        // Only 5 of the required 10 units were available — clamped to 0, shortage logged.
+        $this->assertEquals(0.0, (float) $stock->fresh()->current_stock);
+        $this->assertDatabaseHas('stock_movements', [
+            'stock_item_id' => $stock->id,
+            'movement_type' => 'stock_shortage',
+            'reference_id' => $order->id,
+        ]);
+
+        app(OrderSettlementReversalService::class)->execute($order->fresh(), 'Test void');
+
+        // Reversal should restore only what was actually taken (5), not the full required quantity (10).
+        $this->assertEquals(5.0, (float) $stock->fresh()->current_stock);
     }
 
     public function test_restaurant_food_items_ignore_recipes_even_when_defined(): void

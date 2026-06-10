@@ -84,4 +84,24 @@ class LoginApiTest extends TenantTestCase
             ->assertOk()
             ->assertJsonPath('data.attributes.username', $this->user->username);
     }
+
+    public function test_login_is_throttled_after_too_many_attempts(): void
+    {
+        config(['tenancy.bootstrappers' => []]);
+
+        Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
+        User::factory()->create(['username' => 'frontdesk', 'email' => 'staff@demo.local']);
+
+        $payload = [
+            'property_code' => 'demo',
+            'username' => 'frontdesk',
+            'password' => 'wrong',
+        ];
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->tenantJson('POST', '/api/v1/auth/login', $payload)->assertUnprocessable();
+        }
+
+        $this->tenantJson('POST', '/api/v1/auth/login', $payload)->assertStatus(429);
+    }
 }
