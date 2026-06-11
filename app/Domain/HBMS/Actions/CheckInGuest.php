@@ -10,6 +10,9 @@ use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
 use App\Domain\Shared\Services\FolioService;
 use App\Domain\Shared\Services\NotificationService;
+use App\Domain\HBMS\Services\ReservationSettingsService;
+use Brick\Money\Money;
+use Carbon\Carbon;
 use DomainException;
 use Illuminate\Support\Facades\DB;
 
@@ -18,6 +21,7 @@ class CheckInGuest
     public function __construct(
         private readonly FolioService $folioService,
         private readonly NotificationService $notificationService,
+        private readonly ReservationSettingsService $reservationSettings,
     ) {}
 
     public function execute(Reservation $reservation, array $options = []): Folio
@@ -54,6 +58,20 @@ class CheckInGuest
             $room->update(['status' => 'occupied']);
 
             $folio = $this->folioService->openFolio($reservation->fresh());
+
+            $paymentMode = $this->reservationSettings->all()['payment_mode'] ?? 'prepaid';
+
+            if ($paymentMode === 'prepaid') {
+                $stayNights = max(
+                    1,
+                    Carbon::parse($reservation->check_in_date)->diffInDays(Carbon::parse($reservation->check_out_date))
+                );
+                $roomGross = Money::of((string) $reservation->daily_rate, $folio->currency)->multipliedBy($stayNights);
+
+                if ($roomGross->isPositive()) {
+                    $this->folioService->recordPrepaidRoomCharge($folio, $roomGross);
+                }
+            }
 
             GuestCheckedIn::dispatch($reservation, $room, $folio);
 

@@ -9,6 +9,7 @@ use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\RoomType;
 use App\Domain\Shared\Services\FolioService;
 use App\Domain\Shared\Services\ReportingService;
+use Brick\Money\Money;
 use Stancl\Tenancy\Middleware\InitializeTenancyBySubdomain;
 use Stancl\Tenancy\Middleware\PreventAccessFromCentralDomains;
 use Tests\TenantTestCase;
@@ -83,6 +84,8 @@ class ReportingTest extends TenantTestCase
         ]);
 
         $folio = app(FolioService::class)->openFolio($reservation);
+
+        app(FolioService::class)->recordPrepaidRoomCharge($folio, Money::of('200000.00', 'TZS'));
 
         FolioTransaction::query()->create([
             'folio_id' => $folio->id,

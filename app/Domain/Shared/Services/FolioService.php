@@ -97,6 +97,33 @@ class FolioService
         });
     }
 
+    /**
+     * Record the room charge for a prepaid reservation as already settled when its folio is opened.
+     *
+     * The room charge itself is never posted as a folio transaction (it's tracked off-ledger and
+     * computed from the reservation's rate/nights), so this only records a Payment — it must NOT
+     * post a folio_transaction, which would leave the folio with a permanent non-zero balance and
+     * block check-out (FolioService::balance() must reach zero before check-out).
+     */
+    public function recordPrepaidRoomCharge(Folio $folio, Money $amount): \App\Domain\Till\Models\Payment
+    {
+        return DB::transaction(function () use ($folio, $amount) {
+            $payment = \App\Domain\Till\Models\Payment::query()->create([
+                'folio_id'    => $folio->id,
+                'amount'      => $amount->getAmount()->toFloat(),
+                'currency'    => $folio->currency,
+                'method'      => 'prepaid',
+                'received_by' => Auth::id(),
+                'notes'       => 'Room charge prepaid at booking',
+                'status'      => 'captured',
+            ]);
+
+            $folio->increment('settled_amount', $amount->getAmount()->toFloat());
+
+            return $payment;
+        });
+    }
+
     public function postWriteOff(
         Folio $folio,
         string $reason,
