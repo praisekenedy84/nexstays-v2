@@ -4,10 +4,12 @@ declare(strict_types=1);
 
 namespace App\Http\Controllers\Web;
 
+use App\Domain\Shared\Services\FacilitySettingsService;
 use App\Domain\Shared\Services\FbSettingsService;
 use App\Domain\Shared\Services\PaymentMethodSettingsService;
 use App\Domain\Shared\Services\TaxSettingsService;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Web\UpdateFacilitySettingsRequest;
 use App\Http\Requests\Web\UpdateFbSettingsRequest;
 use App\Http\Requests\Web\UpdatePaymentMethodSettingsRequest;
 use App\Http\Requests\Web\UpdateTaxSettingsRequest;
@@ -20,6 +22,7 @@ class FinanceSettingsController extends Controller
         private readonly TaxSettingsService $taxSettings,
         private readonly PaymentMethodSettingsService $paymentMethodSettings,
         private readonly FbSettingsService $fbSettings,
+        private readonly FacilitySettingsService $facilitySettings,
     ) {}
 
     public function edit(): View
@@ -90,5 +93,21 @@ class FinanceSettingsController extends Controller
         return redirect()
             ->route('tenant.finance.fb-settings.edit')
             ->with('success', 'F&B settings updated.');
+    }
+
+    public function facilitySettingsEdit(): View
+    {
+        return view('modules.finance.facility-settings', [
+            'settings' => $this->facilitySettings->all(),
+        ]);
+    }
+
+    public function facilitySettingsUpdate(UpdateFacilitySettingsRequest $request): RedirectResponse
+    {
+        $this->facilitySettings->update($request->validated());
+
+        return redirect()
+            ->route('tenant.finance.facility-settings.edit')
+            ->with('success', 'Facility fee settings updated.');
     }
 }

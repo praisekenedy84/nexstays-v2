@@ -95,9 +95,10 @@ class OrderController extends Controller
         $order = $this->orderService->recalculate($order);
         $amount = Money::of((string) $order->total, $currency);
         $tendered = Money::of($request->validated('amount_tendered'), $currency);
-        $session = $this->tillSessionService->activeForOutlet($order->outlet_id);
-
-        throw_if($session === null, \DomainException::class, 'No active till session for this outlet.');
+        $tillSessionId = $request->validated('till_session_id');
+        $session = $tillSessionId !== null
+            ? $this->tillSessionService->activeForOutlet($order->outlet_id)
+            : null;
 
         $payment = $this->orderService->recordCashPayment($order, $amount, $tendered, $session);
 

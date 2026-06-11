@@ -40,6 +40,30 @@ class TillApiTest extends TenantTestCase
         ]);
     }
 
+    public function test_cash_payment_succeeds_without_a_till_session(): void
+    {
+        $this->user->givePermissionTo(['manage-orders', 'manage-till']);
+
+        $outlet = Outlet::query()->where('type', 'restaurant')->first()
+            ?? Outlet::query()->create(['name' => 'R', 'type' => 'restaurant', 'is_active' => true]);
+
+        $orderResponse = $this->tenantJson('POST', "/api/v1/outlets/{$outlet->id}/orders", [
+            'covers' => 2,
+        ]);
+
+        $orderId = $orderResponse->json('data.id');
+
+        $this->tenantJson('POST', "/api/v1/orders/{$orderId}/cash-payment", [
+            'amount_tendered' => '0',
+        ])->assertOk();
+
+        $this->assertDatabaseHas('payments', [
+            'order_id' => $orderId,
+            'method' => 'cash',
+            'till_session_id' => null,
+        ]);
+    }
+
     public function test_cash_payment_requires_active_till(): void
     {
         $this->user->givePermissionTo(['manage-orders', 'manage-till']);

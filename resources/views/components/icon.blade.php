@@ -28,6 +28,8 @@
         'inventory' => 'boxes',
         'cart' => 'shopping-cart',
         'wallet' => 'wallet',
+        'dumbbell' => 'dumbbell',
+        'waves' => 'waves',
         'clock' => 'clock',
         'clipboard' => 'clipboard',
         'alert' => 'alert-triangle',

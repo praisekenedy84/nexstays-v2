@@ -155,6 +155,30 @@
         </section>
     @endcanany
 
+    {{-- ===== FACILITIES ===== --}}
+    @can('view-facility-reports')
+        <section class="mb-8">
+            <h3 class="mb-3 text-xs font-semibold uppercase tracking-wide text-ink-muted">Facilities</h3>
+            <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+
+                <a href="{{ route('tenant.reports.pool-attendance') }}"
+                   class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-sky-700">Swimming Pool</p>
+                    <h4 class="mt-1 font-bold text-ink">Pool attendance & revenue</h4>
+                    <p class="mt-1 text-sm text-ink-muted">Visits, walk-ins, hotel guests, and money collected — PDF and Excel export.</p>
+                </a>
+
+                <a href="{{ route('tenant.reports.gym-attendance') }}"
+                   class="card block p-5 transition hover:ring-2 hover:ring-primary/20">
+                    <p class="text-xs font-semibold uppercase tracking-wide text-violet-700">Gym</p>
+                    <h4 class="mt-1 font-bold text-ink">Gym attendance & revenue</h4>
+                    <p class="mt-1 text-sm text-ink-muted">Member visits, settlement breakdown, and daily totals — PDF and Excel export.</p>
+                </a>
+
+            </div>
+        </section>
+    @endcan
+
     {{-- ===== FOOD & BEVERAGE ===== --}}
     @can('view-fb-reports')
         <section class="mb-8">

@@ -47,6 +47,11 @@ class RoleController extends Controller
             'view-expenditures', 'manage-expenditures',
         ],
         'Damage' => ['view-damage', 'manage-damage'],
+        'Facilities' => [
+            'view-facility-attendance',
+            'record-facility-attendance',
+            'view-facility-reports',
+        ],
         'Reports' => ['view-reports', 'view-fb-reports', 'run-night-audit'],
         'Administration' => ['manage-users', 'manage-roles'],
     ];

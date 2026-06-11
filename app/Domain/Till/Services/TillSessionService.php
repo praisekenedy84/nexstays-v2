@@ -94,8 +94,10 @@ class TillSessionService
         string $description,
         ?string $referenceId = null,
         ?string $referenceType = null,
-    ): TillMovement {
-        throw_if(! $session->isOpen(), \DomainException::class, 'Till session is not open.');
+    ): ?TillMovement {
+        if (! $session->isOpen()) {
+            return null;
+        }
 
         return TillMovement::query()->create([
             'till_session_id' => $session->id,

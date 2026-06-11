@@ -60,6 +60,9 @@ class RoleAndPermissionSeeder extends Seeder
         'view-damage',
         'manage-damage',
         'view-fb-reports',
+        'view-facility-attendance',
+        'record-facility-attendance',
+        'view-facility-reports',
     ];
 
     /**
@@ -117,6 +120,9 @@ class RoleAndPermissionSeeder extends Seeder
             'view-ancillary-services',
             'view-damage',
             'manage-damage',
+            'view-facility-attendance',
+            'record-facility-attendance',
+            'view-facility-reports',
         ]);
 
         Role::findByName('housekeeper', self::GUARD)->syncPermissions([
@@ -156,6 +162,7 @@ class RoleAndPermissionSeeder extends Seeder
 
         Role::findByName('finance', self::GUARD)->syncPermissions([
             'view-reservations', 'view-guests', 'view-folios', 'view-reports', 'view-fb-reports',
+            'view-facility-attendance', 'view-facility-reports',
             'view-orders', 'view-all-orders',
             'view-till', 'view-inventory', 'run-night-audit',
             'view-purchases', 'view-expenditures', 'manage-expenditures', 'view-debts',

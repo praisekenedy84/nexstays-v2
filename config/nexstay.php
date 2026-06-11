@@ -25,6 +25,17 @@ return [
             'room_charge' => env('NEXSTAY_ROOM_VAT_RATE', '0.18'),
             'restaurant' => env('NEXSTAY_FB_VAT_RATE', '0.18'),
             'bar' => env('NEXSTAY_BAR_VAT_RATE', '0.18'),
+            'pool' => env('NEXSTAY_POOL_VAT_RATE', '0.18'),
+            'gym' => env('NEXSTAY_GYM_VAT_RATE', '0.18'),
+        ],
+    ],
+
+    'facilities' => [
+        'pool' => [
+            'default_fee' => (float) env('NEXSTAY_POOL_DEFAULT_FEE', 15000),
+        ],
+        'gym' => [
+            'default_fee' => (float) env('NEXSTAY_GYM_DEFAULT_FEE', 10000),
         ],
     ],
 
@@ -125,6 +136,17 @@ return [
             ],
         ],
         [
+            'id' => 'facilities-group',
+            'label' => 'Facilities',
+            'icon' => 'dumbbell',
+            'children' => [
+                ['id' => 'facility-pool', 'label' => 'Swimming Pool', 'route' => 'tenant.facilities.pool', 'permission' => 'view-facility-attendance'],
+                ['id' => 'facility-gym', 'label' => 'Gym', 'route' => 'tenant.facilities.gym', 'permission' => 'view-facility-attendance'],
+                ['id' => 'facility-pool-report', 'label' => 'Pool report', 'route' => 'tenant.reports.pool-attendance', 'permission' => 'view-facility-reports'],
+                ['id' => 'facility-gym-report', 'label' => 'Gym report', 'route' => 'tenant.reports.gym-attendance', 'permission' => 'view-facility-reports'],
+            ],
+        ],
+        [
             'id' => 'finance',
             'label' => 'Finance',
             'icon' => 'wallet',
@@ -164,6 +186,7 @@ return [
                 ['id' => 'finance-settings', 'label' => 'Finance & tax', 'route' => 'tenant.finance.settings.edit', 'permission' => 'manage-roles'],
                 ['id' => 'payment-methods', 'label' => 'Payment methods', 'route' => 'tenant.finance.payment-methods.edit', 'permission' => 'manage-roles'],
                 ['id' => 'fb-settings', 'label' => 'F&B settlement', 'route' => 'tenant.finance.fb-settings.edit', 'permission' => 'manage-roles'],
+                ['id' => 'facility-settings', 'label' => 'Facility fees', 'route' => 'tenant.finance.facility-settings.edit', 'permission' => 'manage-roles'],
             ],
         ],
     ],

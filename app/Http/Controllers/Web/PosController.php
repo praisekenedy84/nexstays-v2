@@ -190,9 +190,6 @@ class PosController extends Controller
         ]);
 
         $activeTill = $this->tillService->activeForOutlet($order->outlet_id);
-        if ($activeTill === null) {
-            return back()->with('error', 'No active till session for this outlet. Open a till first.');
-        }
 
         $currency = config('nexstay.currency.default', 'TZS');
         $total    = Money::of((string) $order->total, $currency);

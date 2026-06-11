@@ -48,6 +48,8 @@ use App\Http\Controllers\Web\AncillaryServiceController;
 use App\Http\Controllers\Web\BookedListController;
 use App\Http\Controllers\Web\DebtController;
 use App\Http\Controllers\Web\ExpenditureController;
+use App\Http\Controllers\Web\FacilityAttendanceController;
+use App\Http\Controllers\Web\FacilityAttendanceReportController;
 use App\Http\Controllers\Web\FbReportController;
 use App\Http\Controllers\Web\PurchaseController;
 use App\Http\Controllers\Web\FinanceSettingsController;
@@ -199,6 +201,8 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::put('/finance/payment-methods', [FinanceSettingsController::class, 'paymentMethodsUpdate'])->name('finance.payment-methods.update');
             Route::get('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsEdit'])->name('finance.fb-settings.edit');
             Route::put('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsUpdate'])->name('finance.fb-settings.update');
+            Route::get('/finance/facility-settings', [FinanceSettingsController::class, 'facilitySettingsEdit'])->name('finance.facility-settings.edit');
+            Route::put('/finance/facility-settings', [FinanceSettingsController::class, 'facilitySettingsUpdate'])->name('finance.facility-settings.update');
         });
 
         Route::middleware('permission:view-reports|view-fb-reports|view-reservations')->group(function () {
@@ -270,6 +274,23 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
                 ->name('reports.payment-summary.export-excel');
             Route::get('/reports/payment-summary/export-pdf', [PaymentSummaryReportController::class, 'exportPdf'])
                 ->name('reports.payment-summary.export-pdf');
+        });
+
+        Route::middleware('permission:view-facility-reports')->group(function () {
+            Route::get('/reports/pool-attendance', [FacilityAttendanceReportController::class, 'pool'])->name('reports.pool-attendance');
+            Route::get('/reports/pool-attendance/export-excel', [FacilityAttendanceReportController::class, 'poolExportExcel'])->name('reports.pool-attendance.export-excel');
+            Route::get('/reports/pool-attendance/export-pdf', [FacilityAttendanceReportController::class, 'poolExportPdf'])->name('reports.pool-attendance.export-pdf');
+            Route::get('/reports/gym-attendance', [FacilityAttendanceReportController::class, 'gym'])->name('reports.gym-attendance');
+            Route::get('/reports/gym-attendance/export-excel', [FacilityAttendanceReportController::class, 'gymExportExcel'])->name('reports.gym-attendance.export-excel');
+            Route::get('/reports/gym-attendance/export-pdf', [FacilityAttendanceReportController::class, 'gymExportPdf'])->name('reports.gym-attendance.export-pdf');
+        });
+
+        Route::middleware('permission:view-facility-attendance|record-facility-attendance')->group(function () {
+            Route::get('/facilities/pool', [FacilityAttendanceController::class, 'pool'])->name('facilities.pool');
+            Route::get('/facilities/gym', [FacilityAttendanceController::class, 'gym'])->name('facilities.gym');
+            Route::middleware('permission:record-facility-attendance')->group(function () {
+                Route::post('/facilities/attendance', [FacilityAttendanceController::class, 'store'])->name('facilities.attendance.store');
+            });
         });
 
         Route::middleware('permission:view-debts')->group(function () {

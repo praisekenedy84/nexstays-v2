@@ -8,6 +8,7 @@ use App\Domain\Shared\Models\Order;
 use App\Domain\Shared\Services\OrderAuthorizationService;
 use App\Http\Rules\ActiveTillSessionForOutlet;
 use Illuminate\Foundation\Http\FormRequest;
+use Illuminate\Validation\Rule;
 
 class RecordOrderCashPaymentRequest extends FormRequest
 {
@@ -32,10 +33,10 @@ class RecordOrderCashPaymentRequest extends FormRequest
 
         return [
             'till_session_id' => [
-                'required',
+                'nullable',
                 'uuid',
                 'exists:till_sessions,id',
-                new ActiveTillSessionForOutlet($order),
+                Rule::when($this->filled('till_session_id'), [new ActiveTillSessionForOutlet($order)]),
             ],
             'amount_tendered' => ['required', 'numeric', 'min:'.$order->total],
         ];

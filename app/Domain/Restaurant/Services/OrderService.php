@@ -220,7 +220,7 @@ class OrderService
         });
     }
 
-    public function recordCashPayment(Order $order, Money $amount, Money $tendered, TillSession $tillSession): Payment
+    public function recordCashPayment(Order $order, Money $amount, Money $tendered, ?TillSession $tillSession = null): Payment
     {
         throw_if(
             ! $this->paymentMethodSettings->isEnabled('cash'),
@@ -238,7 +238,7 @@ class OrderService
 
             $payment = Payment::query()->create([
                 'order_id' => $order->id,
-                'till_session_id' => $tillSession->id,
+                'till_session_id' => $tillSession?->id,
                 'amount' => $amount->getAmount()->toFloat(),
                 'currency' => $currency,
                 'method' => 'cash',
@@ -248,14 +248,16 @@ class OrderService
                 'status' => 'captured',
             ]);
 
-            $this->tillSessionService->recordMovement(
-                $tillSession,
-                'cash_payment',
-                $amount,
-                "Cash payment for order {$order->order_number}",
-                $payment->id,
-                Payment::class,
-            );
+            if ($tillSession !== null) {
+                $this->tillSessionService->recordMovement(
+                    $tillSession,
+                    'cash_payment',
+                    $amount,
+                    "Cash payment for order {$order->order_number}",
+                    $payment->id,
+                    Payment::class,
+                );
+            }
 
             $this->finalizeClosedOrder(
                 $order,
