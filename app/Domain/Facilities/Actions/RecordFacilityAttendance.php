@@ -28,6 +28,7 @@ class RecordFacilityAttendance
      * @param  array{
      *     facility_type: string,
      *     visitor_name?: string|null,
+     *     party_size?: int|string|null,
      *     reservation_id?: string|null,
      *     amount?: float|int|string|null,
      *     settlement: string,
@@ -155,6 +156,7 @@ class RecordFacilityAttendance
             return FacilityAttendance::query()->create([
                 'facility_type'        => $facilityType,
                 'visitor_name'         => $visitorName,
+                'party_size'           => max(1, (int) ($data['party_size'] ?? 1)),
                 'guest_id'             => $guestId,
                 'reservation_id'       => $reservation?->id,
                 'amount'               => $amount->getAmount()->toFloat(),

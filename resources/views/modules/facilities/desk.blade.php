@@ -1,6 +1,7 @@
 <x-layouts.app :active-nav="$navId" :title="$facilityLabel" subtitle="Record attendance and collect fees">
-    <div class="mb-6 grid gap-4 sm:grid-cols-3">
+    <div class="mb-6 grid gap-4 sm:grid-cols-4">
         <x-ui.kpi-card label="Today" :value="$todayCount" period="visits recorded" />
+        <x-ui.kpi-card label="Today" :value="$todayPeople" period="people" />
         <x-ui.kpi-card label="Period collected" :value="number_format($periodTotal, 0)" :period="config('nexstay.currency.default', 'TZS')" />
         <x-ui.kpi-card label="Default fee" :value="number_format($defaultFee, 0)" period="per visit" />
     </div>
@@ -42,6 +43,11 @@
                         </option>
                     @endforeach
                 </select>
+            </div>
+
+            <div>
+                <label class="mb-1.5 block text-xs font-medium text-ink-muted">Number of people</label>
+                <input type="number" step="1" min="1" name="party_size" value="{{ old('party_size', 1) }}" class="input-field" id="party-size-field">
             </div>
 
             <div>
@@ -122,6 +128,7 @@
                 <tr>
                     <th class="px-5 py-3 text-left">Date & time</th>
                     <th class="px-5 py-3 text-left">Visitor</th>
+                    <th class="px-5 py-3 text-right">People</th>
                     <th class="px-5 py-3 text-left">Type</th>
                     <th class="px-5 py-3 text-left">Settlement</th>
                     <th class="px-5 py-3 text-right">Amount</th>
@@ -133,6 +140,7 @@
                     <tr>
                         <td class="px-5 py-4 text-ink-muted">{{ $row->attended_at->format('d M Y H:i') }}</td>
                         <td class="px-5 py-4 font-medium">{{ $row->visitor_name }}</td>
+                        <td class="px-5 py-4 text-right">{{ $row->party_size }}</td>
                         <td class="px-5 py-4">{{ $row->reservation_id ? 'Hotel guest' : 'Walk-in' }}</td>
                         <td class="px-5 py-4 capitalize">{{ str_replace('_', ' ', $row->settlement) }}</td>
                         <td class="px-5 py-4 text-right font-medium">@money($row->amount)</td>
@@ -140,7 +148,7 @@
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="6" class="px-5 py-12 text-center text-ink-muted">No attendance recorded for this period.</td>
+                        <td colspan="7" class="px-5 py-12 text-center text-ink-muted">No attendance recorded for this period.</td>
                     </tr>
                 @endforelse
             </tbody>

@@ -52,6 +52,7 @@ class FacilityAttendanceTest extends TenantTestCase
                 'facility_type' => 'pool',
                 'visitor_type' => 'walk_in',
                 'visitor_name' => 'Jane Doe',
+                'party_size' => 4,
                 'amount' => 15000,
                 'settlement' => 'cash',
                 'till_session_id' => $session->id,
@@ -65,10 +66,29 @@ class FacilityAttendanceTest extends TenantTestCase
         $this->assertNotNull($attendance);
         $this->assertSame('pool', $attendance->facility_type);
         $this->assertSame('Jane Doe', $attendance->visitor_name);
+        $this->assertSame(4, $attendance->party_size);
         $this->assertNull($attendance->reservation_id);
         $this->assertSame('cash', $attendance->settlement);
         $this->assertNotNull($attendance->payment_id);
         $this->assertSame(15000.0, (float) $attendance->amount);
+    }
+
+    public function test_party_size_defaults_to_one_when_not_provided(): void
+    {
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->post(route('tenant.facilities.attendance.store'), [
+                'facility_type' => 'pool',
+                'visitor_type' => 'walk_in',
+                'visitor_name' => 'Solo Visitor',
+                'amount' => 5000,
+                'settlement' => 'cash',
+            ]);
+
+        $response->assertRedirect(route('tenant.facilities.pool'));
+
+        $attendance = FacilityAttendance::query()->where('visitor_name', 'Solo Visitor')->first();
+        $this->assertSame(1, $attendance->party_size);
     }
 
     public function test_walk_in_gym_attendance_with_cash_payment_and_no_till(): void

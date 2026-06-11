@@ -92,6 +92,7 @@
                 <tr>
                     <th class="px-5 py-3 text-left">Date</th>
                     <th class="px-5 py-3 text-left">Visitor</th>
+                    <th class="px-5 py-3 text-right">People</th>
                     <th class="px-5 py-3 text-left">Type</th>
                     <th class="px-5 py-3 text-left">Settlement</th>
                     <th class="px-5 py-3 text-right">Amount</th>
@@ -103,13 +104,14 @@
                     <tr>
                         <td class="px-5 py-4 text-ink-muted">{{ $row->attended_at->format('d M Y H:i') }}</td>
                         <td class="px-5 py-4 font-medium">{{ $row->visitor_name }}</td>
+                        <td class="px-5 py-4 text-right">{{ $row->party_size }}</td>
                         <td class="px-5 py-4">{{ $row->reservation_id ? 'Hotel guest' : 'Walk-in' }}</td>
                         <td class="px-5 py-4 capitalize">{{ str_replace('_', ' ', $row->settlement) }}</td>
                         <td class="px-5 py-4 text-right">@money($row->amount)</td>
                         <td class="px-5 py-4 text-ink-muted">{{ $row->recorder?->name ?? '—' }}</td>
                     </tr>
                 @empty
-                    <tr><td colspan="6" class="px-5 py-12 text-center text-ink-muted">No visits in this period.</td></tr>
+                    <tr><td colspan="7" class="px-5 py-12 text-center text-ink-muted">No visits in this period.</td></tr>
                 @endforelse
             </tbody>
         </table>

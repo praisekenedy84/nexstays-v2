@@ -79,6 +79,12 @@ class FacilityAttendanceController extends Controller
             ->whereDate('attended_at', now()->toDateString())
             ->count();
 
+        $todayPeople = FacilityAttendance::query()
+            ->where('facility_type', $facilityType)
+            ->whereNull('voided_at')
+            ->whereDate('attended_at', now()->toDateString())
+            ->sum('party_size');
+
         return view('modules.facilities.desk', [
             'facilityType' => $facilityType,
             'facilityLabel' => $facilityType === 'gym' ? 'Gym' : 'Swimming Pool',
@@ -87,6 +93,7 @@ class FacilityAttendanceController extends Controller
             'attendances' => $attendances,
             'periodTotal' => $periodTotal,
             'todayCount' => $todayCount,
+            'todayPeople' => $todayPeople,
             'from' => $from,
             'to' => $to,
             'reservations' => Reservation::query()

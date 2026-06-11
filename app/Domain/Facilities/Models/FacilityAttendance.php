@@ -27,6 +27,7 @@ class FacilityAttendance extends Model
     protected $fillable = [
         'facility_type',
         'visitor_name',
+        'party_size',
         'guest_id',
         'reservation_id',
         'amount',
@@ -45,6 +46,7 @@ class FacilityAttendance extends Model
     {
         return [
             'amount' => 'decimal:2',
+            'party_size' => 'integer',
             'attended_at' => 'datetime',
             'voided_at' => 'datetime',
         ];

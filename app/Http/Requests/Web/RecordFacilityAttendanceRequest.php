@@ -38,6 +38,7 @@ class RecordFacilityAttendanceRequest extends FormRequest
                 'uuid',
                 'exists:reservations,id',
             ],
+            'party_size' => ['nullable', 'integer', 'min:1', 'max:1000'],
             'amount' => [
                 Rule::requiredIf(fn () => $settlement !== 'complimentary'),
                 'nullable',
