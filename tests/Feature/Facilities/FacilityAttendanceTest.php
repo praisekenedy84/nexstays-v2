@@ -272,6 +272,167 @@ class FacilityAttendanceTest extends TenantTestCase
         $response->assertSee('Print receipt');
     }
 
+    public function test_attendance_edit_page_loads(): void
+    {
+        $attendance = FacilityAttendance::query()->create([
+            'facility_type' => 'pool',
+            'visitor_name' => 'Edit Me',
+            'party_size' => 2,
+            'amount' => 15000,
+            'currency' => 'TZS',
+            'settlement' => 'cash',
+            'recorded_by' => $this->user->id,
+            'attended_at' => now(),
+        ]);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.facilities.attendance.edit', $attendance));
+
+        $response->assertOk();
+        $response->assertSee('Edit Me');
+        $response->assertSee('Save changes');
+    }
+
+    public function test_walk_in_attendance_amount_update_updates_payment(): void
+    {
+        $session = TillSession::query()->create([
+            'outlet_id' => null,
+            'opened_by' => $this->user->id,
+            'float_amount' => 50000,
+            'currency' => 'TZS',
+            'status' => 'open',
+            'opened_at' => now(),
+        ]);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->post(route('tenant.facilities.attendance.store'), [
+                'facility_type' => 'pool',
+                'visitor_type' => 'walk_in',
+                'visitor_name' => 'Edit Cash',
+                'party_size' => 2,
+                'amount' => 15000,
+                'settlement' => 'cash',
+                'till_session_id' => $session->id,
+                'cash_tendered' => 20000,
+            ]);
+
+        $attendance = FacilityAttendance::query()->where('visitor_name', 'Edit Cash')->first();
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->patch(route('tenant.facilities.attendance.update', $attendance), [
+                'visitor_name' => 'Edit Cash Updated',
+                'party_size' => 3,
+                'amount' => 18000,
+                'notes' => 'Adjusted fee',
+            ]);
+
+        $response->assertRedirect(route('tenant.facilities.pool'));
+        $response->assertSessionHas('success');
+
+        $attendance->refresh();
+        $this->assertSame('Edit Cash Updated', $attendance->visitor_name);
+        $this->assertSame(3, $attendance->party_size);
+        $this->assertSame(18000.0, (float) $attendance->amount);
+        $this->assertSame('Adjusted fee', $attendance->notes);
+
+        $payment = $attendance->payment;
+        $this->assertSame(18000.0, (float) $payment->amount);
+        $this->assertSame(2000.0, (float) $payment->cash_change);
+    }
+
+    public function test_folio_attendance_amount_update_updates_folio_transaction_with_tax(): void
+    {
+        $roomType = RoomType::factory()->create();
+        $guest = Guest::factory()->create(['first_name' => 'Edit', 'last_name' => 'Folio']);
+        $reservation = Reservation::factory()->create([
+            'room_type_id' => $roomType->id,
+            'guest_id' => $guest->id,
+            'status' => 'checked_in',
+        ]);
+        app(FolioService::class)->openFolio($reservation);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->post(route('tenant.facilities.attendance.store'), [
+                'facility_type' => 'gym',
+                'visitor_type' => 'hotel_guest',
+                'reservation_id' => $reservation->id,
+                'amount' => 10000,
+                'settlement' => 'folio',
+            ]);
+
+        $attendance = FacilityAttendance::query()->where('reservation_id', $reservation->id)->first();
+        $folioTransactionId = $attendance->folio_transaction_id;
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->patch(route('tenant.facilities.attendance.update', $attendance), [
+                'party_size' => 1,
+                'amount' => 20000,
+            ]);
+
+        $response->assertRedirect(route('tenant.facilities.gym'));
+
+        $attendance->refresh();
+        $this->assertSame(20000.0, (float) $attendance->amount);
+
+        $transaction = \App\Domain\HBMS\Models\FolioTransaction::find($folioTransactionId);
+        $this->assertSame(20000.0, (float) $transaction->amount);
+        $this->assertGreaterThan(0, (float) $transaction->tax_amount);
+    }
+
+    public function test_voided_attendance_cannot_be_edited(): void
+    {
+        $attendance = FacilityAttendance::query()->create([
+            'facility_type' => 'pool',
+            'visitor_name' => 'Already Voided',
+            'amount' => 0,
+            'currency' => 'TZS',
+            'settlement' => 'complimentary',
+            'recorded_by' => $this->user->id,
+            'attended_at' => now(),
+            'voided_at' => now(),
+            'void_reason' => 'Initial void',
+        ]);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->patch(route('tenant.facilities.attendance.update', $attendance), [
+                'party_size' => 1,
+                'amount' => 0,
+            ]);
+
+        $response->assertSessionHas('error');
+    }
+
+    public function test_complimentary_attendance_amount_must_stay_zero(): void
+    {
+        $attendance = FacilityAttendance::query()->create([
+            'facility_type' => 'pool',
+            'visitor_name' => 'Free Visit',
+            'amount' => 0,
+            'currency' => 'TZS',
+            'settlement' => 'complimentary',
+            'recorded_by' => $this->user->id,
+            'attended_at' => now(),
+        ]);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->patch(route('tenant.facilities.attendance.update', $attendance), [
+                'party_size' => 1,
+                'amount' => 5000,
+            ]);
+
+        $response->assertSessionHas('error');
+
+        $attendance->refresh();
+        $this->assertSame(0.0, (float) $attendance->amount);
+    }
+
     public function test_pool_attendance_report_loads(): void
     {
         FacilityAttendance::query()->create([

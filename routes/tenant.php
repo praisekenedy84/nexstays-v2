@@ -291,6 +291,8 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/facilities/attendance/{attendance}/receipt', [FacilityAttendanceController::class, 'receipt'])->name('facilities.attendance.receipt');
             Route::middleware('permission:record-facility-attendance')->group(function () {
                 Route::post('/facilities/attendance', [FacilityAttendanceController::class, 'store'])->name('facilities.attendance.store');
+                Route::get('/facilities/attendance/{attendance}/edit', [FacilityAttendanceController::class, 'edit'])->name('facilities.attendance.edit');
+                Route::patch('/facilities/attendance/{attendance}', [FacilityAttendanceController::class, 'update'])->name('facilities.attendance.update');
                 Route::delete('/facilities/attendance/{attendance}', [FacilityAttendanceController::class, 'void'])->name('facilities.attendance.void');
             });
         });

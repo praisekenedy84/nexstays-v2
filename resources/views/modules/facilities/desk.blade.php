@@ -153,6 +153,7 @@
                                     @if ($row->isVoided())
                                         <span class="text-xs font-medium uppercase text-rose-600">Voided</span>
                                     @else
+                                        <a href="{{ route('tenant.facilities.attendance.edit', $row) }}" class="text-xs font-medium text-ink hover:underline">Edit</a>
                                         <form method="POST" action="{{ route('tenant.facilities.attendance.void', $row) }}" class="void-form">
                                             @csrf
                                             @method('DELETE')

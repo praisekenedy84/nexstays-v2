@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Domain\Facilities\Actions\RecordFacilityAttendance;
+use App\Domain\Facilities\Actions\UpdateFacilityAttendance;
 use App\Domain\Facilities\Actions\VoidFacilityAttendance;
 use App\Domain\Facilities\Models\FacilityAttendance;
 use App\Domain\HBMS\Models\Reservation;
@@ -12,6 +13,7 @@ use App\Domain\Shared\Services\FacilitySettingsService;
 use App\Domain\Till\Models\TillSession;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\RecordFacilityAttendanceRequest;
+use App\Http\Requests\Web\UpdateFacilityAttendanceRequest;
 use App\Http\Requests\Web\VoidFacilityAttendanceRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -61,6 +63,36 @@ class FacilityAttendanceController extends Controller
         }
 
         return redirect()->route($route)->with('success', 'Attendance record voided.');
+    }
+
+    public function edit(FacilityAttendance $attendance): View
+    {
+        $route = $attendance->facility_type === 'gym'
+            ? 'tenant.facilities.gym'
+            : 'tenant.facilities.pool';
+
+        return view('modules.facilities.edit', [
+            'attendance' => $attendance,
+            'facilityType' => $attendance->facility_type,
+            'facilityLabel' => $attendance->typeLabel(),
+            'navId' => $attendance->facility_type === 'gym' ? 'facility-gym' : 'facility-pool',
+            'backRoute' => $route,
+        ]);
+    }
+
+    public function update(UpdateFacilityAttendanceRequest $request, FacilityAttendance $attendance): RedirectResponse
+    {
+        $route = $attendance->facility_type === 'gym'
+            ? 'tenant.facilities.gym'
+            : 'tenant.facilities.pool';
+
+        try {
+            app(UpdateFacilityAttendance::class)->execute($attendance, $request->validated());
+        } catch (\DomainException $e) {
+            return back()->withInput()->with('error', $e->getMessage());
+        }
+
+        return redirect()->route($route)->with('success', 'Attendance record updated.');
     }
 
     public function receipt(FacilityAttendance $attendance): View
