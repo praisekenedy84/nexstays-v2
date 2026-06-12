@@ -288,8 +288,10 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
         Route::middleware('permission:view-facility-attendance|record-facility-attendance')->group(function () {
             Route::get('/facilities/pool', [FacilityAttendanceController::class, 'pool'])->name('facilities.pool');
             Route::get('/facilities/gym', [FacilityAttendanceController::class, 'gym'])->name('facilities.gym');
+            Route::get('/facilities/attendance/{attendance}/receipt', [FacilityAttendanceController::class, 'receipt'])->name('facilities.attendance.receipt');
             Route::middleware('permission:record-facility-attendance')->group(function () {
                 Route::post('/facilities/attendance', [FacilityAttendanceController::class, 'store'])->name('facilities.attendance.store');
+                Route::delete('/facilities/attendance/{attendance}', [FacilityAttendanceController::class, 'void'])->name('facilities.attendance.void');
             });
         });
 

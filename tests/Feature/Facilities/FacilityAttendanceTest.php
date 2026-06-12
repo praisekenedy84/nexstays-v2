@@ -144,6 +144,134 @@ class FacilityAttendanceTest extends TenantTestCase
         $this->assertNull($attendance->payment_id);
     }
 
+    public function test_walk_in_attendance_can_be_voided_and_reverses_payment(): void
+    {
+        $session = TillSession::query()->create([
+            'outlet_id' => null,
+            'opened_by' => $this->user->id,
+            'float_amount' => 50000,
+            'currency' => 'TZS',
+            'status' => 'open',
+            'opened_at' => now(),
+        ]);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->post(route('tenant.facilities.attendance.store'), [
+                'facility_type' => 'pool',
+                'visitor_type' => 'walk_in',
+                'visitor_name' => 'To Be Voided',
+                'amount' => 15000,
+                'settlement' => 'cash',
+                'till_session_id' => $session->id,
+                'cash_tendered' => 15000,
+            ]);
+
+        $attendance = FacilityAttendance::query()->where('visitor_name', 'To Be Voided')->first();
+        $paymentId = $attendance->payment_id;
+        $this->assertNotNull($paymentId);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->delete(route('tenant.facilities.attendance.void', $attendance), [
+                'reason' => 'Recorded by mistake',
+            ]);
+
+        $response->assertRedirect(route('tenant.facilities.pool'));
+        $response->assertSessionHas('success');
+
+        $attendance->refresh();
+        $this->assertTrue($attendance->isVoided());
+        $this->assertSame('Recorded by mistake', $attendance->void_reason);
+        $this->assertSame($this->user->id, $attendance->voided_by);
+        $this->assertDatabaseMissing('payments', ['id' => $paymentId]);
+    }
+
+    public function test_hotel_guest_folio_attendance_voids_folio_transaction(): void
+    {
+        $roomType = RoomType::factory()->create();
+        $guest = Guest::factory()->create(['first_name' => 'Voided', 'last_name' => 'Guest']);
+        $reservation = Reservation::factory()->create([
+            'room_type_id' => $roomType->id,
+            'guest_id' => $guest->id,
+            'status' => 'checked_in',
+        ]);
+        app(FolioService::class)->openFolio($reservation);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->post(route('tenant.facilities.attendance.store'), [
+                'facility_type' => 'gym',
+                'visitor_type' => 'hotel_guest',
+                'reservation_id' => $reservation->id,
+                'amount' => 10000,
+                'settlement' => 'folio',
+            ]);
+
+        $attendance = FacilityAttendance::query()->where('reservation_id', $reservation->id)->first();
+        $folioTransactionId = $attendance->folio_transaction_id;
+        $this->assertNotNull($folioTransactionId);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->delete(route('tenant.facilities.attendance.void', $attendance), [
+                'reason' => 'Wrong guest',
+            ]);
+
+        $attendance->refresh();
+        $this->assertTrue($attendance->isVoided());
+        $this->assertDatabaseHas('folio_transactions', [
+            'id' => $folioTransactionId,
+            'void_reason' => 'Wrong guest',
+        ]);
+        $this->assertNotNull(\App\Domain\HBMS\Models\FolioTransaction::find($folioTransactionId)->voided_at);
+    }
+
+    public function test_voided_attendance_cannot_be_voided_again(): void
+    {
+        $attendance = FacilityAttendance::query()->create([
+            'facility_type' => 'pool',
+            'visitor_name' => 'Already Voided',
+            'amount' => 0,
+            'currency' => 'TZS',
+            'settlement' => 'complimentary',
+            'recorded_by' => $this->user->id,
+            'attended_at' => now(),
+            'voided_at' => now(),
+            'void_reason' => 'Initial void',
+        ]);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->delete(route('tenant.facilities.attendance.void', $attendance), [
+                'reason' => 'Second attempt',
+            ]);
+
+        $response->assertRedirect(route('tenant.facilities.pool'));
+        $response->assertSessionHas('error');
+    }
+
+    public function test_attendance_receipt_page_loads(): void
+    {
+        $attendance = FacilityAttendance::query()->create([
+            'facility_type' => 'pool',
+            'visitor_name' => 'Receipt Guest',
+            'amount' => 15000,
+            'currency' => 'TZS',
+            'settlement' => 'cash',
+            'recorded_by' => $this->user->id,
+            'attended_at' => now(),
+        ]);
+
+        $response = $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.facilities.attendance.receipt', $attendance));
+
+        $response->assertOk();
+        $response->assertSee('Receipt Guest');
+        $response->assertSee('Print receipt');
+    }
+
     public function test_pool_attendance_report_loads(): void
     {
         FacilityAttendance::query()->create([

@@ -5,12 +5,14 @@ declare(strict_types=1);
 namespace App\Http\Controllers\Web;
 
 use App\Domain\Facilities\Actions\RecordFacilityAttendance;
+use App\Domain\Facilities\Actions\VoidFacilityAttendance;
 use App\Domain\Facilities\Models\FacilityAttendance;
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\Shared\Services\FacilitySettingsService;
 use App\Domain\Till\Models\TillSession;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Web\RecordFacilityAttendanceRequest;
+use App\Http\Requests\Web\VoidFacilityAttendanceRequest;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\View\View;
@@ -44,6 +46,28 @@ class FacilityAttendanceController extends Controller
         return redirect()
             ->route($route)
             ->with('success', 'Attendance recorded.');
+    }
+
+    public function void(VoidFacilityAttendanceRequest $request, FacilityAttendance $attendance): RedirectResponse
+    {
+        $route = $attendance->facility_type === 'gym'
+            ? 'tenant.facilities.gym'
+            : 'tenant.facilities.pool';
+
+        try {
+            app(VoidFacilityAttendance::class)->execute($attendance, $request->validated('reason'));
+        } catch (\DomainException $e) {
+            return redirect()->route($route)->with('error', $e->getMessage());
+        }
+
+        return redirect()->route($route)->with('success', 'Attendance record voided.');
+    }
+
+    public function receipt(FacilityAttendance $attendance): View
+    {
+        $attendance->load(['guest', 'reservation', 'recorder', 'payment']);
+
+        return view('modules.facilities.receipt', ['attendance' => $attendance]);
     }
 
     private function desk(Request $request, string $facilityType): View

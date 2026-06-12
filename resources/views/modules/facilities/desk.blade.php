@@ -133,11 +133,12 @@
                     <th class="px-5 py-3 text-left">Settlement</th>
                     <th class="px-5 py-3 text-right">Amount</th>
                     <th class="px-5 py-3 text-left">Recorded by</th>
+                    <th class="px-5 py-3 text-right">Actions</th>
                 </tr>
             </thead>
             <tbody class="divide-y divide-slate-100">
                 @forelse ($attendances as $row)
-                    <tr>
+                    <tr class="{{ $row->isVoided() ? 'opacity-50' : '' }}">
                         <td class="px-5 py-4 text-ink-muted">{{ $row->attended_at->format('d M Y H:i') }}</td>
                         <td class="px-5 py-4 font-medium">{{ $row->visitor_name }}</td>
                         <td class="px-5 py-4 text-right">{{ $row->party_size }}</td>
@@ -145,10 +146,27 @@
                         <td class="px-5 py-4 capitalize">{{ str_replace('_', ' ', $row->settlement) }}</td>
                         <td class="px-5 py-4 text-right font-medium">@money($row->amount)</td>
                         <td class="px-5 py-4 text-ink-muted">{{ $row->recorder?->name ?? '—' }}</td>
+                        <td class="px-5 py-4 text-right">
+                            <div class="flex justify-end gap-2">
+                                <a href="{{ route('tenant.facilities.attendance.receipt', $row) }}" target="_blank" class="text-xs font-medium text-primary hover:underline">Receipt</a>
+                                @can('record-facility-attendance')
+                                    @if ($row->isVoided())
+                                        <span class="text-xs font-medium uppercase text-rose-600">Voided</span>
+                                    @else
+                                        <form method="POST" action="{{ route('tenant.facilities.attendance.void', $row) }}" class="void-form">
+                                            @csrf
+                                            @method('DELETE')
+                                            <input type="hidden" name="reason" class="void-reason-field">
+                                            <button type="submit" class="text-xs font-medium text-rose-600 hover:underline">Delete</button>
+                                        </form>
+                                    @endif
+                                @endcan
+                            </div>
+                        </td>
                     </tr>
                 @empty
                     <tr>
-                        <td colspan="7" class="px-5 py-12 text-center text-ink-muted">No attendance recorded for this period.</td>
+                        <td colspan="8" class="px-5 py-12 text-center text-ink-muted">No attendance recorded for this period.</td>
                     </tr>
                 @endforelse
             </tbody>
@@ -203,5 +221,16 @@
             settlement.addEventListener('change', syncSettlement);
             syncVisitorType();
         })();
+
+        document.querySelectorAll('.void-form').forEach((voidForm) => {
+            voidForm.addEventListener('submit', (event) => {
+                const reason = window.prompt('Reason for deleting this attendance record:');
+                if (reason === null || reason.trim() === '') {
+                    event.preventDefault();
+                    return;
+                }
+                voidForm.querySelector('.void-reason-field').value = reason.trim();
+            });
+        });
     </script>
 </x-layouts.app>

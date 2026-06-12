@@ -40,6 +40,8 @@ class FacilityAttendance extends Model
         'recorded_by',
         'attended_at',
         'voided_at',
+        'void_reason',
+        'voided_by',
     ];
 
     protected function casts(): array
@@ -80,6 +82,11 @@ class FacilityAttendance extends Model
     public function recorder(): BelongsTo
     {
         return $this->belongsTo(User::class, 'recorded_by');
+    }
+
+    public function voider(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'voided_by');
     }
 
     public function isVoided(): bool
