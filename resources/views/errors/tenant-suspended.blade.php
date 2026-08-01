@@ -22,15 +22,24 @@
             Please contact the developer or NexStay support for assistance.
         </p>
 
+        @if (! empty($reason))
+            <div class="mt-5 rounded-xl bg-red-50 px-4 py-3 text-left">
+                <p class="text-xs font-medium uppercase tracking-wide text-red-600">Reason</p>
+                <p class="mt-1 text-sm leading-relaxed text-red-800">{{ $reason }}</p>
+            </div>
+        @endif
+
         @if (! empty($propertyCode))
             <p class="mt-4 text-xs text-ink-subtle">
                 Property code: <code class="rounded bg-slate-100 px-1.5 py-0.5 font-medium text-ink-muted">{{ $propertyCode }}</code>
             </p>
         @endif
 
-        <a href="{{ route('tenant.login') }}" class="btn-secondary mt-8 inline-flex w-full">
-            Back to sign in
-        </a>
+        <div class="mt-8 flex justify-center">
+            <a href="{{ route('tenant.login') }}" class="btn-primary w-full">
+                Back to sign in
+            </a>
+        </div>
     </div>
 </body>
 </html>

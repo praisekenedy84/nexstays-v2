@@ -34,11 +34,15 @@ class InitializeTenancyByToken
         }
 
         if (! empty($tenant->suspended_at)) {
+            $reason = trim((string) ($tenant->suspension_reason ?? ''));
+
             return response()->json([
                 'error' => [
                     'code' => 'TENANT_SUSPENDED',
-                    'message' => 'This property is suspended and cannot be accessed. Please contact the developer or NexStay support.',
-                    'details' => null,
+                    'message' => $reason !== ''
+                        ? "This property is suspended: {$reason}"
+                        : 'This property is suspended and cannot be accessed. Please contact the developer or NexStay support.',
+                    'details' => $reason !== '' ? ['reason' => $reason] : null,
                     'request_id' => (string) \Illuminate\Support\Str::uuid(),
                 ],
             ], 403);

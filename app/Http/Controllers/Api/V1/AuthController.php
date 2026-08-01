@@ -30,8 +30,13 @@ class AuthController extends Controller
         }
 
         if (! empty($tenant->suspended_at)) {
+            $reason = trim((string) ($tenant->suspension_reason ?? ''));
+            $message = $reason !== ''
+                ? "This property is suspended: {$reason}"
+                : 'This property is suspended and cannot be accessed. Please contact the developer or NexStay support.';
+
             throw ValidationException::withMessages([
-                'property_code' => ['This property is suspended and cannot be accessed. Please contact the developer or NexStay support.'],
+                'property_code' => [$message],
             ]);
         }
 

@@ -34,6 +34,26 @@ class WebLoginTest extends TenantTestCase
             ->assertSee($tenant->id);
     }
 
+    public function test_login_post_shows_suspended_page_with_reason(): void
+    {
+        $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
+        $tenant->suspended_at = now();
+        $tenant->suspension_reason = 'Payment overdue for March invoice';
+        $tenant->save();
+
+        Auth::shouldUse('web');
+
+        $this->post('/login', [
+            'property_code' => $tenant->id,
+            'username' => $this->user->username,
+            'password' => 'password',
+        ])
+            ->assertStatus(503)
+            ->assertViewIs('errors.tenant-suspended')
+            ->assertViewHas('reason', 'Payment overdue for March invoice')
+            ->assertSee('Payment overdue for March invoice');
+    }
+
     public function test_login_post_shows_suspended_page_for_a_suspended_tenant(): void
     {
         $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));

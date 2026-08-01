@@ -81,8 +81,13 @@
                                             </button>
                                         </form>
                                     @else
-                                        <form method="POST" action="{{ route('platform.tenants.suspend', $tenant->id) }}">
+                                        <form method="POST" action="{{ route('platform.tenants.suspend', $tenant->id) }}"
+                                              class="flex items-center gap-1.5"
+                                              onsubmit="return this.reason.value.trim().length >= 5 || (alert('Please enter a suspension reason (at least 5 characters).'), false)">
                                             @csrf @method('PATCH')
+                                            <input type="text" name="reason" required minlength="5" maxlength="500"
+                                                   placeholder="Reason"
+                                                   class="w-36 rounded-lg border border-white/10 bg-white/5 px-2 py-1 text-xs text-white placeholder:text-slate-500 focus:border-yellow-600/50 focus:outline-none">
                                             <button class="rounded-lg bg-yellow-700/30 px-3 py-1 text-xs font-medium text-yellow-300 hover:bg-yellow-700/50 transition">
                                                 Suspend
                                             </button>

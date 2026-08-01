@@ -8,6 +8,7 @@ use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
 use Spatie\Permission\Models\Role as TenantRole;
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Platform\SuspendTenantRequest;
 use App\Models\Tenant;
 use App\Models\User;
 use App\Support\Username;
@@ -174,10 +175,11 @@ class TenantController extends Controller
         return back()->with('success', 'Hotel settings saved.');
     }
 
-    public function suspend(Request $request, string $tenantId): RedirectResponse
+    public function suspend(SuspendTenantRequest $request, string $tenantId): RedirectResponse
     {
         $tenant = Tenant::findOrFail($tenantId);
         $tenant->suspended_at = now()->toIso8601String();
+        $tenant->suspension_reason = $request->validated('reason');
         $tenant->save();
 
         return back()->with('success', "Hotel [{$tenant->id}] suspended.");
@@ -187,6 +189,7 @@ class TenantController extends Controller
     {
         $tenant = Tenant::findOrFail($tenantId);
         $tenant->suspended_at = null;
+        $tenant->suspension_reason = null;
         $tenant->save();
 
         return back()->with('success', "Hotel [{$tenant->id}] reactivated.");

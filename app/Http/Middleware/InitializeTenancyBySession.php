@@ -51,7 +51,7 @@ class InitializeTenancyBySession
         }
 
         if ($this->tenantResolver->isSuspended($tenant)) {
-            return $this->denySuspendedTenant($request, $tenant->id);
+            return $this->denySuspendedTenant($request, $tenant->id, $tenant->suspension_reason);
         }
 
         if (! tenancy()->initialized) {
@@ -88,7 +88,7 @@ class InitializeTenancyBySession
      * auth()->user() after tenancy has ended (that path queries the central DB
      * and surfaces as a 500).
      */
-    private function denySuspendedTenant(Request $request, string $propertyCode): Response
+    private function denySuspendedTenant(Request $request, string $propertyCode, ?string $reason = null): Response
     {
         if (tenancy()->initialized) {
             tenancy()->end();
@@ -102,6 +102,7 @@ class InitializeTenancyBySession
 
         return response()->view('errors.tenant-suspended', [
             'propertyCode' => $propertyCode,
+            'reason' => $reason,
         ], 503);
     }
 }

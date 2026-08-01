@@ -40,6 +40,12 @@
                 @endif
             </div>
             <p class="mt-1 font-mono text-sm text-slate-400">{{ $tenant->id }} &nbsp;·&nbsp; Provisioned {{ $tenant->created_at?->format('d M Y') }}</p>
+            @if (! empty($tenant->suspended_at) && ! empty($tenant->suspension_reason))
+                <p class="mt-2 max-w-xl text-sm text-red-300/90">
+                    <span class="font-medium text-red-300">Suspension reason:</span>
+                    {{ $tenant->suspension_reason }}
+                </p>
+            @endif
         </div>
 
         {{-- Maintenance actions --}}
@@ -57,12 +63,19 @@
                 </button>
             </form>
             @if (empty($tenant->suspended_at))
-                <form method="POST" action="{{ route('platform.tenants.suspend', $tenant->id) }}">
+                <form method="POST" action="{{ route('platform.tenants.suspend', $tenant->id) }}" class="flex flex-wrap items-center gap-2">
                     @csrf @method('PATCH')
+                    <input type="text" name="reason" required minlength="5" maxlength="500"
+                           placeholder="Reason for suspension"
+                           value="{{ old('reason') }}"
+                           class="min-w-[16rem] rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-xs text-white placeholder:text-slate-500 focus:border-yellow-600/50 focus:outline-none focus:ring-1 focus:ring-yellow-600/40">
                     <button class="rounded-xl bg-yellow-700/30 px-3 py-2 text-xs font-medium text-yellow-300 hover:bg-yellow-700/50 transition">
                         Suspend hotel
                     </button>
                 </form>
+                @error('reason')
+                    <p class="w-full text-xs text-red-400">{{ $message }}</p>
+                @enderror
             @else
                 <form method="POST" action="{{ route('platform.tenants.restore', $tenant->id) }}">
                     @csrf @method('PATCH')

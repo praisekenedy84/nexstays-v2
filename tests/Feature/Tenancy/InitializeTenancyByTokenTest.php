@@ -105,6 +105,26 @@ class InitializeTenancyByTokenTest extends TenantTestCase
         tenancy()->end();
     }
 
+    public function test_suspended_tenant_via_header_returns_forbidden_with_reason(): void
+    {
+        $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
+        $tenant->suspended_at = now();
+        $tenant->suspension_reason = 'Contract ended';
+        $tenant->save();
+
+        $request = Request::create('/api/v1/availability', 'GET');
+        $request->headers->set('X-Tenant-Id', $tenant->id);
+
+        $response = (new InitializeTenancyByToken())->handle($request, fn ($req) => response('ok'));
+
+        $this->assertSame(403, $response->getStatusCode());
+        $payload = $response->getData(true);
+        $this->assertSame('TENANT_SUSPENDED', $payload['error']['code'] ?? null);
+        $this->assertSame('Contract ended', $payload['error']['details']['reason'] ?? null);
+        $this->assertStringContainsString('Contract ended', $payload['error']['message'] ?? '');
+        $this->assertFalse(tenancy()->initialized);
+    }
+
     public function test_suspended_tenant_via_header_returns_forbidden(): void
     {
         $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));

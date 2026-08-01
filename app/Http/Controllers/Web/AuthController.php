@@ -35,7 +35,7 @@ class AuthController extends Controller
             $tenant = $this->tenantResolver->find($tenantId);
 
             if ($tenant && $this->tenantResolver->isSuspended($tenant)) {
-                return $this->denySuspendedTenant($tenant->id);
+                return $this->denySuspendedTenant($tenant->id, $tenant->suspension_reason);
             }
 
             if ($tenant) {
@@ -76,7 +76,7 @@ class AuthController extends Controller
         }
 
         if ($this->tenantResolver->isSuspended($tenant)) {
-            return $this->denySuspendedTenant($tenant->id);
+            return $this->denySuspendedTenant($tenant->id, $tenant->suspension_reason);
         }
 
         try {
@@ -129,7 +129,7 @@ class AuthController extends Controller
         return redirect()->route('tenant.login');
     }
 
-    private function denySuspendedTenant(string $propertyCode): Response
+    private function denySuspendedTenant(string $propertyCode, ?string $reason = null): Response
     {
         if (tenancy()->initialized) {
             tenancy()->end();
@@ -143,6 +143,7 @@ class AuthController extends Controller
 
         return response()->view('errors.tenant-suspended', [
             'propertyCode' => $propertyCode,
+            'reason' => $reason,
         ], 503);
     }
 }
