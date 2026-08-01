@@ -179,7 +179,10 @@ return [
             return null;
         }
 
-        if (in_array(strtolower($domain), ['localhost', '127.0.0.1', '::1'], true)) {
+        // Strip a leading dot so ".localhost" matches the same host check as "localhost".
+        $normalized = strtolower(ltrim($domain, '.'));
+
+        if (in_array($normalized, ['localhost', '127.0.0.1', '::1'], true)) {
             return null;
         }
 

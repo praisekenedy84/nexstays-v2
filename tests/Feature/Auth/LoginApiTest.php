@@ -9,6 +9,25 @@ use Tests\TenantTestCase;
 
 class LoginApiTest extends TenantTestCase
 {
+    public function test_login_rejects_suspended_tenant(): void
+    {
+        config(['tenancy.bootstrappers' => []]);
+
+        $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
+        $tenant->suspended_at = now();
+        $tenant->save();
+
+        User::factory()->create(['username' => 'frontdesk', 'email' => 'staff@demo.local']);
+
+        $this->tenantJson('POST', '/api/v1/auth/login', [
+            'property_code' => 'demo',
+            'username' => 'frontdesk',
+            'password' => 'password',
+        ])
+            ->assertUnprocessable()
+            ->assertJsonValidationErrors(['property_code']);
+    }
+
     public function test_it_rejects_invalid_credentials(): void
     {
         config(['tenancy.bootstrappers' => []]);

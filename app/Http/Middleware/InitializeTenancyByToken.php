@@ -22,7 +22,7 @@ class InitializeTenancyByToken
 
         $tenant = Tenant::find($tenantId);
 
-        if (! $tenant || ! empty($tenant->suspended_at)) {
+        if (! $tenant) {
             return response()->json([
                 'error' => [
                     'code' => 'TENANT_NOT_FOUND',
@@ -31,6 +31,17 @@ class InitializeTenancyByToken
                     'request_id' => (string) \Illuminate\Support\Str::uuid(),
                 ],
             ], 401);
+        }
+
+        if (! empty($tenant->suspended_at)) {
+            return response()->json([
+                'error' => [
+                    'code' => 'TENANT_SUSPENDED',
+                    'message' => 'This property is suspended and cannot be accessed. Please contact the developer or NexStay support.',
+                    'details' => null,
+                    'request_id' => (string) \Illuminate\Support\Str::uuid(),
+                ],
+            ], 403);
         }
 
         if (! tenancy()->initialized) {

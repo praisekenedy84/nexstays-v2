@@ -105,7 +105,7 @@ class InitializeTenancyByTokenTest extends TenantTestCase
         tenancy()->end();
     }
 
-    public function test_suspended_tenant_via_header_returns_unauthorized(): void
+    public function test_suspended_tenant_via_header_returns_forbidden(): void
     {
         $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
         $tenant->suspended_at = now();
@@ -116,7 +116,8 @@ class InitializeTenancyByTokenTest extends TenantTestCase
 
         $response = (new InitializeTenancyByToken())->handle($request, fn ($req) => response('ok'));
 
-        $this->assertSame(401, $response->getStatusCode());
+        $this->assertSame(403, $response->getStatusCode());
+        $this->assertSame('TENANT_SUSPENDED', $response->getData(true)['error']['code'] ?? null);
         $this->assertFalse(tenancy()->initialized);
     }
 }

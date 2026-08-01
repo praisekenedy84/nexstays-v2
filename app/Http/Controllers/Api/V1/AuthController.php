@@ -29,6 +29,12 @@ class AuthController extends Controller
             ]);
         }
 
+        if (! empty($tenant->suspended_at)) {
+            throw ValidationException::withMessages([
+                'property_code' => ['This property is suspended and cannot be accessed. Please contact the developer or NexStay support.'],
+            ]);
+        }
+
         tenancy()->initialize($tenant);
 
         $user = User::findByLoginIdentifier($request->loginIdentifier());

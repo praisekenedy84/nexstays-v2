@@ -11,6 +11,7 @@ use App\Models\Tenant;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Hash;
@@ -24,7 +25,7 @@ class AuthController extends Controller
     {
     }
 
-    public function create(): View|RedirectResponse
+    public function create(): View|RedirectResponse|Response
     {
         // Recover an existing session without a subdomain: if the session already
         // has a tenant_id and the user is still authenticated, go straight to the dashboard.
@@ -33,7 +34,11 @@ class AuthController extends Controller
         if ($tenantId) {
             $tenant = $this->tenantResolver->find($tenantId);
 
-            if ($tenant && ! $this->tenantResolver->isSuspended($tenant)) {
+            if ($tenant && $this->tenantResolver->isSuspended($tenant)) {
+                return $this->denySuspendedTenant($tenant->id);
+            }
+
+            if ($tenant) {
                 try {
                     tenancy()->initialize($tenant);
                 } catch (Throwable $e) {
@@ -60,7 +65,7 @@ class AuthController extends Controller
         return view('auth.login');
     }
 
-    public function store(LoginRequest $request): RedirectResponse
+    public function store(LoginRequest $request): RedirectResponse|Response
     {
         $tenant = Tenant::find($request->validated('property_code'));
 
@@ -68,6 +73,10 @@ class AuthController extends Controller
             return back()
                 ->withInput($request->only('username', 'property_code'))
                 ->withErrors(['property_code' => 'Property code not found. Please check with your manager.']);
+        }
+
+        if ($this->tenantResolver->isSuspended($tenant)) {
+            return $this->denySuspendedTenant($tenant->id);
         }
 
         try {
@@ -118,5 +127,22 @@ class AuthController extends Controller
         Cookie::queue(Cookie::forget('nexstay_active'));
 
         return redirect()->route('tenant.login');
+    }
+
+    private function denySuspendedTenant(string $propertyCode): Response
+    {
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        Auth::guard('web')->forgetUser();
+        session()->invalidate();
+        session()->regenerateToken();
+
+        Cookie::queue(Cookie::forget('nexstay_active'));
+
+        return response()->view('errors.tenant-suspended', [
+            'propertyCode' => $propertyCode,
+        ], 503);
     }
 }

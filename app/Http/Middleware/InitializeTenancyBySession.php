@@ -7,6 +7,7 @@ namespace App\Http\Middleware;
 use App\Domain\Shared\Services\TenantResolver;
 use Closure;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Cookie;
 use Illuminate\Support\Facades\Log;
 use Symfony\Component\HttpFoundation\Response;
@@ -50,14 +51,7 @@ class InitializeTenancyBySession
         }
 
         if ($this->tenantResolver->isSuspended($tenant)) {
-            $request->session()->forget('tenant_id');
-
-            if (tenancy()->initialized) {
-                tenancy()->end();
-            }
-
-            return redirect()->route('tenant.login')
-                ->withErrors(['property_code' => 'This property has been suspended. Please contact NexStay support.']);
+            return $this->denySuspendedTenant($request, $tenant->id);
         }
 
         if (! tenancy()->initialized) {
@@ -85,5 +79,29 @@ class InitializeTenancyBySession
         }
 
         return $next($request);
+    }
+
+    /**
+     * Clear the orphaned auth session and show the suspended page.
+     *
+     * We invalidate the session instead of Auth::logout() so we never resolve
+     * auth()->user() after tenancy has ended (that path queries the central DB
+     * and surfaces as a 500).
+     */
+    private function denySuspendedTenant(Request $request, string $propertyCode): Response
+    {
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        Auth::guard('web')->forgetUser();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
+
+        Cookie::queue(Cookie::forget('nexstay_active'));
+
+        return response()->view('errors.tenant-suspended', [
+            'propertyCode' => $propertyCode,
+        ], 503);
     }
 }

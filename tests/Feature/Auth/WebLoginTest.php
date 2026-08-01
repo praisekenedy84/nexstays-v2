@@ -18,7 +18,7 @@ class WebLoginTest extends TenantTestCase
         config(['tenancy.bootstrappers' => []]);
     }
 
-    public function test_get_login_does_not_redirect_to_dashboard_for_a_suspended_tenant_session(): void
+    public function test_get_login_shows_suspended_page_for_a_suspended_tenant_session(): void
     {
         $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
         $tenant->suspended_at = now();
@@ -28,8 +28,28 @@ class WebLoginTest extends TenantTestCase
 
         $this->withSession(['tenant_id' => $tenant->id])
             ->get('/login')
-            ->assertOk()
-            ->assertViewIs('auth.login');
+            ->assertStatus(503)
+            ->assertViewIs('errors.tenant-suspended')
+            ->assertSee('System unavailable')
+            ->assertSee($tenant->id);
+    }
+
+    public function test_login_post_shows_suspended_page_for_a_suspended_tenant(): void
+    {
+        $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
+        $tenant->suspended_at = now();
+        $tenant->save();
+
+        Auth::shouldUse('web');
+
+        $this->post('/login', [
+            'property_code' => $tenant->id,
+            'username' => $this->user->username,
+            'password' => 'password',
+        ])
+            ->assertStatus(503)
+            ->assertViewIs('errors.tenant-suspended')
+            ->assertSee('System unavailable');
     }
 
     public function test_get_login_redirects_to_dashboard_for_an_active_tenant_session(): void

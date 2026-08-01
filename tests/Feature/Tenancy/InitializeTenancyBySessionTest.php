@@ -100,7 +100,7 @@ class InitializeTenancyBySessionTest extends TenantTestCase
         );
     }
 
-    public function test_suspended_tenant_ends_a_leaked_tenancy_before_redirecting(): void
+    public function test_suspended_tenant_ends_a_leaked_tenancy_and_shows_unavailable_page(): void
     {
         $tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
         $tenant->suspended_at = now();
@@ -113,7 +113,9 @@ class InitializeTenancyBySessionTest extends TenantTestCase
 
         $response = app(InitializeTenancyBySession::class)->handle($request, fn ($req) => response('ok'));
 
-        $this->assertSame(302, $response->getStatusCode());
+        $this->assertSame(503, $response->getStatusCode());
+        $this->assertSame('errors.tenant-suspended', $response->original->name());
         $this->assertFalse(tenancy()->initialized);
+        $this->assertTrue(Cookie::hasQueued('nexstay_active'));
     }
 }
