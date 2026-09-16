@@ -71,6 +71,8 @@ class ReceivePurchaseOrder
     ): void {
         $stockItem = $line->stockItem;
 
+        $performedBy = Auth::id();
+
         StockMovement::query()->create([
             'stock_item_id'  => $stockItem->id,
             'movement_type'  => 'purchase',
@@ -78,15 +80,23 @@ class ReceivePurchaseOrder
             'reference_id'   => $purchaseOrder->id,
             'reference_type' => PurchaseOrder::class,
             'notes'          => "PO {$purchaseOrder->po_number}",
-            'performed_by'   => Auth::id(),
+            'performed_by'   => $performedBy,
         ]);
 
         $stockItem->increment('current_stock', $qty);
-        $stockItem = $stockItem->fresh();
-        $this->beverageStockLink->clearAwaitingWhenStocked($stockItem);
+
+        $updates = [
+            'last_restocked_at' => now(),
+            'last_restocked_by' => $performedBy,
+        ];
 
         if ($cost > 0) {
-            $stockItem->update(['cost_per_unit' => $cost]);
+            $updates['cost_per_unit'] = $cost;
         }
+
+        $stockItem->update($updates);
+
+        $stockItem = $stockItem->fresh();
+        $this->beverageStockLink->clearAwaitingWhenStocked($stockItem);
     }
 }

@@ -9,7 +9,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
 
     <title>{{ $title ? "{$title} — NexStay" : 'NexStay' }}</title>
@@ -34,21 +34,29 @@
     {{-- Impersonation banner --}}
     @if (session('impersonating'))
         @php $imp = session('impersonating'); @endphp
-        <div class="flex items-center justify-between bg-amber-400 px-5 py-2 text-xs font-medium text-amber-950">
-            <span>
+        <div class="flex flex-col gap-2 bg-amber-400 px-4 py-2 text-xs font-medium text-amber-950 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+            <span class="min-w-0 leading-relaxed">
                 Viewing as <strong>{{ $imp['user_name'] }}</strong> ({{ $imp['user_username'] ?? $imp['user_email'] }})
                 at <strong>{{ $imp['tenant_name'] }}</strong>
-                &nbsp;·&nbsp; Platform admin: {{ $imp['platform_admin'] }}
+                <span class="hidden sm:inline">&nbsp;·&nbsp;</span>
+                <span class="block sm:inline">Platform admin: {{ $imp['platform_admin'] }}</span>
             </span>
-            <form method="POST" action="{{ route('platform.impersonate.stop') }}">
+            <form method="POST" action="{{ route('platform.impersonate.stop') }}" class="shrink-0 self-end sm:self-auto">
                 @csrf
                 <button type="submit"
-                    class="rounded-lg bg-amber-900/20 px-3 py-1 font-semibold transition hover:bg-amber-900/30">
+                    class="rounded-lg bg-amber-900/20 px-3 py-1.5 font-semibold transition hover:bg-amber-900/30">
                     Exit &rarr;
                 </button>
             </form>
         </div>
     @endif
+
+    <div
+        id="nav-overlay"
+        class="fixed inset-0 z-40 bg-slate-900/50 opacity-0 pointer-events-none transition-opacity duration-200 lg:hidden"
+        aria-hidden="true"
+        data-nav-close
+    ></div>
 
     <div class="flex min-h-screen">
         <x-layout.sidebar :active="$activeNav" />
@@ -64,7 +72,7 @@
                 />
             @endisset
 
-            <main class="flex-1 overflow-auto px-6 pb-8 pt-2 lg:px-8">
+            <main class="flex-1 overflow-auto px-4 pb-8 pt-3 sm:px-6 lg:px-8 lg:pt-2">
                 <x-ui.flash />
                 {{ $slot }}
             </main>

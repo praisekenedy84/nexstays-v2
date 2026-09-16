@@ -1,21 +1,35 @@
 @props(['active' => 'dashboard'])
 
-<aside class="flex w-56 shrink-0 flex-col border-r border-slate-200/80 bg-white px-3 py-6 dark:bg-slate-900 dark:border-slate-700/60">
-    <a
-        href="{{ route('tenant.dashboard') }}"
-        class="mb-1 flex items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
-        title="{{ $tenantLabel ?? 'NexStay' }}"
-    >
-        <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold tracking-wide text-white">
-            {{ strtoupper(substr((string) ($tenantLabel ?? 'NS'), 0, 2)) }}
-        </span>
-        <span class="min-w-0">
-            <span class="block truncate text-sm font-bold text-ink">NexStay</span>
-            <span class="block truncate text-xs text-ink-muted" title="{{ $tenantLabel ?? '' }}">{{ $tenantLabel ?? 'Property' }}</span>
-        </span>
-    </a>
+<aside
+    id="app-sidebar"
+    class="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] max-w-xs -translate-x-full flex-col border-r border-slate-200/80 bg-white px-3 py-5 transition-transform duration-200 ease-out dark:bg-slate-900 dark:border-slate-700/60 lg:static lg:z-auto lg:w-56 lg:max-w-none lg:translate-x-0 lg:py-6"
+    aria-label="Sidebar"
+>
+    <div class="mb-1 flex items-center gap-2">
+        <a
+            href="{{ route('tenant.dashboard') }}"
+            class="flex min-w-0 flex-1 items-center gap-3 rounded-xl px-2 py-2 transition hover:bg-slate-50 dark:hover:bg-slate-800/60"
+            title="{{ $tenantLabel ?? 'NexStay' }}"
+        >
+            <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-navy text-xs font-bold tracking-wide text-white">
+                {{ strtoupper(substr((string) ($tenantLabel ?? 'NS'), 0, 2)) }}
+            </span>
+            <span class="min-w-0">
+                <span class="block truncate text-sm font-bold text-ink">NexStay</span>
+                <span class="block truncate text-xs text-ink-muted" title="{{ $tenantLabel ?? '' }}">{{ $tenantLabel ?? 'Property' }}</span>
+            </span>
+        </a>
+        <button
+            type="button"
+            class="nav-close-btn rounded-lg p-2 text-ink-muted transition hover:bg-slate-100 hover:text-ink dark:hover:bg-slate-700/50 lg:hidden"
+            aria-label="Close menu"
+            data-nav-close
+        >
+            <x-icon name="x" class="size-5" />
+        </button>
+    </div>
 
-    <nav class="mt-6 flex flex-1 flex-col gap-0.5 overflow-y-auto" aria-label="Main navigation">
+    <nav class="mt-4 flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain" aria-label="Main navigation">
         @foreach ($hbmsNavigation ?? [] as $item)
             @if (isset($item['children']))
                 @php

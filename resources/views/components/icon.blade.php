@@ -41,6 +41,8 @@
         'user' => 'user-round',
         'moon' => 'moon',
         'sun' => 'sun',
+        'menu' => 'menu',
+        'x' => 'x',
         default => 'circle',
     };
 @endphp

@@ -1,10 +1,10 @@
 <x-layouts.app active-nav="restaurant" title="All staff shift" subtitle="Daily sales by waiter">
     @php $currency = 'TZS'; @endphp
 
-    <form method="GET" class="mb-6 flex items-end gap-3">
-        <div>
+    <form method="GET" class="mb-6 flex flex-wrap items-end gap-3">
+        <div class="min-w-0 flex-1 sm:flex-none">
             <label class="mb-1 block text-xs font-medium text-ink-muted">Date</label>
-            <input type="date" name="date" value="{{ $date }}" class="input-field w-auto" onchange="this.form.submit()">
+            <input type="date" name="date" value="{{ $date }}" class="input-field w-full sm:w-auto" onchange="this.form.submit()">
         </div>
         <a href="{{ route('tenant.restaurant.index') }}" class="btn-outline">← POS</a>
     </form>
@@ -13,19 +13,19 @@
     <div class="mb-8 grid grid-cols-2 gap-4 sm:grid-cols-4">
         <div class="card p-5 text-center">
             <p class="text-xs font-medium text-ink-muted">Total cash</p>
-            <p class="mt-1 text-2xl font-bold text-emerald-700">{{ $currency }} {{ number_format($overall['cash']) }}</p>
+            <p class="mt-1 text-lg font-bold text-emerald-700 sm:text-2xl">{{ $currency }} {{ number_format($overall['cash']) }}</p>
         </div>
         <div class="card p-5 text-center">
             <p class="text-xs font-medium text-ink-muted">Total folio posts</p>
-            <p class="mt-1 text-2xl font-bold text-indigo-700">{{ $currency }} {{ number_format($overall['folio']) }}</p>
+            <p class="mt-1 text-lg font-bold text-indigo-700 sm:text-2xl">{{ $currency }} {{ number_format($overall['folio']) }}</p>
         </div>
         <div class="card p-5 text-center">
             <p class="text-xs font-medium text-ink-muted">Total settled</p>
-            <p class="mt-1 text-2xl font-bold text-ink">{{ $currency }} {{ number_format($overall['total_closed']) }}</p>
+            <p class="mt-1 text-lg font-bold text-ink sm:text-2xl">{{ $currency }} {{ number_format($overall['total_closed']) }}</p>
         </div>
         <div class="card p-5 text-center">
             <p class="text-xs font-medium text-ink-muted">Orders closed / open</p>
-            <p class="mt-1 text-2xl font-bold text-ink">
+            <p class="mt-1 text-lg font-bold text-ink sm:text-2xl">
                 {{ $overall['count_closed'] }}
                 @if ($overall['count_open'] > 0)
                     <span class="text-base font-normal text-amber-600">· {{ $overall['count_open'] }} open</span>

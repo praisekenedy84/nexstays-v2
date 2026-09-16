@@ -28,9 +28,9 @@
 
     {{-- Header --}}
     <div class="mb-5 flex flex-wrap items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
+        <div class="flex min-w-0 flex-wrap items-center gap-2 sm:gap-3">
             <a href="{{ $backRoute }}" class="text-sm text-ink-muted hover:text-ink">← Back</a>
-            <span class="text-slate-300">/</span>
+            <span class="hidden text-slate-300 sm:inline">/</span>
             <span class="font-mono text-sm font-semibold text-primary">{{ $order->order_number }}</span>
             <span @class([
                 'rounded-full px-2.5 py-0.5 text-xs font-semibold capitalize',
@@ -42,8 +42,8 @@
                 'bg-slate-200 text-slate-500'     => $order->status === 'closed',
             ])>{{ str_replace('_', ' ', $order->status) }}</span>
         </div>
-        <div class="flex items-center gap-3">
-            <div class="text-xs text-ink-muted">
+        <div class="flex w-full flex-col gap-3 sm:w-auto sm:flex-row sm:items-center">
+            <div class="text-xs leading-relaxed text-ink-muted">
                 <span>{{ $order->outlet->name }}</span>
                 @if ($order->table)
                     <span>· Table {{ $order->table->table_number }}</span>
@@ -53,11 +53,12 @@
                 @endif
                 <span>· {{ $order->covers }} pax</span>
                 <span>· {{ $order->waiter?->name ?? '—' }}</span>
-                <span class="ml-2 text-ink-subtle">
+                <span class="text-ink-subtle">
                     · Opened {{ $order->opened_at?->format('d M, H:i') ?? '—' }}
                 </span>
             </div>
 
+            <div class="flex flex-wrap items-center gap-2">
             {{-- Receipt link --}}
             <a href="{{ route('tenant.pos.orders.receipt', $order) }}"
                target="_blank"
@@ -76,6 +77,7 @@
                     </button>
                 </form>
             @endif
+            </div>
         </div>
     </div>
 
@@ -101,7 +103,7 @@
                         <div class="divide-y divide-slate-100 border-t border-slate-100">
                             @forelse ($cat->items as $item)
                                 <form method="POST" action="{{ route('tenant.pos.orders.add-item', $order) }}"
-                                      class="pos-add-item-form flex items-center justify-between gap-3 px-5 py-3">
+                                      class="pos-add-item-form flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:px-5">
                                     @csrf
                                     <input type="hidden" name="menu_item_id" value="{{ $item->id }}">
                                     @php $itemPhoto = \App\Domain\Shared\Models\MenuItem::photoUrl($item->photo); @endphp
@@ -109,7 +111,7 @@
                                         <img src="{{ $itemPhoto }}" alt="{{ $item->name }}"
                                              class="size-10 shrink-0 rounded-lg object-cover border border-slate-100">
                                     @endif
-                                    <div class="min-w-0 flex-1">
+                                    <div class="min-w-0 flex-1 basis-[40%]">
                                         <p class="truncate text-sm font-medium text-ink">{{ $item->name }}</p>
                                         @if ($item->description)
                                             <p class="truncate text-xs text-ink-subtle">{{ $item->description }}</p>
@@ -118,9 +120,9 @@
                                     <div class="shrink-0 text-right">
                                         <p class="text-sm font-semibold text-ink">{{ $currency }} {{ number_format((float) $item->price) }}</p>
                                     </div>
-                                    <div class="flex shrink-0 items-center gap-1.5">
+                                    <div class="flex w-full shrink-0 items-center justify-end gap-1.5 sm:w-auto">
                                         <input type="number" name="quantity" value="1" min="1" max="99"
-                                               class="w-14 rounded-lg border border-slate-300 px-2 py-1 text-center text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                               class="w-14 rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-600 dark:bg-slate-800">
                                         <button type="submit"
                                                 class="rounded-lg bg-primary px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-primary/90">
                                             Add
@@ -153,7 +155,7 @@
                             <div class="divide-y divide-slate-100 border-t border-slate-100">
                                 @foreach ($cat->items as $item)
                                     <form method="POST" action="{{ route('tenant.pos.orders.add-item', $order) }}"
-                                          class="pos-add-item-form flex items-center justify-between gap-3 px-5 py-3">
+                                          class="pos-add-item-form flex flex-wrap items-center justify-between gap-3 px-4 py-3 sm:flex-nowrap sm:px-5">
                                         @csrf
                                         <input type="hidden" name="menu_item_id" value="{{ $item->id }}">
                                         @php $itemPhoto = \App\Domain\Shared\Models\MenuItem::photoUrl($item->photo); @endphp
@@ -161,7 +163,7 @@
                                             <img src="{{ $itemPhoto }}" alt="{{ $item->name }}"
                                                  class="size-10 shrink-0 rounded-lg object-cover border border-slate-100">
                                         @endif
-                                        <div class="min-w-0 flex-1">
+                                        <div class="min-w-0 flex-1 basis-[40%]">
                                             <p class="truncate text-sm font-medium text-ink">{{ $item->name }}</p>
                                             @if ($item->description)
                                                 <p class="truncate text-xs text-ink-subtle">{{ $item->description }}</p>
@@ -170,9 +172,9 @@
                                         <div class="shrink-0 text-right">
                                             <p class="text-sm font-semibold text-ink">{{ $currency }} {{ number_format((float) $item->price) }}</p>
                                         </div>
-                                        <div class="flex shrink-0 items-center gap-1.5">
+                                        <div class="flex w-full shrink-0 items-center justify-end gap-1.5 sm:w-auto">
                                             <input type="number" name="quantity" value="1" min="1" max="99"
-                                                   class="w-14 rounded-lg border border-slate-300 px-2 py-1 text-center text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20">
+                                                   class="w-14 rounded-lg border border-slate-300 px-2 py-1.5 text-center text-sm focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20 dark:border-slate-600 dark:bg-slate-800">
                                             <button type="submit"
                                                     class="rounded-lg bg-sky-600 px-3 py-1.5 text-xs font-semibold text-white transition hover:bg-sky-700">
                                                 Add

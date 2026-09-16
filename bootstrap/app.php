@@ -25,6 +25,7 @@ return Application::configure(basePath: dirname(__DIR__))
             'tenant.session' => \App\Http\Middleware\InitializeTenancyBySession::class,
             'tenant.token' => \App\Http\Middleware\InitializeTenancyByToken::class,
             'app.timezone' => \App\Http\Middleware\SetApplicationTimezone::class,
+            'feature' => \App\Http\Middleware\EnsureTenantFeature::class,
         ]);
 
         // InitializeTenancyBySession must run after StartSession (needs the session store)

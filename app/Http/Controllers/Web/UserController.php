@@ -64,7 +64,7 @@ class UserController extends Controller
             'user'             => $user,
             'userRole'         => $user->roles->first(),
             'userPermissions'  => $user->getAllPermissions()->pluck('name')->flip()->all(),
-            'permissionGroups' => RoleController::PERMISSION_GROUPS,
+            'permissionGroups' => RoleController::allowedPermissionGroups(),
         ]);
     }
 

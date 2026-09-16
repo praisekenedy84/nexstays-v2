@@ -27,4 +27,17 @@ class Tenant extends BaseTenant implements TenantWithDatabase
         static::saved(fn (self $tenant) => Cache::store(config('cache.default'))->forget("central_tenant:{$tenant->id}"));
         static::deleted(fn (self $tenant) => Cache::store(config('cache.default'))->forget("central_tenant:{$tenant->id}"));
     }
+
+    public function hasFeature(string $feature): bool
+    {
+        return \App\Support\TenantFeatures::allows($feature, $this);
+    }
+
+    /**
+     * @return list<string>
+     */
+    public function enabledFeatureKeys(): array
+    {
+        return \App\Support\TenantFeatures::enabled($this);
+    }
 }

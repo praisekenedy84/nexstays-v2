@@ -74,9 +74,108 @@ return [
 
     /*
     |--------------------------------------------------------------------------
+    | Tenant feature packs (Platform Admin controlled)
+    |--------------------------------------------------------------------------
+    | Keys are stored on the central Tenant as enabled_features (virtual column).
+    | Shared F&B permissions unlock when any of restaurant/bar/lounge is enabled.
+    */
+    'features' => [
+        'hotel' => [
+            'label' => 'Hotel / Front office',
+            'description' => 'Reservations, rooms, guests, folios, night audit',
+            'permissions' => [
+                'view-reservations',
+                'manage-reservations',
+                'force-delete-reservations',
+                'check-in-guests',
+                'check-out-guests',
+                'view-guests',
+                'manage-guests',
+                'view-rooms',
+                'manage-rooms',
+                'manage-room-status',
+                'manage-room-types',
+                'manage-rate-plans',
+                'view-folios',
+                'post-folio-charges',
+                'view-availability',
+                'view-debts',
+                'view-ancillary-services',
+                'manage-ancillary-services',
+                'view-damage',
+                'manage-damage',
+                'run-night-audit',
+                'view-reports',
+            ],
+        ],
+        'restaurant' => [
+            'label' => 'Restaurant',
+            'description' => 'Restaurant POS and F&B shared tools',
+            'permissions' => [],
+        ],
+        'bar' => [
+            'label' => 'Bar',
+            'description' => 'Bar POS and F&B shared tools',
+            'permissions' => [],
+        ],
+        'lounge' => [
+            'label' => 'Lounge',
+            'description' => 'Lounge POS and F&B shared tools',
+            'permissions' => [],
+        ],
+        'inventory' => [
+            'label' => 'Inventory',
+            'description' => 'Stock items and purchases',
+            'permissions' => [
+                'view-inventory',
+                'manage-inventory',
+                'view-purchases',
+                'manage-purchases',
+            ],
+        ],
+        'facilities' => [
+            'label' => 'Facilities',
+            'description' => 'Pool and gym attendance',
+            'permissions' => [
+                'view-facility-attendance',
+                'record-facility-attendance',
+                'view-facility-reports',
+            ],
+        ],
+    ],
+
+    'fb_feature_keys' => ['restaurant', 'bar', 'lounge'],
+
+    'shared_fb_permissions' => [
+        'view-outlets',
+        'manage-outlets',
+        'view-menu',
+        'manage-menu',
+        'view-orders',
+        'view-all-orders',
+        'manage-orders',
+        'manage-all-orders',
+        'manage-own-orders',
+        'process-kitchen-orders',
+        'view-till',
+        'manage-till',
+        'view-fb-reports',
+    ],
+
+    'always_on_permissions' => [
+        'manage-users',
+        'manage-roles',
+        'view-expenditures',
+        'manage-expenditures',
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
     | HBMS web navigation (tenant UI)
     |--------------------------------------------------------------------------
     | permission: null = any authenticated staff member
+    | feature: single module key required
+    | features: any of the listed module keys required
     */
     'navigation' => [
         [
@@ -97,53 +196,58 @@ return [
             'id' => 'front-office',
             'label' => 'Front office',
             'icon' => 'bed',
+            'feature' => 'hotel',
             'children' => [
-                ['id' => 'availability', 'label' => 'Availability', 'route' => 'tenant.availability', 'permission' => 'view-availability'],
-                ['id' => 'reservations', 'label' => 'Reservations', 'route' => 'tenant.reservations.index', 'permission' => 'view-reservations'],
-                ['id' => 'booked-list', 'label' => 'Booked list', 'route' => 'tenant.booked-list.index', 'permission' => 'view-reservations'],
-                ['id' => 'time-left', 'label' => 'Time left', 'route' => 'tenant.time-left.index', 'permission' => 'view-reservations'],
-                ['id' => 'guests', 'label' => 'Guests', 'route' => 'tenant.guests.index', 'permission' => 'view-guests'],
-                ['id' => 'room-types', 'label' => 'Room types', 'route' => 'tenant.room-types.index', 'permission' => 'view-rooms'],
-                ['id' => 'rooms', 'label' => 'Rooms', 'route' => 'tenant.rooms.index', 'permission' => 'view-rooms'],
-                ['id' => 'rate-plans', 'label' => 'Rate plans', 'route' => 'tenant.rate-plans.index', 'permission' => 'view-reservations'],
-                ['id' => 'damage', 'label' => 'Damage', 'route' => 'tenant.damages.index', 'permission' => 'view-damage'],
+                ['id' => 'availability', 'label' => 'Availability', 'route' => 'tenant.availability', 'permission' => 'view-availability', 'feature' => 'hotel'],
+                ['id' => 'reservations', 'label' => 'Reservations', 'route' => 'tenant.reservations.index', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'booked-list', 'label' => 'Booked list', 'route' => 'tenant.booked-list.index', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'time-left', 'label' => 'Time left', 'route' => 'tenant.time-left.index', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'guests', 'label' => 'Guests', 'route' => 'tenant.guests.index', 'permission' => 'view-guests', 'feature' => 'hotel'],
+                ['id' => 'room-types', 'label' => 'Room types', 'route' => 'tenant.room-types.index', 'permission' => 'view-rooms', 'feature' => 'hotel'],
+                ['id' => 'rooms', 'label' => 'Rooms', 'route' => 'tenant.rooms.index', 'permission' => 'view-rooms', 'feature' => 'hotel'],
+                ['id' => 'rate-plans', 'label' => 'Rate plans', 'route' => 'tenant.rate-plans.index', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'damage', 'label' => 'Damage', 'route' => 'tenant.damages.index', 'permission' => 'view-damage', 'feature' => 'hotel'],
             ],
         ],
         [
             'id' => 'fb',
             'label' => 'Food & beverage',
             'icon' => 'restaurant',
+            'features' => ['restaurant', 'bar', 'lounge'],
             'children' => [
-                ['id' => 'restaurant', 'label' => 'Restaurant', 'route' => 'tenant.restaurant.index', 'permission' => 'view-orders'],
-                ['id' => 'bar', 'label' => 'Bar', 'route' => 'tenant.bar.index', 'permission' => 'view-orders'],
-                ['id' => 'lounge', 'label' => 'Lounge', 'route' => 'tenant.lounge.index', 'permission' => 'view-orders'],
-                ['id' => 'fb-orders', 'label' => 'Sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-orders'],
-                ['id' => 'shift-mine', 'label' => 'My shift', 'route' => 'tenant.shift.mine', 'permission' => 'view-orders'],
-                ['id' => 'shift-all', 'label' => 'Staff shift', 'route' => 'tenant.shift.all', 'permission' => 'view-fb-reports'],
-                ['id' => 'outlets', 'label' => 'Outlets', 'route' => 'tenant.outlets.index', 'permission' => 'view-outlets'],
-                ['id' => 'menu-categories', 'label' => 'Menu categories', 'route' => 'tenant.menu-categories.index', 'permission' => 'view-menu'],
-                ['id' => 'menu', 'label' => 'Menu items', 'route' => 'tenant.menu-items.index', 'permission' => 'view-menu'],
-                ['id' => 'till', 'label' => 'Till', 'route' => 'tenant.till.index', 'permission' => 'view-till'],
+                ['id' => 'restaurant', 'label' => 'Restaurant', 'route' => 'tenant.restaurant.index', 'permission' => 'view-orders', 'feature' => 'restaurant'],
+                ['id' => 'bar', 'label' => 'Bar', 'route' => 'tenant.bar.index', 'permission' => 'view-orders', 'feature' => 'bar'],
+                ['id' => 'lounge', 'label' => 'Lounge', 'route' => 'tenant.lounge.index', 'permission' => 'view-orders', 'feature' => 'lounge'],
+                ['id' => 'fb-orders', 'label' => 'Sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-orders', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'shift-mine', 'label' => 'My shift', 'route' => 'tenant.shift.mine', 'permission' => 'view-orders', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'shift-all', 'label' => 'Staff shift', 'route' => 'tenant.shift.all', 'permission' => 'view-fb-reports', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'outlets', 'label' => 'Outlets', 'route' => 'tenant.outlets.index', 'permission' => 'view-outlets', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'menu-categories', 'label' => 'Menu categories', 'route' => 'tenant.menu-categories.index', 'permission' => 'view-menu', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'menu', 'label' => 'Menu items', 'route' => 'tenant.menu-items.index', 'permission' => 'view-menu', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'till', 'label' => 'Till', 'route' => 'tenant.till.index', 'permission' => 'view-till', 'features' => ['restaurant', 'bar', 'lounge']],
             ],
         ],
         [
             'id' => 'inventory-group',
             'label' => 'Inventory',
             'icon' => 'inventory',
+            'feature' => 'inventory',
             'children' => [
-                ['id' => 'inventory', 'label' => 'Stock items', 'route' => 'tenant.stock-items.index', 'permission' => 'view-inventory'],
-                ['id' => 'purchases', 'label' => 'Purchases', 'route' => 'tenant.purchases.index', 'permission' => 'view-purchases'],
+                ['id' => 'inventory', 'label' => 'Stock items', 'route' => 'tenant.stock-items.index', 'permission' => 'view-inventory', 'feature' => 'inventory'],
+                ['id' => 'stock-history', 'label' => 'Stock history', 'route' => 'tenant.stock-items.movements', 'permission' => 'view-inventory', 'feature' => 'inventory'],
+                ['id' => 'purchases', 'label' => 'Purchases', 'route' => 'tenant.purchases.index', 'permission' => 'view-purchases', 'feature' => 'inventory'],
             ],
         ],
         [
             'id' => 'facilities-group',
             'label' => 'Facilities',
             'icon' => 'dumbbell',
+            'feature' => 'facilities',
             'children' => [
-                ['id' => 'facility-pool', 'label' => 'Swimming Pool', 'route' => 'tenant.facilities.pool', 'permission' => 'view-facility-attendance'],
-                ['id' => 'facility-gym', 'label' => 'Gym', 'route' => 'tenant.facilities.gym', 'permission' => 'view-facility-attendance'],
-                ['id' => 'facility-pool-report', 'label' => 'Pool report', 'route' => 'tenant.reports.pool-attendance', 'permission' => 'view-facility-reports'],
-                ['id' => 'facility-gym-report', 'label' => 'Gym report', 'route' => 'tenant.reports.gym-attendance', 'permission' => 'view-facility-reports'],
+                ['id' => 'facility-pool', 'label' => 'Swimming Pool', 'route' => 'tenant.facilities.pool', 'permission' => 'view-facility-attendance', 'feature' => 'facilities'],
+                ['id' => 'facility-gym', 'label' => 'Gym', 'route' => 'tenant.facilities.gym', 'permission' => 'view-facility-attendance', 'feature' => 'facilities'],
+                ['id' => 'facility-pool-report', 'label' => 'Pool report', 'route' => 'tenant.reports.pool-attendance', 'permission' => 'view-facility-reports', 'feature' => 'facilities'],
+                ['id' => 'facility-gym-report', 'label' => 'Gym report', 'route' => 'tenant.reports.gym-attendance', 'permission' => 'view-facility-reports', 'feature' => 'facilities'],
             ],
         ],
         [
@@ -151,9 +255,9 @@ return [
             'label' => 'Finance',
             'icon' => 'wallet',
             'children' => [
-                ['id' => 'fb-sales', 'label' => 'F&B sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-all-orders'],
-                ['id' => 'debts', 'label' => 'Outstanding debts', 'route' => 'tenant.debts.index', 'permission' => 'view-debts'],
-                ['id' => 'ancillary', 'label' => 'Extra services', 'route' => 'tenant.ancillary-services.index', 'permission' => 'view-ancillary-services'],
+                ['id' => 'fb-sales', 'label' => 'F&B sales', 'route' => 'tenant.fb.orders.index', 'permission' => 'view-all-orders', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'debts', 'label' => 'Outstanding debts', 'route' => 'tenant.debts.index', 'permission' => 'view-debts', 'feature' => 'hotel'],
+                ['id' => 'ancillary', 'label' => 'Extra services', 'route' => 'tenant.ancillary-services.index', 'permission' => 'view-ancillary-services', 'feature' => 'hotel'],
                 ['id' => 'expenditures', 'label' => 'Expenditures', 'route' => 'tenant.expenditures.index', 'permission' => 'view-expenditures'],
             ],
         ],
@@ -162,18 +266,18 @@ return [
             'label' => 'Reports',
             'icon' => 'document',
             'children' => [
-                ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reservations'],
-                ['id' => 'sales-summary-report', 'label' => 'Sales summary', 'route' => 'tenant.reports.sales-summary', 'permission' => 'view-reports'],
-                ['id' => 'bar-sales-summary-report', 'label' => 'Bar item sales', 'route' => 'tenant.reports.bar-sales-summary', 'permission' => 'view-fb-reports'],
-                ['id' => 'lounge-sales-summary-report', 'label' => 'Lounge item sales', 'route' => 'tenant.reports.lounge-sales-summary', 'permission' => 'view-fb-reports'],
-                ['id' => 'menu-item-sales-summary-report', 'label' => 'Menu item sales', 'route' => 'tenant.reports.menu-item-sales-summary', 'permission' => 'view-fb-reports'],
-                ['id' => 'occupancy-report', 'label' => 'Occupancy', 'route' => 'tenant.reports.occupancy', 'permission' => 'view-reservations'],
-                ['id' => 'room-reservation-reports', 'label' => 'Room reservations finance', 'route' => 'tenant.reports.room-reservations', 'permission' => 'view-reservations'],
-                ['id' => 'room-reservations-summary-report', 'label' => 'Room reservations summary', 'route' => 'tenant.reports.room-reservations-summary', 'permission' => 'view-reservations'],
-                ['id' => 'room-payments-accounting-reports', 'label' => 'Room payments & accounting', 'route' => 'tenant.reports.room-payments-accounting', 'permission' => 'view-reservations'],
-                ['id' => 'payment-summary-report', 'label' => 'Payment collection', 'route' => 'tenant.reports.payment-summary', 'permission' => 'view-reports'],
-                ['id' => 'fb-reports', 'label' => 'F&B revenue split', 'route' => 'tenant.reports.fb-revenue', 'permission' => 'view-fb-reports'],
-                ['id' => 'fb-profitability-reports', 'label' => 'F&B profitability', 'route' => 'tenant.reports.fb-profitability', 'permission' => 'view-fb-reports'],
+                ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'sales-summary-report', 'label' => 'Sales summary', 'route' => 'tenant.reports.sales-summary', 'permission' => 'view-reports', 'feature' => 'hotel'],
+                ['id' => 'bar-sales-summary-report', 'label' => 'Bar item sales', 'route' => 'tenant.reports.bar-sales-summary', 'permission' => 'view-fb-reports', 'feature' => 'bar'],
+                ['id' => 'lounge-sales-summary-report', 'label' => 'Lounge item sales', 'route' => 'tenant.reports.lounge-sales-summary', 'permission' => 'view-fb-reports', 'feature' => 'lounge'],
+                ['id' => 'menu-item-sales-summary-report', 'label' => 'Menu item sales', 'route' => 'tenant.reports.menu-item-sales-summary', 'permission' => 'view-fb-reports', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'occupancy-report', 'label' => 'Occupancy', 'route' => 'tenant.reports.occupancy', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'room-reservation-reports', 'label' => 'Room reservations finance', 'route' => 'tenant.reports.room-reservations', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'room-reservations-summary-report', 'label' => 'Room reservations summary', 'route' => 'tenant.reports.room-reservations-summary', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'room-payments-accounting-reports', 'label' => 'Room payments & accounting', 'route' => 'tenant.reports.room-payments-accounting', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'payment-summary-report', 'label' => 'Payment collection', 'route' => 'tenant.reports.payment-summary', 'permission' => 'view-reports', 'feature' => 'hotel'],
+                ['id' => 'fb-reports', 'label' => 'F&B revenue split', 'route' => 'tenant.reports.fb-revenue', 'permission' => 'view-fb-reports', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'fb-profitability-reports', 'label' => 'F&B profitability', 'route' => 'tenant.reports.fb-profitability', 'permission' => 'view-fb-reports', 'features' => ['restaurant', 'bar', 'lounge']],
             ],
         ],
         [
@@ -185,8 +289,8 @@ return [
                 ['id' => 'roles', 'label' => 'Roles & permissions', 'route' => 'tenant.roles.index', 'permission' => 'manage-roles'],
                 ['id' => 'finance-settings', 'label' => 'Finance & tax', 'route' => 'tenant.finance.settings.edit', 'permission' => 'manage-roles'],
                 ['id' => 'payment-methods', 'label' => 'Payment methods', 'route' => 'tenant.finance.payment-methods.edit', 'permission' => 'manage-roles'],
-                ['id' => 'fb-settings', 'label' => 'F&B settlement', 'route' => 'tenant.finance.fb-settings.edit', 'permission' => 'manage-roles'],
-                ['id' => 'facility-settings', 'label' => 'Facility fees', 'route' => 'tenant.finance.facility-settings.edit', 'permission' => 'manage-roles'],
+                ['id' => 'fb-settings', 'label' => 'F&B settlement', 'route' => 'tenant.finance.fb-settings.edit', 'permission' => 'manage-roles', 'features' => ['restaurant', 'bar', 'lounge']],
+                ['id' => 'facility-settings', 'label' => 'Facility fees', 'route' => 'tenant.finance.facility-settings.edit', 'permission' => 'manage-roles', 'feature' => 'facilities'],
             ],
         ],
     ],

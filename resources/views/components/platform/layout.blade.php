@@ -4,7 +4,7 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>{{ $title ? "{$title} — NexStay Platform" : 'NexStay Platform' }}</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
@@ -12,18 +12,41 @@
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
 <body class="min-h-screen bg-slate-950 text-slate-100">
+    <div
+        id="nav-overlay"
+        class="fixed inset-0 z-40 bg-black/60 opacity-0 pointer-events-none transition-opacity duration-200 lg:hidden"
+        aria-hidden="true"
+        data-nav-close
+    ></div>
+
     <div class="flex min-h-screen">
         {{-- Sidebar --}}
-        <aside class="flex w-56 shrink-0 flex-col border-r border-white/5 bg-slate-900 px-3 py-6">
-            <div class="mb-6 flex items-center gap-3 px-2">
-                <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold tracking-wide text-white">NS</span>
-                <span class="min-w-0">
-                    <span class="block truncate text-sm font-bold text-white">NexStay</span>
-                    <span class="block truncate text-xs text-slate-400">Platform Admin</span>
-                </span>
+        <aside
+            id="app-sidebar"
+            class="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] max-w-xs -translate-x-full flex-col border-r border-white/5 bg-slate-900 px-3 py-5 transition-transform duration-200 ease-out lg:static lg:z-auto lg:w-56 lg:max-w-none lg:translate-x-0 lg:py-6"
+            aria-label="Sidebar"
+        >
+            <div class="mb-6 flex items-center gap-2 px-2">
+                <div class="flex min-w-0 flex-1 items-center gap-3">
+                    <span class="flex size-10 shrink-0 items-center justify-center rounded-full bg-indigo-600 text-xs font-bold tracking-wide text-white">NS</span>
+                    <span class="min-w-0">
+                        <span class="block truncate text-sm font-bold text-white">NexStay</span>
+                        <span class="block truncate text-xs text-slate-400">Platform Admin</span>
+                    </span>
+                </div>
+                <button
+                    type="button"
+                    class="nav-close-btn rounded-lg p-2 text-slate-400 transition hover:bg-white/5 hover:text-white lg:hidden"
+                    aria-label="Close menu"
+                    data-nav-close
+                >
+                    <svg class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                    </svg>
+                </button>
             </div>
 
-            <nav class="flex flex-1 flex-col gap-0.5">
+            <nav class="flex flex-1 flex-col gap-0.5 overflow-y-auto overscroll-contain">
                 <a href="{{ route('platform.tenants.index') }}"
                    @class(['flex items-center gap-3 rounded-xl px-3 py-2 text-sm font-medium transition',
                            'bg-indigo-600 text-white' => $activeNav === 'tenants',
@@ -49,16 +72,28 @@
 
         {{-- Main content --}}
         <div class="flex min-w-0 flex-1 flex-col">
-            <header class="flex items-center justify-between border-b border-white/5 bg-slate-900/50 px-8 py-4">
-                <div>
+            <header class="sticky top-0 z-30 flex items-center gap-3 border-b border-white/5 bg-slate-900/90 px-4 py-3 backdrop-blur-md sm:px-6 lg:static lg:bg-slate-900/50 lg:px-8 lg:py-4 lg:backdrop-blur-none">
+                <button
+                    type="button"
+                    class="nav-open-btn -ml-1 rounded-lg p-2 text-slate-400 transition hover:bg-white/5 hover:text-white lg:hidden"
+                    aria-label="Open menu"
+                    aria-controls="app-sidebar"
+                    aria-expanded="false"
+                    data-nav-open
+                >
+                    <svg class="size-5" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24" aria-hidden="true">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M4 6h16M4 12h16M4 18h16"/>
+                    </svg>
+                </button>
+                <div class="min-w-0 flex-1">
                     @if($title)
-                        <h1 class="text-base font-semibold text-white">{{ $title }}</h1>
+                        <h1 class="truncate text-base font-semibold text-white">{{ $title }}</h1>
                     @endif
                 </div>
-                <span class="text-xs text-slate-500">{{ auth('platform_admin')->user()?->name }}</span>
+                <span class="hidden truncate text-xs text-slate-500 sm:inline">{{ auth('platform_admin')->user()?->name }}</span>
             </header>
 
-            <main class="flex-1 overflow-auto px-8 py-6">
+            <main class="flex-1 overflow-auto px-4 py-5 sm:px-6 lg:px-8 lg:py-6">
                 @if (session('success'))
                     <div class="mb-6 rounded-xl bg-emerald-900/40 px-4 py-3 text-sm text-emerald-300 ring-1 ring-emerald-700/50">
                         {{ session('success') }}

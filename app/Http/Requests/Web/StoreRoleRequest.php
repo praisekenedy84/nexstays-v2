@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace App\Http\Requests\Web;
 
 use App\Support\NavigationMenuRegistry;
-use Database\Seeders\RoleAndPermissionSeeder;
+use App\Support\TenantFeatures;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -28,7 +28,7 @@ class StoreRoleRequest extends FormRequest
                 'unique:roles,name',
             ],
             'permissions' => ['nullable', 'array'],
-            'permissions.*' => ['string', Rule::in(RoleAndPermissionSeeder::PERMISSIONS)],
+            'permissions.*' => ['string', Rule::in(TenantFeatures::allowedPermissions())],
             'navigation' => ['nullable', 'array'],
             'navigation.*' => ['string', Rule::in(NavigationMenuRegistry::allItemIds())],
         ];
@@ -38,6 +38,7 @@ class StoreRoleRequest extends FormRequest
     {
         return [
             'name.regex' => 'Role name may only contain lowercase letters, numbers, and underscores.',
+            'permissions.*.in' => 'One or more permissions are not available for this property.',
         ];
     }
 }

@@ -131,3 +131,66 @@ document.querySelectorAll('form[method="POST"], form[method="post"]').forEach((f
         window.refreshLucideIcons?.();
     });
 })();
+
+// Mobile off-canvas navigation
+(function () {
+    const sidebar = document.getElementById('app-sidebar');
+    const overlay = document.getElementById('nav-overlay');
+    if (!sidebar) return;
+
+    const openBtns = document.querySelectorAll('[data-nav-open]');
+    const closeEls = document.querySelectorAll('[data-nav-close]');
+
+    const setExpanded = (open) => {
+        openBtns.forEach((btn) => btn.setAttribute('aria-expanded', open ? 'true' : 'false'));
+        if (overlay) overlay.setAttribute('aria-hidden', open ? 'false' : 'true');
+    };
+
+    const openNav = () => {
+        document.body.classList.add('nav-open');
+        setExpanded(true);
+        sidebar.querySelector('a, button')?.focus?.({ preventScroll: true });
+    };
+
+    const closeNav = () => {
+        document.body.classList.remove('nav-open');
+        setExpanded(false);
+    };
+
+    openBtns.forEach((btn) => btn.addEventListener('click', openNav));
+    closeEls.forEach((el) => el.addEventListener('click', closeNav));
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && document.body.classList.contains('nav-open')) {
+            closeNav();
+        }
+    });
+
+    // Close drawer after navigating (helpful for same-document hash / bfcache restores)
+    window.addEventListener('pageshow', closeNav);
+
+    // Desktop resize: ensure drawer state doesn't linger
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const onMq = () => {
+        if (mq.matches) closeNav();
+    };
+    if (typeof mq.addEventListener === 'function') {
+        mq.addEventListener('change', onMq);
+    } else {
+        mq.addListener(onMq);
+    }
+})();
+
+// Wrap wide tables so they scroll horizontally on small screens
+(function () {
+    document.querySelectorAll('main table').forEach((table) => {
+        if (table.closest('.table-scroll, .overflow-x-auto, .overflow-auto')) {
+            return;
+        }
+
+        const wrap = document.createElement('div');
+        wrap.className = 'table-scroll';
+        table.parentNode.insertBefore(wrap, table);
+        wrap.appendChild(table);
+    });
+})();

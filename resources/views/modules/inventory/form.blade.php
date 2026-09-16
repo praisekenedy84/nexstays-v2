@@ -15,16 +15,18 @@
             @if ($stockItem->relationLoaded('lastRestockedBy') && $stockItem->lastRestockedBy)
                 by {{ $stockItem->lastRestockedBy->name }}
             @endif
+            <a href="{{ route('tenant.stock-items.history', $stockItem) }}" class="ml-3 text-primary hover:underline">View history</a>
             @can('manage-inventory')
                 <a href="{{ route('tenant.stock-items.restock-form', $stockItem) }}" class="ml-3 text-primary hover:underline">Restock again</a>
             @endcan
         </div>
     @elseif ($isEdit)
-        @can('manage-inventory')
-            <div class="mb-4 max-w-xl">
+        <div class="mb-4 flex max-w-xl flex-wrap gap-3">
+            <a href="{{ route('tenant.stock-items.history', $stockItem) }}" class="btn-outline">View history</a>
+            @can('manage-inventory')
                 <a href="{{ route('tenant.stock-items.restock-form', $stockItem) }}" class="btn-primary">Restock</a>
-            </div>
-        @endcan
+            @endcan
+        </div>
     @endif
 
     <form method="POST" action="{{ $isEdit ? route('tenant.stock-items.update', $stockItem) : route('tenant.stock-items.store') }}" class="card max-w-xl space-y-4 p-6">

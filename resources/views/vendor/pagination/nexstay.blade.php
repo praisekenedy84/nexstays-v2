@@ -1,5 +1,5 @@
 @if ($paginator->hasPages())
-    <nav class="flex items-center justify-between gap-4" aria-label="Pagination">
+    <nav class="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between sm:gap-4" aria-label="Pagination">
         <p class="text-xs text-ink-muted">
             @if ($paginator->firstItem())
                 {{ number_format($paginator->firstItem()) }}–{{ number_format($paginator->lastItem()) }} of {{ number_format($paginator->total()) }}
@@ -8,7 +8,7 @@
             @endif
         </p>
 
-        <div class="flex items-center gap-1">
+        <div class="flex max-w-full items-center gap-1 overflow-x-auto pb-0.5">
             {{-- Previous --}}
             @if ($paginator->onFirstPage())
                 <span class="inline-flex size-8 items-center justify-center rounded-lg text-slate-300 cursor-default">

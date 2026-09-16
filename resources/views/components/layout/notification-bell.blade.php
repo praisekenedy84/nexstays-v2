@@ -5,7 +5,7 @@
             id="notif-bell-btn"
             aria-label="Notifications"
             aria-expanded="false"
-            class="relative flex size-9 items-center justify-center rounded-full text-ink-muted transition hover:bg-slate-100 hover:text-ink">
+            class="relative flex size-9 items-center justify-center rounded-full text-ink-muted transition hover:bg-slate-100 hover:text-ink dark:hover:bg-slate-700/50 dark:hover:text-ink">
         <x-icon name="bell" class="size-5" />
         <span id="notif-badge"
               class="absolute top-0.5 right-0.5 hidden size-4 items-center justify-center rounded-full bg-primary text-[10px] font-bold text-white leading-none">
@@ -14,7 +14,7 @@
 
     {{-- Dropdown --}}
     <div id="notif-dropdown"
-         class="absolute right-0 z-50 mt-2 hidden w-80 origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl"
+         class="absolute right-0 z-50 mt-2 hidden w-[min(20rem,calc(100vw-1.5rem))] origin-top-right rounded-xl border border-slate-200 bg-white shadow-xl dark:border-slate-700 dark:bg-slate-800"
          role="dialog"
          aria-label="Recent notifications">
 

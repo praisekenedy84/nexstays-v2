@@ -6,11 +6,14 @@ namespace App\Http\Controllers\Platform;
 
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\Room;
+use App\Domain\Shared\Actions\UpdateTenantFeatures;
 use Spatie\Permission\Models\Role as TenantRole;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Platform\SuspendTenantRequest;
+use App\Http\Requests\Platform\UpdateTenantFeaturesRequest;
 use App\Models\Tenant;
 use App\Models\User;
+use App\Support\TenantFeatures;
 use App\Support\Username;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Http\RedirectResponse;
@@ -39,7 +42,10 @@ class TenantController extends Controller
 
     public function create(): View
     {
-        return view('platform.tenants.create');
+        return view('platform.tenants.create', [
+            'featureDefinitions' => TenantFeatures::definitions(),
+            'enabledFeatures' => TenantFeatures::keys(),
+        ]);
     }
 
     public function store(Request $request): RedirectResponse
@@ -51,14 +57,21 @@ class TenantController extends Controller
             'admin_username' => ['required', 'string', 'max:50', 'regex:'. Username::PATTERN],
             'admin_email'    => ['nullable', 'email', 'max:200'],
             'admin_password' => ['nullable', 'string', 'min:8', 'max:200'],
+            'features'       => ['nullable', 'array'],
+            'features.*'     => ['string', 'in:'.implode(',', TenantFeatures::keys())],
         ]);
 
         $password = $validated['admin_password'] ?: Str::password(16);
+        $features = array_values(array_intersect(
+            TenantFeatures::keys(),
+            array_map('strval', $validated['features'] ?? TenantFeatures::keys())
+        ));
 
         // Creating the tenant fires TenantCreated → CreateDatabase + MigrateDatabase (synchronous).
         $tenant = Tenant::create([
             'id'   => $validated['property_code'],
             'name' => $validated['property_name'],
+            'enabled_features' => $features,
         ]);
 
         tenancy()->initialize($tenant);
@@ -102,7 +115,22 @@ class TenantController extends Controller
 
         tenancy()->end();
 
-        return view('platform.tenants.show', compact('tenant', 'users', 'roles', 'stats'));
+        return view('platform.tenants.show', [
+            'tenant' => $tenant,
+            'users' => $users,
+            'roles' => $roles,
+            'stats' => $stats,
+            'featureDefinitions' => TenantFeatures::definitions(),
+            'enabledFeatures' => TenantFeatures::enabled($tenant),
+        ]);
+    }
+
+    public function updateFeatures(UpdateTenantFeaturesRequest $request, string $tenantId, UpdateTenantFeatures $updateTenantFeatures): RedirectResponse
+    {
+        $tenant = Tenant::findOrFail($tenantId);
+        $updateTenantFeatures->execute($tenant, $request->validated('features', []));
+
+        return back()->with('success', "Modules updated for [{$tenantId}].");
     }
 
     public function runMigrations(string $tenantId): RedirectResponse

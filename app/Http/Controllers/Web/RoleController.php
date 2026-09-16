@@ -10,6 +10,7 @@ use App\Http\Requests\Web\StoreRoleRequest;
 use App\Http\Requests\Web\UpdateRoleRequest;
 use App\Models\Role;
 use App\Support\NavigationMenuRegistry;
+use App\Support\TenantFeatures;
 use Database\Seeders\RoleAndPermissionSeeder;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -56,6 +57,28 @@ class RoleController extends Controller
         'Administration' => ['manage-users', 'manage-roles'],
     ];
 
+    /**
+     * @return array<string, list<string>>
+     */
+    public static function allowedPermissionGroups(): array
+    {
+        $allowed = array_flip(TenantFeatures::allowedPermissions());
+
+        $groups = [];
+        foreach (self::PERMISSION_GROUPS as $label => $permissions) {
+            $filtered = array_values(array_filter(
+                $permissions,
+                fn (string $permission) => isset($allowed[$permission])
+            ));
+
+            if ($filtered !== []) {
+                $groups[$label] = $filtered;
+            }
+        }
+
+        return $groups;
+    }
+
     public function index(Request $request): View
     {
         $sort   = in_array($request->query('sort'), ['name', 'users_count', 'permissions_count']) ? $request->query('sort') : 'name';
@@ -79,7 +102,7 @@ class RoleController extends Controller
 
         return view('hbms.roles.form', [
             'role' => $role,
-            'permissionGroups' => self::PERMISSION_GROUPS,
+            'permissionGroups' => self::allowedPermissionGroups(),
             'rolePermissions' => [],
             'navigationGroups' => NavigationMenuRegistry::groups(),
             'visibleNavigationIds' => NavigationMenuRegistry::allItemIds(),
@@ -103,7 +126,7 @@ class RoleController extends Controller
     {
         return view('hbms.roles.form', [
             'role' => $role,
-            'permissionGroups' => self::PERMISSION_GROUPS,
+            'permissionGroups' => self::allowedPermissionGroups(),
             'rolePermissions' => $role->permissions->pluck('name')->all(),
             'navigationGroups' => NavigationMenuRegistry::groups(),
             'visibleNavigationIds' => NavigationMenuRegistry::visibleItemIdsForRole($role),
@@ -133,7 +156,7 @@ class RoleController extends Controller
 
         return view('hbms.roles.matrix', [
             'roles' => $roles,
-            'permissionGroups' => self::PERMISSION_GROUPS,
+            'permissionGroups' => self::allowedPermissionGroups(),
             'rolePermissions' => $rolePermissions,
             'systemRoles' => RoleAndPermissionSeeder::ROLES,
         ]);

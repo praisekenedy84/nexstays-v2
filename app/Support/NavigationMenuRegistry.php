@@ -12,19 +12,34 @@ final class NavigationMenuRegistry
     /**
      * @return list<array{id: string, label: string, items: list<array{id: string, label: string, permission: string|null}>}>
      */
-    public static function groups(): array
+    public static function groups(?\App\Models\Tenant $tenant = null): array
     {
         return Collection::make(config('nexstay.navigation', []))
-            ->map(function (array $item): array {
+            ->map(function (array $item) use ($tenant): ?array {
                 if (isset($item['children'])) {
+                    if (! TenantFeatures::allowsNavigationItem($item, $tenant)) {
+                        return null;
+                    }
+
+                    $children = Collection::make($item['children'])
+                        ->filter(fn (array $child) => TenantFeatures::allowsNavigationItem($child, $tenant))
+                        ->map(fn (array $child) => self::normalizeItem($child))
+                        ->values()
+                        ->all();
+
+                    if ($children === []) {
+                        return null;
+                    }
+
                     return [
                         'id' => $item['id'],
                         'label' => $item['label'],
-                        'items' => Collection::make($item['children'])
-                            ->map(fn (array $child) => self::normalizeItem($child))
-                            ->values()
-                            ->all(),
+                        'items' => $children,
                     ];
+                }
+
+                if (! TenantFeatures::allowsNavigationItem($item, $tenant)) {
+                    return null;
                 }
 
                 return [
@@ -33,6 +48,7 @@ final class NavigationMenuRegistry
                     'items' => [self::normalizeItem($item)],
                 ];
             })
+            ->filter()
             ->values()
             ->all();
     }
@@ -40,9 +56,9 @@ final class NavigationMenuRegistry
     /**
      * @return list<array{id: string, label: string, permission: string|null}>
      */
-    public static function allItems(): array
+    public static function allItems(?\App\Models\Tenant $tenant = null): array
     {
-        return Collection::make(self::groups())
+        return Collection::make(self::groups($tenant))
             ->flatMap(fn (array $group) => $group['items'])
             ->values()
             ->all();
@@ -51,9 +67,9 @@ final class NavigationMenuRegistry
     /**
      * @return list<string>
      */
-    public static function allItemIds(): array
+    public static function allItemIds(?\App\Models\Tenant $tenant = null): array
     {
-        return array_column(self::allItems(), 'id');
+        return array_column(self::allItems($tenant), 'id');
     }
 
     /**
@@ -61,6 +77,10 @@ final class NavigationMenuRegistry
      */
     public static function isVisibleForRole(array $item, Role $role): bool
     {
+        if (! TenantFeatures::allowsNavigationItem($item)) {
+            return false;
+        }
+
         $permission = $item['permission'] ?? null;
 
         if ($permission !== null && ! $role->hasPermissionTo($permission)) {

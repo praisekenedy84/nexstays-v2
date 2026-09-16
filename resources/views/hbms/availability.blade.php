@@ -10,7 +10,7 @@
 
     <div class="grid gap-6 xl:grid-cols-[360px_1fr]">
         <aside class="space-y-6">
-            <section class="card p-6">
+            <section class="card p-4 sm:p-6">
                 <h2 class="text-lg font-bold text-ink">Search availability</h2>
                 <p class="mt-1 text-sm text-ink-muted">Matches <code class="text-xs">GET /api/v1/availability</code></p>
 

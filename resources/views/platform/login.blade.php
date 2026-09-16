@@ -2,13 +2,13 @@
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
 <head>
     <meta charset="utf-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
     <title>Platform Admin — NexStay</title>
     <link rel="preconnect" href="https://fonts.bunny.net">
     <link href="https://fonts.bunny.net/css?family=plus-jakarta-sans:400,500,600,700&display=swap" rel="stylesheet">
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="flex min-h-screen items-center justify-center bg-slate-900 px-4">
+<body class="flex min-h-screen items-center justify-center bg-slate-900 px-4 py-8">
     <div class="w-full max-w-sm">
         <div class="mb-8 text-center">
             <span class="mx-auto mb-4 flex size-14 items-center justify-center rounded-full bg-white/10 text-sm font-bold text-white ring-1 ring-white/20">NS</span>

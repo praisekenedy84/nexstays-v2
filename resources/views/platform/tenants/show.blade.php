@@ -104,6 +104,33 @@
         @endforeach
     </div>
 
+    {{-- Modules --}}
+    <div class="mb-8">
+        <h3 class="mb-3 text-sm font-semibold text-slate-300">Modules</h3>
+        <div class="rounded-2xl bg-slate-800/60 p-5 ring-1 ring-white/5">
+            <p class="mb-4 text-xs text-slate-500">
+                Enabled modules control sidebar items, routes, and which permissions Tenant Admin can assign.
+            </p>
+            <form method="POST" action="{{ route('platform.tenants.features', $tenant->id) }}" class="space-y-4">
+                @csrf @method('PATCH')
+                @include('platform.tenants._modules', [
+                    'featureDefinitions' => $featureDefinitions,
+                    'enabledFeatures' => old('features', $enabledFeatures),
+                ])
+                @error('features')
+                    <p class="text-xs text-red-400">{{ $message }}</p>
+                @enderror
+                @error('features.*')
+                    <p class="text-xs text-red-400">{{ $message }}</p>
+                @enderror
+                <button type="submit"
+                    class="rounded-xl bg-indigo-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-indigo-500">
+                    Save modules
+                </button>
+            </form>
+        </div>
+    </div>
+
     {{-- Hotel settings --}}
     <div class="mb-8">
         <h3 class="mb-3 text-sm font-semibold text-slate-300">Settings</h3>

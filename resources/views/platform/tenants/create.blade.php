@@ -14,7 +14,7 @@
         </div>
     @endif
 
-    <div class="max-w-lg rounded-2xl bg-slate-900 p-6 ring-1 ring-white/10">
+    <div class="max-w-2xl rounded-2xl bg-slate-900 p-6 ring-1 ring-white/10">
         <p class="mb-6 text-sm text-slate-400">
             Provisioning creates the hotel's database schema, runs all migrations, seeds roles &amp; permissions, and creates the first GM account.
         </p>
@@ -78,6 +78,15 @@
                         placeholder="Auto-generated if empty" autocomplete="new-password"
                         class="w-full rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm text-white placeholder-slate-600 focus:border-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/30">
                 </div>
+            </fieldset>
+
+            <fieldset class="space-y-4 border-t border-white/5 pt-5">
+                <legend class="mb-1 text-xs font-semibold uppercase tracking-wider text-slate-500">Modules</legend>
+                <p class="text-xs text-slate-500">Choose which product modules this property can use. Roles and sidebar items are limited to enabled modules.</p>
+                @include('platform.tenants._modules', [
+                    'featureDefinitions' => $featureDefinitions,
+                    'enabledFeatures' => old('features', $enabledFeatures),
+                ])
             </fieldset>
 
             <div class="border-t border-white/5 pt-4">

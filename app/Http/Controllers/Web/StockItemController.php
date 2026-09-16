@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Domain\Inventory\Actions\RestockStockItem;
 use App\Domain\Inventory\Models\StockItem;
+use App\Domain\Inventory\Models\StockMovement;
 use App\Domain\Inventory\Services\BeverageStockLinkService;
 use App\Http\Requests\Web\RestockStockItemRequest;
 use App\Domain\Shared\Models\MenuItem;
@@ -233,5 +234,54 @@ class StockItemController extends Controller
         return redirect()
             ->route('tenant.stock-items.index', ['outlet_id' => $stockItem->outlet_id])
             ->with('success', "{$stockItem->name} restocked successfully.");
+    }
+
+    public function history(Request $request, StockItem $stockItem): View
+    {
+        $stockItem->load(['outlet', 'lastRestockedBy']);
+
+        $type = $request->query('type');
+        $allowedTypes = ['restock', 'purchase', 'consumption', 'stock_shortage'];
+        $type = in_array($type, $allowedTypes, true) ? $type : null;
+
+        $movements = $stockItem->movements()
+            ->with('performer')
+            ->when($type, fn ($q) => $q->where('movement_type', $type))
+            ->orderByDesc('created_at')
+            ->paginate(40)
+            ->withQueryString();
+
+        return view('modules.inventory.history', compact('stockItem', 'movements', 'type'));
+    }
+
+    public function movements(Request $request): View
+    {
+        $type = $request->query('type');
+        $allowedTypes = ['restock', 'purchase', 'consumption', 'stock_shortage'];
+        $type = in_array($type, $allowedTypes, true) ? $type : null;
+        $search = trim((string) $request->query('search', ''));
+        $outletId = $request->query('outlet_id');
+
+        $movements = StockMovement::query()
+            ->with(['performer', 'stockItem.outlet'])
+            ->when($type, fn ($q) => $q->where('movement_type', $type))
+            ->when($outletId, fn ($q) => $q->whereHas('stockItem', fn ($s) => $s->where('outlet_id', $outletId)))
+            ->when($search, function ($q) use ($search) {
+                $operator = $q->getConnection()->getDriverName() === 'pgsql' ? 'ilike' : 'like';
+                $q->whereHas('stockItem', fn ($s) => $s->where('name', $operator, "%{$search}%"));
+            })
+            ->orderByDesc('created_at')
+            ->paginate(40)
+            ->withQueryString();
+
+        $barOutlets = $this->beverageStockLink->barOutlets();
+
+        return view('modules.inventory.movements', compact(
+            'movements',
+            'type',
+            'search',
+            'outletId',
+            'barOutlets',
+        ));
     }
 }

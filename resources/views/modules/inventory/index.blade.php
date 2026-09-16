@@ -4,7 +4,7 @@
             @if ($barOutlets->isNotEmpty())
                 <div>
                     <label class="mb-1 block text-xs font-medium text-ink-muted">Bar outlet</label>
-                    <select name="outlet_id" class="input-field min-w-[180px]" onchange="this.form.submit()">
+                    <select name="outlet_id" class="input-field w-full min-w-0 sm:min-w-[180px]" onchange="this.form.submit()">
                         <option value="">All</option>
                         @foreach ($barOutlets as $outlet)
                             <option value="{{ $outlet->id }}" @selected($outletId === $outlet->id)>{{ $outlet->name }}</option>
@@ -23,6 +23,7 @@
                 </form>
                 <a href="{{ route('tenant.stock-items.create', ['outlet_id' => $outletId]) }}" class="btn-primary">Add stock item</a>
             @endcan
+            <a href="{{ route('tenant.stock-items.movements', ['outlet_id' => $outletId]) }}" class="btn-outline">Stock history</a>
         </div>
     </div>
 
@@ -120,6 +121,7 @@
                             @else
                                 —
                             @endif
+                            <a href="{{ route('tenant.stock-items.history', $item) }}" class="mt-1 block text-primary hover:underline">History</a>
                         </td>
                         @can('manage-inventory')
                             <td class="px-5 py-4 text-right whitespace-nowrap">

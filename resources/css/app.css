@@ -76,6 +76,42 @@
     body {
         @apply bg-surface font-sans text-ink antialiased;
     }
+
+    /* Prevent horizontal page scroll on narrow screens */
+    html {
+        overflow-x: clip;
+    }
+
+    /* Larger tap targets for form controls on touch devices */
+    @media (max-width: 1023px) {
+        .btn-primary,
+        .btn-outline {
+            min-height: 2.75rem;
+        }
+
+        .input-field {
+            min-height: 2.75rem;
+            font-size: 16px; /* avoid iOS zoom on focus */
+        }
+    }
+}
+
+/* Mobile off-canvas navigation */
+body.nav-open {
+    overflow: hidden;
+}
+
+body.nav-open #app-sidebar {
+    transform: translateX(0);
+}
+
+body.nav-open #nav-overlay {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+body.nav-open .nav-open-btn {
+    pointer-events: none;
 }
 
 @layer components {
@@ -150,5 +186,35 @@
 
     .filter-pill-active {
         @apply border-primary text-primary;
+    }
+
+    /* Horizontal scroll shell for wide tables (also applied via JS) */
+    .table-scroll {
+        @apply -mx-1 max-w-full overflow-x-auto overscroll-x-contain;
+    }
+
+    .table-scroll table {
+        @apply min-w-full;
+    }
+
+    /* Filter / action toolbars stay usable on phones */
+    .toolbar-scroll {
+        @apply flex flex-wrap items-end gap-3;
+    }
+}
+
+/* Unlayered so these beat Tailwind min-w utilities on phones */
+@media (max-width: 639px) {
+    form.flex.flex-wrap > div:has(> .input-field),
+    form.flex.flex-wrap > div:has(> select) {
+        flex: 1 1 100%;
+        min-width: 0;
+    }
+
+    form.flex.flex-wrap .input-field,
+    form.flex.flex-wrap select.input-field,
+    form.flex.flex-wrap select {
+        min-width: 0 !important;
+        width: 100%;
     }
 }

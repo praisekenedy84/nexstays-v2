@@ -65,10 +65,14 @@ final class HbmsNavigation
     }
 
     /**
-     * @param  array{id: string, permission?: string|null}  $item
+     * @param  array{id: string, permission?: string|null, feature?: string, features?: list<string>}  $item
      */
     private static function canSee(array $item, User $user): bool
     {
+        if (! TenantFeatures::allowsNavigationItem($item)) {
+            return false;
+        }
+
         $permission = $item['permission'] ?? null;
 
         if ($permission !== null && ! $user->can($permission)) {

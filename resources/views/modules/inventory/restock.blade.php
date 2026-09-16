@@ -1,6 +1,7 @@
 <x-layouts.app active-nav="inventory" title="Restock" :subtitle="$stockItem->name">
-    <div class="mb-6">
+    <div class="mb-6 flex flex-wrap items-center justify-between gap-3">
         <a href="{{ route('tenant.stock-items.index', ['outlet_id' => $stockItem->outlet_id]) }}" class="text-sm text-primary hover:underline">← Inventory</a>
+        <a href="{{ route('tenant.stock-items.history', $stockItem) }}" class="text-sm text-primary hover:underline">View stock history</a>
     </div>
 
     <div class="card mb-6 max-w-xl p-5">

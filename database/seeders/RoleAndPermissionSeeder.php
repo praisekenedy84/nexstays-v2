@@ -173,5 +173,7 @@ class RoleAndPermissionSeeder extends Seeder
         Role::findByName('guest', self::GUARD)->syncPermissions([
             'view-availability',
         ]);
+
+        app(\App\Domain\Shared\Actions\SyncFeatureCeiling::class)->execute();
     }
 }

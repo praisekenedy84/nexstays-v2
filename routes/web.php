@@ -39,6 +39,7 @@ Route::prefix('platform')->name('platform.')->group(function () {
         Route::get('tenants/create', [Platform\TenantController::class, 'create'])->name('tenants.create');
         Route::post('tenants', [Platform\TenantController::class, 'store'])->name('tenants.store');
         Route::get('tenants/{tenant}', [Platform\TenantController::class, 'show'])->name('tenants.show');
+        Route::patch('tenants/{tenant}/features', [Platform\TenantController::class, 'updateFeatures'])->name('tenants.features');
         Route::patch('tenants/{tenant}/settings', [Platform\TenantController::class, 'updateSettings'])->name('tenants.settings');
         Route::patch('tenants/{tenant}/suspend', [Platform\TenantController::class, 'suspend'])->name('tenants.suspend');
         Route::patch('tenants/{tenant}/restore', [Platform\TenantController::class, 'restore'])->name('tenants.restore');

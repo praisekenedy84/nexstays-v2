@@ -2,7 +2,7 @@
     /** @var \App\Models\User $authUser */
     $authUser        = auth()->user();
     $userRole        = $authUser->roles->first();
-    $permGroups      = \App\Http\Controllers\Web\RoleController::PERMISSION_GROUPS;
+    $permGroups      = \App\Http\Controllers\Web\RoleController::allowedPermissionGroups();
     $userPerms       = $authUser->getAllPermissions()->pluck('name')->flip()->all();
 @endphp
 <x-layouts.app active-nav="profile" title="My account" subtitle="Profile, password, and your access permissions">

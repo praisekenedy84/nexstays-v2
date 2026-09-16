@@ -1,5 +1,5 @@
 <x-layouts.app :active-nav="$navId" :title="$facilityLabel" subtitle="Record attendance and collect fees">
-    <div class="mb-6 grid gap-4 sm:grid-cols-4">
+    <div class="mb-6 grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
         <x-ui.kpi-card label="Today" :value="$todayCount" period="visits recorded" />
         <x-ui.kpi-card label="Today" :value="$todayPeople" period="people" />
         <x-ui.kpi-card label="Period collected" :value="number_format($periodTotal, 0)" :period="config('nexstay.currency.default', 'TZS')" />

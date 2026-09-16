@@ -99,11 +99,11 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
         Route::get('/profile', [ProfileController::class, 'edit'])->name('profile.edit');
         Route::put('/profile', [ProfileController::class, 'update'])->name('profile.update');
 
-        Route::middleware('permission:view-availability')->group(function () {
+        Route::middleware(['permission:view-availability', 'feature:hotel'])->group(function () {
             Route::get('/availability', [AvailabilityController::class, 'index'])->name('availability');
         });
 
-        Route::middleware('permission:view-reservations|manage-reservations')->group(function () {
+        Route::middleware(['permission:view-reservations|manage-reservations', 'feature:hotel'])->group(function () {
             Route::post('/reservations/bulk-action', [ReservationController::class, 'bulkAction'])
                 ->middleware('permission:manage-reservations')
                 ->name('reservations.bulk-action');
@@ -145,12 +145,12 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::resource('reservations', ReservationController::class);
         });
 
-        Route::middleware('permission:view-guests|manage-guests')->group(function () {
+        Route::middleware(['permission:view-guests|manage-guests', 'feature:hotel'])->group(function () {
             Route::get('/guests/search', [GuestController::class, 'search'])->name('guests.search');
             Route::resource('guests', GuestController::class)->except(['show']);
         });
 
-        Route::middleware('permission:view-rooms|manage-rooms|manage-room-status')->group(function () {
+        Route::middleware(['permission:view-rooms|manage-rooms|manage-room-status', 'feature:hotel'])->group(function () {
             Route::get('/rooms', [RoomController::class, 'index'])->name('rooms.index');
             Route::middleware('permission:manage-rooms')->group(function () {
                 Route::get('/rooms/create', [RoomController::class, 'create'])->name('rooms.create');
@@ -165,7 +165,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-rooms|manage-room-types')->group(function () {
+        Route::middleware(['permission:view-rooms|manage-room-types', 'feature:hotel'])->group(function () {
             Route::get('/room-types', [RoomTypeController::class, 'index'])->name('room-types.index');
             Route::middleware('permission:manage-room-types')->group(function () {
                 Route::get('/room-types/create', [RoomTypeController::class, 'create'])->name('room-types.create');
@@ -176,7 +176,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-reservations|manage-rate-plans')->group(function () {
+        Route::middleware(['permission:view-reservations|manage-rate-plans', 'feature:hotel'])->group(function () {
             Route::get('/rate-plans', [RatePlanController::class, 'index'])->name('rate-plans.index');
             Route::middleware('permission:manage-rate-plans')->group(function () {
                 Route::get('/rate-plans/create', [RatePlanController::class, 'create'])->name('rate-plans.create');
@@ -199,43 +199,51 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::put('/finance/settings', [FinanceSettingsController::class, 'update'])->name('finance.settings.update');
             Route::get('/finance/payment-methods', [FinanceSettingsController::class, 'paymentMethodsEdit'])->name('finance.payment-methods.edit');
             Route::put('/finance/payment-methods', [FinanceSettingsController::class, 'paymentMethodsUpdate'])->name('finance.payment-methods.update');
-            Route::get('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsEdit'])->name('finance.fb-settings.edit');
-            Route::put('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsUpdate'])->name('finance.fb-settings.update');
-            Route::get('/finance/facility-settings', [FinanceSettingsController::class, 'facilitySettingsEdit'])->name('finance.facility-settings.edit');
-            Route::put('/finance/facility-settings', [FinanceSettingsController::class, 'facilitySettingsUpdate'])->name('finance.facility-settings.update');
+            Route::get('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsEdit'])
+                ->middleware('feature:restaurant,bar,lounge')
+                ->name('finance.fb-settings.edit');
+            Route::put('/finance/fb-settings', [FinanceSettingsController::class, 'fbSettingsUpdate'])
+                ->middleware('feature:restaurant,bar,lounge')
+                ->name('finance.fb-settings.update');
+            Route::get('/finance/facility-settings', [FinanceSettingsController::class, 'facilitySettingsEdit'])
+                ->middleware('feature:facilities')
+                ->name('finance.facility-settings.edit');
+            Route::put('/finance/facility-settings', [FinanceSettingsController::class, 'facilitySettingsUpdate'])
+                ->middleware('feature:facilities')
+                ->name('finance.facility-settings.update');
         });
 
-        Route::middleware('permission:view-reports|view-fb-reports|view-reservations')->group(function () {
-            Route::get('/reports', ReportController::class)->name('reports');
-            Route::get('/reports/sales-summary', [SalesSummaryReportController::class, 'index'])->name('reports.sales-summary');
-            Route::get('/reports/sales-summary/export-excel', [SalesSummaryReportController::class, 'exportExcel'])->name('reports.sales-summary.export-excel');
-            Route::get('/reports/sales-summary/export-pdf', [SalesSummaryReportController::class, 'exportPdf'])->name('reports.sales-summary.export-pdf');
-            Route::get('/reports/bar-sales-summary', [MenuItemSalesSummaryReportController::class, 'barIndex'])->name('reports.bar-sales-summary');
-            Route::get('/reports/bar-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'barExportExcel'])->name('reports.bar-sales-summary.export-excel');
-            Route::get('/reports/bar-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'barExportPdf'])->name('reports.bar-sales-summary.export-pdf');
-            Route::get('/reports/lounge-sales-summary', [MenuItemSalesSummaryReportController::class, 'loungeIndex'])->name('reports.lounge-sales-summary');
-            Route::get('/reports/lounge-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'loungeExportExcel'])->name('reports.lounge-sales-summary.export-excel');
-            Route::get('/reports/lounge-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'loungeExportPdf'])->name('reports.lounge-sales-summary.export-pdf');
-            Route::get('/reports/fb-revenue', [FbReportController::class, 'index'])->name('reports.fb-revenue');
-            Route::get('/reports/fb-revenue/export', [FbReportController::class, 'exportRevenueCsv'])->name('reports.fb-revenue.export');
-            Route::get('/reports/fb-revenue/export-excel', [FbReportController::class, 'exportRevenueExcel'])->name('reports.fb-revenue.export-excel');
-            Route::get('/reports/fb-revenue/export-pdf', [FbReportController::class, 'exportRevenuePdf'])->name('reports.fb-revenue.export-pdf');
-            Route::get('/reports/fb-profitability', [FbReportController::class, 'profitability'])->name('reports.fb-profitability');
-            Route::get('/reports/fb-profitability/export', [FbReportController::class, 'exportProfitabilityCsv'])->name('reports.fb-profitability.export');
-            Route::get('/reports/fb-profitability/export-excel', [FbReportController::class, 'exportProfitabilityExcel'])->name('reports.fb-profitability.export-excel');
-            Route::get('/reports/fb-profitability/export-pdf', [FbReportController::class, 'exportProfitabilityPdf'])->name('reports.fb-profitability.export-pdf');
-            Route::get('/reports/menu-item-sales-summary', [MenuItemSalesSummaryReportController::class, 'index'])->name('reports.menu-item-sales-summary');
-            Route::get('/reports/menu-item-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'exportExcel'])->name('reports.menu-item-sales-summary.export-excel');
-            Route::get('/reports/menu-item-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'exportPdf'])->name('reports.menu-item-sales-summary.export-pdf');
+        Route::middleware(['permission:view-reports|view-fb-reports|view-reservations', 'feature:hotel,restaurant,bar,lounge'])->group(function () {
+            Route::get('/reports', ReportController::class)->middleware('feature:hotel')->name('reports');
+            Route::get('/reports/sales-summary', [SalesSummaryReportController::class, 'index'])->middleware('feature:hotel')->name('reports.sales-summary');
+            Route::get('/reports/sales-summary/export-excel', [SalesSummaryReportController::class, 'exportExcel'])->middleware('feature:hotel')->name('reports.sales-summary.export-excel');
+            Route::get('/reports/sales-summary/export-pdf', [SalesSummaryReportController::class, 'exportPdf'])->middleware('feature:hotel')->name('reports.sales-summary.export-pdf');
+            Route::get('/reports/bar-sales-summary', [MenuItemSalesSummaryReportController::class, 'barIndex'])->middleware('feature:bar')->name('reports.bar-sales-summary');
+            Route::get('/reports/bar-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'barExportExcel'])->middleware('feature:bar')->name('reports.bar-sales-summary.export-excel');
+            Route::get('/reports/bar-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'barExportPdf'])->middleware('feature:bar')->name('reports.bar-sales-summary.export-pdf');
+            Route::get('/reports/lounge-sales-summary', [MenuItemSalesSummaryReportController::class, 'loungeIndex'])->middleware('feature:lounge')->name('reports.lounge-sales-summary');
+            Route::get('/reports/lounge-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'loungeExportExcel'])->middleware('feature:lounge')->name('reports.lounge-sales-summary.export-excel');
+            Route::get('/reports/lounge-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'loungeExportPdf'])->middleware('feature:lounge')->name('reports.lounge-sales-summary.export-pdf');
+            Route::get('/reports/fb-revenue', [FbReportController::class, 'index'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-revenue');
+            Route::get('/reports/fb-revenue/export', [FbReportController::class, 'exportRevenueCsv'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-revenue.export');
+            Route::get('/reports/fb-revenue/export-excel', [FbReportController::class, 'exportRevenueExcel'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-revenue.export-excel');
+            Route::get('/reports/fb-revenue/export-pdf', [FbReportController::class, 'exportRevenuePdf'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-revenue.export-pdf');
+            Route::get('/reports/fb-profitability', [FbReportController::class, 'profitability'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-profitability');
+            Route::get('/reports/fb-profitability/export', [FbReportController::class, 'exportProfitabilityCsv'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-profitability.export');
+            Route::get('/reports/fb-profitability/export-excel', [FbReportController::class, 'exportProfitabilityExcel'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-profitability.export-excel');
+            Route::get('/reports/fb-profitability/export-pdf', [FbReportController::class, 'exportProfitabilityPdf'])->middleware('feature:restaurant,bar,lounge')->name('reports.fb-profitability.export-pdf');
+            Route::get('/reports/menu-item-sales-summary', [MenuItemSalesSummaryReportController::class, 'index'])->middleware('feature:restaurant,bar,lounge')->name('reports.menu-item-sales-summary');
+            Route::get('/reports/menu-item-sales-summary/export-excel', [MenuItemSalesSummaryReportController::class, 'exportExcel'])->middleware('feature:restaurant,bar,lounge')->name('reports.menu-item-sales-summary.export-excel');
+            Route::get('/reports/menu-item-sales-summary/export-pdf', [MenuItemSalesSummaryReportController::class, 'exportPdf'])->middleware('feature:restaurant,bar,lounge')->name('reports.menu-item-sales-summary.export-pdf');
         });
-        Route::middleware('permission:manage-reservations')->group(function () {
+        Route::middleware(['permission:manage-reservations', 'feature:hotel'])->group(function () {
             Route::put('/reports/delivery-settings', [ReportDeliverySettingsController::class, 'update'])
                 ->name('reports.delivery-settings.update');
             Route::post('/reports/delivery-settings/send-now', [ReportDeliverySettingsController::class, 'sendNow'])
                 ->name('reports.delivery-settings.send-now');
         });
 
-        Route::middleware('permission:view-reports|view-reservations')->group(function () {
+        Route::middleware(['permission:view-reports|view-reservations', 'feature:hotel'])->group(function () {
             Route::get('/reports/room-reservations', [RoomReservationReportController::class, 'index'])
                 ->name('reports.room-reservations');
             Route::get('/reports/room-reservations/export', [RoomReservationReportController::class, 'exportCsv'])
@@ -276,7 +284,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
                 ->name('reports.payment-summary.export-pdf');
         });
 
-        Route::middleware('permission:view-facility-reports')->group(function () {
+        Route::middleware(['permission:view-facility-reports', 'feature:facilities'])->group(function () {
             Route::get('/reports/pool-attendance', [FacilityAttendanceReportController::class, 'pool'])->name('reports.pool-attendance');
             Route::get('/reports/pool-attendance/export-excel', [FacilityAttendanceReportController::class, 'poolExportExcel'])->name('reports.pool-attendance.export-excel');
             Route::get('/reports/pool-attendance/export-pdf', [FacilityAttendanceReportController::class, 'poolExportPdf'])->name('reports.pool-attendance.export-pdf');
@@ -285,7 +293,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/reports/gym-attendance/export-pdf', [FacilityAttendanceReportController::class, 'gymExportPdf'])->name('reports.gym-attendance.export-pdf');
         });
 
-        Route::middleware('permission:view-facility-attendance|record-facility-attendance')->group(function () {
+        Route::middleware(['permission:view-facility-attendance|record-facility-attendance', 'feature:facilities'])->group(function () {
             Route::get('/facilities/pool', [FacilityAttendanceController::class, 'pool'])->name('facilities.pool');
             Route::get('/facilities/gym', [FacilityAttendanceController::class, 'gym'])->name('facilities.gym');
             Route::get('/facilities/attendance/{attendance}/receipt', [FacilityAttendanceController::class, 'receipt'])->name('facilities.attendance.receipt');
@@ -297,16 +305,16 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-debts')->group(function () {
+        Route::middleware(['permission:view-debts', 'feature:hotel'])->group(function () {
             Route::get('/debts', [DebtController::class, 'index'])->name('debts.index');
         });
 
-        Route::middleware('permission:view-reservations')->group(function () {
+        Route::middleware(['permission:view-reservations', 'feature:hotel'])->group(function () {
             Route::get('/booked-list', [BookedListController::class, 'index'])->name('booked-list.index');
             Route::get('/time-left', [TimeLeftController::class, 'index'])->name('time-left.index');
         });
 
-        Route::middleware('permission:view-purchases|manage-purchases')->group(function () {
+        Route::middleware(['permission:view-purchases|manage-purchases', 'feature:inventory'])->group(function () {
             Route::get('/purchases', [PurchaseController::class, 'index'])->name('purchases.index');
             Route::middleware('permission:manage-purchases')->group(function () {
                 Route::get('/purchases/create', [PurchaseController::class, 'create'])->name('purchases.create');
@@ -330,7 +338,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-ancillary-services|manage-ancillary-services')->group(function () {
+        Route::middleware(['permission:view-ancillary-services|manage-ancillary-services', 'feature:hotel'])->group(function () {
             Route::get('/ancillary-services', [AncillaryServiceController::class, 'index'])->name('ancillary-services.index');
             Route::middleware('permission:manage-ancillary-services')->group(function () {
                 Route::get('/ancillary-services/create', [AncillaryServiceController::class, 'create'])->name('ancillary-services.create');
@@ -346,7 +354,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-damage|manage-damage')->group(function () {
+        Route::middleware(['permission:view-damage|manage-damage', 'feature:hotel'])->group(function () {
             Route::get('/damages', [RoomDamageController::class, 'index'])->name('damages.index');
             Route::middleware('permission:manage-damage')->group(function () {
                 Route::get('/damages/create', [RoomDamageController::class, 'create'])->name('damages.create');
@@ -358,7 +366,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-outlets|manage-outlets')->group(function () {
+        Route::middleware(['permission:view-outlets|manage-outlets', 'feature:restaurant,bar,lounge'])->group(function () {
             Route::get('/outlets', [OutletController::class, 'index'])->name('outlets.index');
             Route::middleware('permission:manage-outlets')->group(function () {
                 Route::get('/outlets/create', [OutletController::class, 'create'])->name('outlets.create');
@@ -376,10 +384,17 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-orders')->group(function () {
+        Route::middleware(['permission:view-orders', 'feature:restaurant'])->group(function () {
             Route::get('/restaurant', [RestaurantController::class, 'index'])->name('restaurant.index');
+        });
+        Route::middleware(['permission:view-orders', 'feature:bar'])->group(function () {
             Route::get('/bar', [BarController::class, 'index'])->name('bar.index');
+        });
+        Route::middleware(['permission:view-orders', 'feature:lounge'])->group(function () {
             Route::get('/lounge', [LoungeController::class, 'index'])->name('lounge.index');
+        });
+
+        Route::middleware(['permission:view-orders', 'feature:restaurant,bar,lounge'])->group(function () {
             Route::get('/fb/orders', [FbOrderController::class, 'index'])->name('fb.orders.index');
             Route::get('/fb/orders/{order}', [FbOrderController::class, 'show'])->name('fb.orders.show');
 
@@ -389,7 +404,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::get('/shift/all', [ShiftSummaryController::class, 'all'])->name('shift.all');
         });
 
-        Route::middleware('permission:manage-orders|manage-all-orders|manage-own-orders')->group(function () {
+        Route::middleware(['permission:manage-orders|manage-all-orders|manage-own-orders', 'feature:restaurant,bar,lounge'])->group(function () {
             Route::delete('/fb/orders/{order}', [FbOrderController::class, 'destroy'])->name('fb.orders.destroy');
             Route::post('/pos/{outlet}/orders', [PosController::class, 'createOrder'])->name('pos.orders.create');
             Route::post('/pos/orders/{order}/items', [PosController::class, 'addItem'])->name('pos.orders.add-item');
@@ -402,11 +417,11 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::post('/pos/orders/{order}/cancel', [PosController::class, 'cancelOrder'])->name('pos.orders.cancel');
         });
 
-        Route::middleware('permission:view-orders')->group(function () {
+        Route::middleware(['permission:view-orders', 'feature:restaurant,bar,lounge'])->group(function () {
             Route::get('/pos/orders/{order}/receipt', [PosController::class, 'receipt'])->name('pos.orders.receipt');
         });
 
-        Route::middleware('permission:view-till|manage-till')->group(function () {
+        Route::middleware(['permission:view-till|manage-till', 'feature:restaurant,bar,lounge'])->group(function () {
             Route::get('/till', [TillController::class, 'index'])->name('till.index');
             Route::middleware('permission:manage-till')->group(function () {
                 Route::get('/till/create', [TillController::class, 'create'])->name('till.create');
@@ -416,7 +431,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             });
         });
 
-        Route::middleware('permission:view-menu|manage-menu')->group(function () {
+        Route::middleware(['permission:view-menu|manage-menu', 'feature:restaurant,bar,lounge'])->group(function () {
             Route::get('/menu-categories', [MenuCategoryController::class, 'index'])->name('menu-categories.index');
             Route::middleware('permission:manage-menu')->group(function () {
                 Route::get('/menu-categories/create', [MenuCategoryController::class, 'create'])->name('menu-categories.create');
@@ -432,8 +447,10 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::resource('menu-items', MenuItemController::class)->except(['show']);
         });
 
-        Route::middleware('permission:view-inventory|manage-inventory')->group(function () {
+        Route::middleware(['permission:view-inventory|manage-inventory', 'feature:inventory'])->group(function () {
             Route::get('/stock-items/json', [StockItemController::class, 'json'])->name('stock-items.json');
+            Route::get('/stock-items/history', [StockItemController::class, 'movements'])->name('stock-items.movements');
+            Route::get('/stock-items/{stockItem}/history', [StockItemController::class, 'history'])->name('stock-items.history');
             Route::get('/stock-items/{stockItem}/restock', [StockItemController::class, 'restockForm'])
                 ->middleware('permission:manage-inventory')
                 ->name('stock-items.restock-form');
@@ -496,6 +513,7 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
 
         // Public: guest booking engine uses X-Tenant-Id header.
         Route::get('/availability', [ApiAvailabilityController::class, 'index'])
+            ->middleware('feature:hotel')
             ->name('availability.index');
 
         // Authenticated tenant routes.
@@ -507,40 +525,40 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                 Route::get('/users', [ApiUserController::class, 'index'])->name('users.index');
             });
 
-            Route::middleware('permission:view-guests|manage-guests')->group(function () {
+            Route::middleware(['permission:view-guests|manage-guests', 'feature:hotel'])->group(function () {
                 Route::get('/guests', [ApiGuestController::class, 'index'])->name('guests.index');
                 Route::get('/guests/{guest}', [ApiGuestController::class, 'show'])->name('guests.show');
             });
 
-            Route::middleware('permission:manage-guests')->group(function () {
+            Route::middleware(['permission:manage-guests', 'feature:hotel'])->group(function () {
                 Route::post('/guests', [ApiGuestController::class, 'store'])->name('guests.store');
                 Route::patch('/guests/{guest}', [ApiGuestController::class, 'update'])->name('guests.update');
             });
 
-            Route::middleware('permission:view-rooms|manage-room-status')->group(function () {
+            Route::middleware(['permission:view-rooms|manage-room-status', 'feature:hotel'])->group(function () {
                 Route::get('/rooms', [ApiRoomController::class, 'index'])->name('rooms.index');
                 Route::get('/rooms/{room}', [ApiRoomController::class, 'show'])->name('rooms.show');
             });
 
-            Route::middleware('permission:manage-rooms|manage-room-status')->group(function () {
+            Route::middleware(['permission:manage-rooms|manage-room-status', 'feature:hotel'])->group(function () {
                 Route::patch('/rooms/{room}', [ApiRoomController::class, 'update'])->name('rooms.update');
             });
 
-            Route::middleware('permission:manage-room-status')->group(function () {
+            Route::middleware(['permission:manage-room-status', 'feature:hotel'])->group(function () {
                 Route::patch('/rooms/{room}/status', [ApiRoomController::class, 'updateStatus'])
                     ->name('rooms.status');
             });
 
-            Route::middleware('permission:view-availability')->group(function () {
+            Route::middleware(['permission:view-availability', 'feature:hotel'])->group(function () {
                 Route::get('/room-types', [ApiRoomTypeController::class, 'index'])->name('room-types.index');
                 Route::get('/room-types/{roomType}', [ApiRoomTypeController::class, 'show'])->name('room-types.show');
             });
 
-            Route::middleware('permission:view-folios|post-folio-charges')->group(function () {
+            Route::middleware(['permission:view-folios|post-folio-charges', 'feature:hotel'])->group(function () {
                 Route::get('/folios/{folio}', [FolioController::class, 'show'])->name('folios.show');
             });
 
-            Route::middleware('permission:post-folio-charges')->group(function () {
+            Route::middleware(['permission:post-folio-charges', 'feature:hotel'])->group(function () {
                 Route::post('/folios/{folio}/transactions', [FolioController::class, 'postCharge'])
                     ->name('folios.transactions.store');
                 Route::post('/folios/{folio}/payments', [FolioController::class, 'postPayment'])
@@ -549,7 +567,7 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                     ->name('folios.write-off');
             });
 
-            Route::middleware('permission:view-outlets')->group(function () {
+            Route::middleware(['permission:view-outlets', 'feature:restaurant,bar,lounge'])->group(function () {
                 Route::get('/outlets', [ApiOutletController::class, 'index'])->name('outlets.index');
                 Route::get('/outlets/{outlet}', [ApiOutletController::class, 'show'])->name('outlets.show');
                 Route::get('/outlets/{outlet}/tables', [ApiOutletController::class, 'tables'])->name('outlets.tables');
@@ -560,22 +578,22 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                 Route::post('/outlets/{outlet}/tabs', [BarTabController::class, 'store'])->name('outlets.tabs.store');
             });
 
-            Route::middleware('permission:view-orders')->group(function () {
+            Route::middleware(['permission:view-orders', 'feature:restaurant,bar,lounge'])->group(function () {
                 Route::get('/orders/{order}', [ApiOrderController::class, 'show'])->name('orders.show');
             });
 
-            Route::middleware('permission:manage-orders|manage-all-orders|manage-own-orders')->group(function () {
+            Route::middleware(['permission:manage-orders|manage-all-orders|manage-own-orders', 'feature:restaurant,bar,lounge'])->group(function () {
                 Route::post('/orders/{order}/items', [ApiOrderController::class, 'addItems'])->name('orders.items.store');
                 Route::post('/orders/{order}/fire', [ApiOrderController::class, 'fire'])->name('orders.fire');
                 Route::post('/orders/{order}/post-to-folio', [ApiOrderController::class, 'postToFolio'])->name('orders.post-to-folio');
                 Route::post('/orders/{order}/cash-payment', [ApiOrderController::class, 'cashPayment'])->name('orders.cash-payment');
             });
 
-            Route::middleware('permission:manage-orders|manage-all-orders|manage-own-orders|process-kitchen-orders')->group(function () {
+            Route::middleware(['permission:manage-orders|manage-all-orders|manage-own-orders|process-kitchen-orders', 'feature:restaurant,bar,lounge'])->group(function () {
                 Route::patch('/orders/{order}/items/status', [ApiOrderController::class, 'updateItemStatus'])->name('orders.items.status');
             });
 
-            Route::prefix('tills')->name('tills.')->group(function () {
+            Route::prefix('tills')->name('tills.')->middleware('feature:restaurant,bar,lounge')->group(function () {
                 Route::middleware('permission:manage-till')->group(function () {
                     Route::post('/open', [ApiTillController::class, 'open'])->name('open');
                     Route::get('/active', [ApiTillController::class, 'active'])->name('active');
@@ -586,36 +604,36 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                 });
             });
 
-            Route::middleware('permission:view-inventory|manage-inventory')->group(function () {
+            Route::middleware(['permission:view-inventory|manage-inventory', 'feature:inventory'])->group(function () {
                 Route::get('/inventory/stock-items', [ApiStockItemController::class, 'index'])->name('inventory.stock-items.index');
                 Route::post('/inventory/stock-items', [ApiStockItemController::class, 'store'])->name('inventory.stock-items.store');
                 Route::patch('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'update'])->name('inventory.stock-items.update');
                 Route::delete('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'destroy'])->name('inventory.stock-items.destroy');
             });
 
-            Route::middleware('permission:manage-menu')->group(function () {
+            Route::middleware(['permission:manage-menu', 'feature:restaurant,bar,lounge'])->group(function () {
                 Route::post('/outlets/{outlet}/menu/items', [ApiMenuItemController::class, 'store'])->name('outlets.menu.items.store');
                 Route::patch('/menu-items/{menuItem}', [ApiMenuItemController::class, 'update'])->name('menu-items.update');
                 Route::delete('/menu-items/{menuItem}', [ApiMenuItemController::class, 'destroy'])->name('menu-items.destroy');
                 Route::post('/menu-items/{menuItem}/toggle', [ApiMenuItemController::class, 'toggle'])->name('menu-items.toggle');
             });
 
-            Route::middleware('permission:view-debts')->group(function () {
+            Route::middleware(['permission:view-debts', 'feature:hotel'])->group(function () {
                 Route::get('/reports/debts', [ApiReportController::class, 'debts'])->name('reports.debts');
             });
 
-            Route::middleware('permission:view-fb-reports')->group(function () {
+            Route::middleware(['permission:view-fb-reports', 'feature:restaurant,bar,lounge'])->group(function () {
                 Route::get('/reports/fb-revenue', [ApiReportController::class, 'fbRevenue'])->name('reports.fb-revenue');
             });
 
-            Route::middleware('permission:view-reports|view-reservations')->group(function () {
+            Route::middleware(['permission:view-reports|view-reservations', 'feature:hotel'])->group(function () {
                 Route::get('/reports/room-reservations', [ApiReportController::class, 'roomReservations'])
                     ->name('reports.room-reservations');
                 Route::get('/reports/room-payments-accounting', [ApiReportController::class, 'roomPaymentsAccounting'])
                     ->name('reports.room-payments-accounting');
             });
 
-            Route::prefix('reservations')->name('reservations.')->group(function () {
+            Route::prefix('reservations')->name('reservations.')->middleware('feature:hotel')->group(function () {
                 Route::middleware('permission:view-reservations|manage-reservations')->group(function () {
                     Route::get('/', [ApiReservationController::class, 'index'])->name('index');
                     Route::get('/{reservation}', [ApiReservationController::class, 'show'])->name('show');
