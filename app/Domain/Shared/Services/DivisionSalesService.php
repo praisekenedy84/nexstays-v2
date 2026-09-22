@@ -629,6 +629,24 @@ class DivisionSalesService
             : "date({$column})";
     }
 
+    /**
+     * Normalize SQL date/datetime day keys to Y-m-d without timezone day-shift.
+     */
+    private function normalizeSqlDayKey(mixed $dayKey): string
+    {
+        if ($dayKey instanceof \DateTimeInterface) {
+            return $dayKey->format('Y-m-d');
+        }
+
+        $raw = trim((string) $dayKey);
+
+        if (preg_match('/^(\d{4}-\d{2}-\d{2})/', $raw, $matches) === 1) {
+            return $matches[1];
+        }
+
+        return Carbon::parse($raw)->toDateString();
+    }
+
     private function sqlStayNightsExpression(string $checkIn, string $checkOut): string
     {
         return DB::connection()->getDriverName() === 'pgsql'
@@ -771,7 +789,7 @@ class DivisionSalesService
             ->get();
 
         foreach ($folioRows as $row) {
-            $day = Carbon::parse((string) $row->day_key)->toDateString();
+            $day = $this->normalizeSqlDayKey($row->day_key);
             $byDay[$day] ??= $empty();
             $amount = (float) $row->total;
 
@@ -806,7 +824,7 @@ class DivisionSalesService
             ->get();
 
         foreach ($directRows as $row) {
-            $day = Carbon::parse((string) $row->day_key)->toDateString();
+            $day = $this->normalizeSqlDayKey($row->day_key);
             $byDay[$day] ??= $empty();
             $byDay[$day]['restaurant'] += (float) $row->food;
             $byDay[$day]['bar'] += (float) $row->drinks;
@@ -851,7 +869,7 @@ class DivisionSalesService
             ->groupByRaw($paymentDayExpr)
             ->get()
             ->mapWithKeys(fn ($row) => [
-                Carbon::parse((string) $row->day_key)->toDateString() => (float) $row->total,
+                $this->normalizeSqlDayKey($row->day_key) => (float) $row->total,
             ]);
 
         $roomNightsByDay = $this->occupiedRoomNightsByDay($start, $end);

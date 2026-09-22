@@ -71,7 +71,7 @@
                             @if ($trendIsHourly)
                                 Hourly posted sales · {{ $trendFrom->format('d M Y') }}
                             @else
-                                Daily posted sales · {{ $trendFrom->format('d M Y') }} – {{ $trendTo->format('d M Y') }}
+                                Daily posted sales (all divisions) · {{ $trendFrom->format('d M Y') }} – {{ $trendTo->format('d M Y') }}
                             @endif
                             @if ($trendTo->isToday() && ! $trendIsHourly)
                                 · includes live data for today

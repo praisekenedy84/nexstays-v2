@@ -160,12 +160,12 @@ class DashboardController extends Controller
             $revenueTrend
         );
 
-        $hotelTrendValues = $showFbSummary
-            ? array_map(
-                fn (array $point): float => (float) $point['rooms'] + (float) $point['ancillary'],
-                $revenueTrend
-            )
-            : array_map(fn (array $point): float => (float) $point['total'], $revenueTrend);
+        // Hotel chart shows overall posted sales (same as pre-split dashboards) so
+        // historical totals remain visible; the F&B chart below isolates restaurant/bar.
+        $hotelTrendValues = array_map(
+            fn (array $point): float => (float) $point['total'],
+            $revenueTrend
+        );
 
         $hotelTrendTotal = array_sum($hotelTrendValues);
         $fbTrendTotal = array_sum($fbRevenueTrend);
