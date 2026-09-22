@@ -2,7 +2,7 @@
 
 <aside
     id="app-sidebar"
-    class="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] max-w-xs -translate-x-full flex-col border-r border-slate-200/80 bg-white px-3 py-5 transition-transform duration-200 ease-out dark:bg-slate-900 dark:border-slate-700/60 lg:static lg:z-auto lg:w-56 lg:max-w-none lg:translate-x-0 lg:py-6"
+    class="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] max-w-xs -translate-x-full flex-col border-r border-slate-200/80 bg-white px-3 py-5 transition-[translate] duration-200 ease-out dark:bg-slate-900 dark:border-slate-700/60 lg:static lg:z-auto lg:w-56 lg:max-w-none lg:translate-x-0 lg:py-6"
     aria-label="Sidebar"
 >
     <div class="mb-1 flex items-center gap-2">

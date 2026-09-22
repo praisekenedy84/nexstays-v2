@@ -96,13 +96,15 @@
     }
 }
 
-/* Mobile off-canvas navigation */
+/* Mobile off-canvas navigation
+   Tailwind v4 uses the `translate` property (not `transform`) for -translate-x-*. */
 body.nav-open {
     overflow: hidden;
 }
 
 body.nav-open #app-sidebar {
-    transform: translateX(0);
+    --tw-translate-x: 0;
+    translate: 0;
 }
 
 body.nav-open #nav-overlay {

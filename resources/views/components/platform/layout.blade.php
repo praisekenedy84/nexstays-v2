@@ -23,7 +23,7 @@
         {{-- Sidebar --}}
         <aside
             id="app-sidebar"
-            class="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] max-w-xs -translate-x-full flex-col border-r border-white/5 bg-slate-900 px-3 py-5 transition-transform duration-200 ease-out lg:static lg:z-auto lg:w-56 lg:max-w-none lg:translate-x-0 lg:py-6"
+            class="fixed inset-y-0 left-0 z-50 flex w-[min(18rem,85vw)] max-w-xs -translate-x-full flex-col border-r border-white/5 bg-slate-900 px-3 py-5 transition-[translate] duration-200 ease-out lg:static lg:z-auto lg:w-56 lg:max-w-none lg:translate-x-0 lg:py-6"
             aria-label="Sidebar"
         >
             <div class="mb-6 flex items-center gap-2 px-2">
