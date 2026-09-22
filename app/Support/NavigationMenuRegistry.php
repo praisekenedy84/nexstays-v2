@@ -73,7 +73,7 @@ final class NavigationMenuRegistry
     }
 
     /**
-     * @param  array{id: string, permission?: string|null}  $item
+     * @param  array{id: string, permission?: string|null, permission_any?: list<string>}  $item
      */
     public static function isVisibleForRole(array $item, Role $role): bool
     {
@@ -81,10 +81,24 @@ final class NavigationMenuRegistry
             return false;
         }
 
-        $permission = $item['permission'] ?? null;
+        $any = $item['permission_any'] ?? null;
+        if (is_array($any) && $any !== []) {
+            $hasAny = false;
+            foreach ($any as $permission) {
+                if ($role->hasPermissionTo($permission)) {
+                    $hasAny = true;
+                    break;
+                }
+            }
+            if (! $hasAny) {
+                return false;
+            }
+        } else {
+            $permission = $item['permission'] ?? null;
 
-        if ($permission !== null && ! $role->hasPermissionTo($permission)) {
-            return false;
+            if ($permission !== null && ! $role->hasPermissionTo($permission)) {
+                return false;
+            }
         }
 
         return ! in_array($item['id'], $role->hidden_navigation_ids ?? [], true);
@@ -103,15 +117,21 @@ final class NavigationMenuRegistry
     }
 
     /**
-     * @param  array{id: string, label: string, route?: string, permission?: string|null}  $item
-     * @return array{id: string, label: string, permission: string|null}
+     * @param  array{id: string, label: string, route?: string, permission?: string|null, permission_any?: list<string>}  $item
+     * @return array{id: string, label: string, permission: string|null, permission_any?: list<string>}
      */
     private static function normalizeItem(array $item): array
     {
-        return [
+        $normalized = [
             'id' => $item['id'],
             'label' => $item['label'],
             'permission' => $item['permission'] ?? null,
         ];
+
+        if (isset($item['permission_any']) && is_array($item['permission_any'])) {
+            $normalized['permission_any'] = $item['permission_any'];
+        }
+
+        return $normalized;
     }
 }

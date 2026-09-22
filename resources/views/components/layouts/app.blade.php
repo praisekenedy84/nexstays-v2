@@ -72,7 +72,7 @@
                 />
             @endisset
 
-            <main class="flex-1 overflow-auto px-4 pb-8 pt-3 sm:px-6 lg:px-8 lg:pt-2">
+            <main class="flex-1 overflow-auto px-4 pb-[max(2rem,env(safe-area-inset-bottom))] pt-3 sm:px-6 lg:px-8 lg:pt-2">
                 <x-ui.flash />
                 {{ $slot }}
             </main>

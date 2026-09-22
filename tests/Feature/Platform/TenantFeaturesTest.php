@@ -179,6 +179,75 @@ class TenantFeaturesTest extends TenantTestCase
         $this->assertEqualsCanonicalizing(TenantFeatures::keys(), TenantFeatures::enabled($this->tenant));
     }
 
+    public function test_reports_hub_hides_cards_for_disabled_modules(): void
+    {
+        $this->tenant->enabled_features = ['restaurant'];
+        $this->tenant->save();
+        tenancy()->initialize($this->tenant);
+        app(SyncFeatureCeiling::class)->execute($this->tenant);
+
+        $this->user->refresh();
+        $this->user->unsetRelation('roles');
+        $this->user->unsetRelation('permissions');
+
+        $labels = $this->flattenNavLabels(HbmsNavigation::forUser($this->user));
+        $this->assertContains('Reports hub', $labels);
+        $this->assertContains('Menu item sales', $labels);
+        $this->assertNotContains('Bar item sales', $labels);
+        $this->assertNotContains('Occupancy', $labels);
+
+        $html = $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.reports'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Menu item sales summary', $html);
+        $this->assertStringContainsString('F&amp;B revenue split', $html);
+        $this->assertStringNotContainsString('Bar item sales summary', $html);
+        $this->assertStringNotContainsString('Occupancy report', $html);
+        $this->assertStringNotContainsString('Pool attendance', $html);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.reports.bar-sales-summary'))
+            ->assertForbidden();
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.reports.occupancy'))
+            ->assertForbidden();
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.reports.menu-item-sales-summary'))
+            ->assertOk();
+    }
+
+    public function test_hotel_plus_restaurant_hides_bar_report_card(): void
+    {
+        $this->tenant->enabled_features = ['hotel', 'restaurant'];
+        $this->tenant->save();
+        tenancy()->initialize($this->tenant);
+        app(SyncFeatureCeiling::class)->execute($this->tenant);
+
+        $this->user->refresh();
+        $this->user->unsetRelation('roles');
+        $this->user->unsetRelation('permissions');
+
+        $html = $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.reports'))
+            ->assertOk()
+            ->getContent();
+
+        $this->assertStringContainsString('Sales summary', $html);
+        $this->assertStringContainsString('Occupancy report', $html);
+        $this->assertStringContainsString('Menu item sales summary', $html);
+        $this->assertStringNotContainsString('Bar item sales summary', $html);
+        $this->assertStringNotContainsString('Lounge item sales summary', $html);
+    }
+
     /**
      * @param  list<array<string, mixed>>  $nav
      * @return list<string>

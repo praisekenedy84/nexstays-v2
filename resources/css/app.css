@@ -201,6 +201,35 @@ body.nav-open .nav-open-btn {
     .toolbar-scroll {
         @apply flex flex-wrap items-end gap-3;
     }
+
+    /* Card headers with a title + large money total */
+    .card-money-header {
+        @apply flex flex-wrap items-center justify-between gap-2 border-b border-slate-100 px-4 py-3 sm:gap-3 sm:px-6 sm:py-4;
+    }
+
+    .card-money-header .money-total {
+        @apply shrink-0 text-base font-bold text-ink sm:text-lg;
+    }
+
+    /* Segmented scope / period toggles wrap instead of overflowing */
+    .segmented-control {
+        @apply flex max-w-full flex-wrap rounded-lg border border-slate-200 bg-slate-50 p-0.5
+               dark:border-slate-700 dark:bg-slate-800/60;
+    }
+
+    .segmented-control > a,
+    .segmented-control > button {
+        @apply min-h-9 flex-1 rounded-md px-2.5 py-1.5 text-center text-xs font-medium transition sm:flex-none sm:px-3;
+    }
+
+    /* Comfortable card body padding that tightens on phones */
+    .card-pad {
+        @apply p-4 sm:p-6;
+    }
+
+    .card-pad-x {
+        @apply px-4 sm:px-6;
+    }
 }
 
 /* Unlayered so these beat Tailwind min-w utilities on phones */

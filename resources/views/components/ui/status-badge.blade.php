@@ -16,6 +16,6 @@
     $label = str_replace('_', ' ', ucwords((string) $status));
 @endphp
 
-<span {{ $attributes->merge(['class' => "inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium {$classes}"]) }}>
+<span {{ $attributes->merge(['class' => "inline-flex shrink-0 rounded-full px-2.5 py-0.5 text-xs font-medium {$classes}"]) }}>
     {{ $label }}
 </span>

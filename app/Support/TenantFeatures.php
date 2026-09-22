@@ -132,6 +132,40 @@ final class TenantFeatures
     }
 
     /**
+     * Reports hub is available when any report-producing module is enabled.
+     */
+    public static function allowsReportsHub(?Tenant $tenant = null): bool
+    {
+        return self::allowsAny(
+            array_values(array_unique(array_merge(
+                ['hotel', 'facilities'],
+                config('nexstay.fb_feature_keys', ['restaurant', 'bar', 'lounge'])
+            ))),
+            $tenant
+        );
+    }
+
+    /**
+     * Feature flags used by the reports hub and related UI.
+     *
+     * @return array{hotel: bool, restaurant: bool, bar: bool, lounge: bool, fb: bool, facilities: bool, hub: bool}
+     */
+    public static function reportFlags(?Tenant $tenant = null): array
+    {
+        $fbKeys = config('nexstay.fb_feature_keys', ['restaurant', 'bar', 'lounge']);
+
+        return [
+            'hotel' => self::allows('hotel', $tenant),
+            'restaurant' => self::allows('restaurant', $tenant),
+            'bar' => self::allows('bar', $tenant),
+            'lounge' => self::allows('lounge', $tenant),
+            'fb' => self::allowsAny($fbKeys, $tenant),
+            'facilities' => self::allows('facilities', $tenant),
+            'hub' => self::allowsReportsHub($tenant),
+        ];
+    }
+
+    /**
      * @return list<string>
      */
     public static function allowedNavigationIds(?Tenant $tenant = null): array

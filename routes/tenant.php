@@ -213,8 +213,14 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
                 ->name('finance.facility-settings.update');
         });
 
+        Route::middleware([
+            'permission:view-reports|view-fb-reports|view-reservations|view-facility-reports',
+            'feature:hotel,restaurant,bar,lounge,facilities',
+        ])->group(function () {
+            Route::get('/reports', ReportController::class)->name('reports');
+        });
+
         Route::middleware(['permission:view-reports|view-fb-reports|view-reservations', 'feature:hotel,restaurant,bar,lounge'])->group(function () {
-            Route::get('/reports', ReportController::class)->middleware('feature:hotel')->name('reports');
             Route::get('/reports/sales-summary', [SalesSummaryReportController::class, 'index'])->middleware('feature:hotel')->name('reports.sales-summary');
             Route::get('/reports/sales-summary/export-excel', [SalesSummaryReportController::class, 'exportExcel'])->middleware('feature:hotel')->name('reports.sales-summary.export-excel');
             Route::get('/reports/sales-summary/export-pdf', [SalesSummaryReportController::class, 'exportPdf'])->middleware('feature:hotel')->name('reports.sales-summary.export-pdf');

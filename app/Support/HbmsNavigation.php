@@ -65,7 +65,7 @@ final class HbmsNavigation
     }
 
     /**
-     * @param  array{id: string, permission?: string|null, feature?: string, features?: list<string>}  $item
+     * @param  array{id: string, permission?: string|null, permission_any?: list<string>, feature?: string, features?: list<string>}  $item
      */
     private static function canSee(array $item, User $user): bool
     {
@@ -73,16 +73,23 @@ final class HbmsNavigation
             return false;
         }
 
-        $permission = $item['permission'] ?? null;
+        $any = $item['permission_any'] ?? null;
+        if (is_array($any) && $any !== []) {
+            if (! $user->canany($any)) {
+                return false;
+            }
+        } else {
+            $permission = $item['permission'] ?? null;
 
-        if ($permission !== null && ! $user->can($permission)) {
-            return false;
+            if ($permission !== null && ! $user->can($permission)) {
+                return false;
+            }
         }
 
         $roles = $user->roles;
 
         if ($roles->isEmpty()) {
-            return $permission === null;
+            return ($item['permission'] ?? null) === null && empty($item['permission_any']);
         }
 
         return $roles->contains(

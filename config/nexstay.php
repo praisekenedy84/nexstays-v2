@@ -266,7 +266,7 @@ return [
             'label' => 'Reports',
             'icon' => 'document',
             'children' => [
-                ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission' => 'view-reservations', 'feature' => 'hotel'],
+                ['id' => 'reports', 'label' => 'Reports hub', 'route' => 'tenant.reports', 'permission_any' => ['view-reports', 'view-fb-reports', 'view-reservations', 'view-facility-reports'], 'features' => ['hotel', 'restaurant', 'bar', 'lounge', 'facilities']],
                 ['id' => 'sales-summary-report', 'label' => 'Sales summary', 'route' => 'tenant.reports.sales-summary', 'permission' => 'view-reports', 'feature' => 'hotel'],
                 ['id' => 'bar-sales-summary-report', 'label' => 'Bar item sales', 'route' => 'tenant.reports.bar-sales-summary', 'permission' => 'view-fb-reports', 'feature' => 'bar'],
                 ['id' => 'lounge-sales-summary-report', 'label' => 'Lounge item sales', 'route' => 'tenant.reports.lounge-sales-summary', 'permission' => 'view-fb-reports', 'feature' => 'lounge'],

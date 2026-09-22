@@ -14,16 +14,16 @@
     };
 @endphp
 
-<article {{ $attributes->merge(['class' => 'card p-5']) }}>
-    <div class="flex items-start gap-4">
+<article {{ $attributes->merge(['class' => 'card p-4 sm:p-5']) }}>
+    <div class="flex items-start gap-3 sm:gap-4">
         @isset($icon)
-            <div @class(['flex size-12 shrink-0 items-center justify-center rounded-full', $accentClasses])>
+            <div @class(['flex size-10 shrink-0 items-center justify-center rounded-full sm:size-12', $accentClasses])>
                 {{ $icon }}
             </div>
         @endisset
         <div class="min-w-0 flex-1">
             <p class="text-sm text-ink-muted">{{ $label }}</p>
-            <p class="mt-1 text-3xl font-bold tracking-tight text-ink">{{ $value }}</p>
+            <p class="mt-1 break-words text-2xl font-bold tracking-tight text-ink sm:text-3xl">{{ $value }}</p>
             @if ($trend)
                 <p class="mt-2 flex items-center gap-1 text-xs">
                     <span class="font-medium text-success">{{ $trend }}</span>

@@ -20,9 +20,6 @@ class DivisionSalesService
         private readonly OrderRevenueService $orderRevenue,
     ) {}
 
-    private const FB_FOLIO_TYPES    = ['restaurant', 'bar', 'lounge'];
-    private const KNOWN_FOLIO_TYPES = ['room_charge', 'restaurant', 'bar', 'lounge', 'payment'];
-
     /**
      * Live revenue totals for a specific day (defaults to today).
      *
@@ -157,18 +154,11 @@ class DivisionSalesService
 
         $dailyRows = [];
         if ($period !== 'daily') {
-            $current = $from->copy()->startOfDay();
-            $lastDay = $to->copy()->startOfDay();
-
-            while ($current->lte($lastDay)) {
-                $daySummary = $this->summaryForRange(
-                    $current->copy()->startOfDay(),
-                    $current->copy()->endOfDay()
-                );
-
+            foreach ($this->dailySummariesForRange($from, $to) as $daySummary) {
+                $day = Carbon::parse($daySummary['date']);
                 $dailyRows[] = [
-                    'date'               => $current->toDateString(),
-                    'date_label'         => $current->format('D, d M Y'),
+                    'date'               => $daySummary['date'],
+                    'date_label'         => $day->format('D, d M Y'),
                     'rooms'              => $daySummary['rooms'],
                     'restaurant'         => $daySummary['restaurant'],
                     'bar'                => $daySummary['bar'],
@@ -177,8 +167,6 @@ class DivisionSalesService
                     'room_nights'        => $daySummary['room_nights'],
                     'payments_collected' => $daySummary['payments_collected'],
                 ];
-
-                $current->addDay();
             }
         }
 
@@ -303,13 +291,12 @@ class DivisionSalesService
      */
     public function bookedRoomRevenue(Carbon $from, Carbon $to): array
     {
-        $reservations = Reservation::query()
-            ->whereDate('check_in_date', '>=', $from)
-            ->whereDate('check_in_date', '<=', $to)
-            ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
-            ->get(['check_in_date', 'check_out_date', 'daily_rate']);
-
-        return $this->summarizeBookedReservations($reservations);
+        return $this->aggregateBookedRoomRevenue(
+            Reservation::query()
+                ->whereDate('check_in_date', '>=', $from)
+                ->whereDate('check_in_date', '<=', $to)
+                ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
+        );
     }
 
     /**
@@ -319,38 +306,33 @@ class DivisionSalesService
      */
     public function todayArrivalBookedRevenue(): array
     {
-        $today = now()->startOfDay();
-
-        $reservations = Reservation::query()
-            ->whereDate('check_in_date', $today)
-            ->whereIn('status', ['confirmed', 'checked_in'])
-            ->get(['check_in_date', 'check_out_date', 'daily_rate']);
-
-        return $this->summarizeBookedReservations($reservations);
+        return $this->aggregateBookedRoomRevenue(
+            Reservation::query()
+                ->whereDate('check_in_date', now()->toDateString())
+                ->whereIn('status', ['confirmed', 'checked_in'])
+        );
     }
 
     /**
-     * @param  \Illuminate\Support\Collection<int, Reservation>  $reservations
+     * @param  \Illuminate\Database\Eloquent\Builder<Reservation>  $query
      * @return array{revenue: float, reservation_count: int, room_nights: int}
      */
-    private function summarizeBookedReservations($reservations): array
+    private function aggregateBookedRoomRevenue($query): array
     {
-        $revenue = 0.0;
-        $roomNights = 0;
+        $nightsExpr = $this->sqlStayNightsExpression('check_in_date', 'check_out_date');
 
-        foreach ($reservations as $reservation) {
-            $nights = max(
-                1,
-                Carbon::parse($reservation->check_in_date)->diffInDays(Carbon::parse($reservation->check_out_date))
-            );
-            $roomNights += $nights;
-            $revenue += (float) $reservation->daily_rate * $nights;
-        }
+        $row = $query
+            ->selectRaw("
+                COUNT(*) AS reservation_count,
+                COALESCE(SUM({$nightsExpr}), 0) AS room_nights,
+                COALESCE(SUM({$nightsExpr} * daily_rate), 0) AS revenue
+            ")
+            ->first();
 
         return [
-            'revenue' => round($revenue, 2),
-            'reservation_count' => $reservations->count(),
-            'room_nights' => $roomNights,
+            'revenue' => round((float) ($row->revenue ?? 0), 2),
+            'reservation_count' => (int) ($row->reservation_count ?? 0),
+            'room_nights' => (int) ($row->room_nights ?? 0),
         ];
     }
 
@@ -362,6 +344,14 @@ class DivisionSalesService
     public function recentSnapshots(int $days = 7): Collection
     {
         return SalesSnapshot::query()
+            ->select([
+                'snapshot_date',
+                'rooms',
+                'restaurant',
+                'bar',
+                'ancillary',
+                'total',
+            ])
             ->orderByDesc('snapshot_date')
             ->limit($days)
             ->get()
@@ -373,6 +363,13 @@ class DivisionSalesService
      * Daily or hourly revenue points for trend charts, oldest first.
      * Single-day ranges return 24 hourly buckets; multi-day ranges return one point per day.
      *
+     * @param  array{
+     *     rooms?: float,
+     *     restaurant?: float,
+     *     bar?: float,
+     *     ancillary?: float,
+     *     total?: float
+     * }|null  $liveTodaySummary  Precomputed today summary to avoid a duplicate live query.
      * @return list<array{
      *     date: string,
      *     label: string,
@@ -385,7 +382,7 @@ class DivisionSalesService
      *     granularity: 'hour'|'day'
      * }>
      */
-    public function revenueTrend(Carbon $from, Carbon $to): array
+    public function revenueTrend(Carbon $from, Carbon $to, ?array $liveTodaySummary = null): array
     {
         $start = $from->copy()->startOfDay();
         $end = $to->copy()->startOfDay();
@@ -413,10 +410,27 @@ class DivisionSalesService
         }
 
         $snapshots = SalesSnapshot::query()
-            ->whereDate('snapshot_date', '>=', $start)
-            ->whereDate('snapshot_date', '<=', $end)
-            ->get()
+            ->where('snapshot_date', '>=', $start->toDateString())
+            ->where('snapshot_date', '<=', $end->toDateString())
+            ->get(['snapshot_date', 'rooms', 'restaurant', 'bar', 'ancillary', 'total'])
             ->keyBy(fn (SalesSnapshot $snap) => $snap->snapshot_date->toDateString());
+
+        $missingDays = [];
+        $current = $start->copy();
+        while ($current->lte($end)) {
+            $dateStr = $current->toDateString();
+            if (! $current->isSameDay($today) && ! $snapshots->has($dateStr)) {
+                $missingDays[] = $dateStr;
+            }
+            $current->addDay();
+        }
+
+        $fallbackByDay = $missingDays === []
+            ? []
+            : $this->dailyRevenueBreakdown(
+                Carbon::parse(min($missingDays))->startOfDay(),
+                Carbon::parse(max($missingDays))->endOfDay()
+            );
 
         $liveToday = null;
         $points = [];
@@ -427,15 +441,15 @@ class DivisionSalesService
             $isToday = $current->isSameDay($today);
 
             if ($isToday) {
-                $liveToday ??= $this->liveSummary();
+                $liveToday ??= $liveTodaySummary ?? $this->liveSummary();
                 $points[] = [
                     'date'       => $dateStr,
                     'label'      => 'Today · '.$current->format('d M'),
-                    'total'      => $liveToday['total'],
-                    'rooms'      => $liveToday['rooms'],
-                    'restaurant' => $liveToday['restaurant'],
-                    'bar'        => $liveToday['bar'],
-                    'ancillary'  => $liveToday['ancillary'],
+                    'total'      => (float) $liveToday['total'],
+                    'rooms'      => (float) $liveToday['rooms'],
+                    'restaurant' => (float) $liveToday['restaurant'],
+                    'bar'        => (float) $liveToday['bar'],
+                    'ancillary'  => (float) $liveToday['ancillary'],
                     'is_live'    => true,
                     'granularity' => 'day',
                 ];
@@ -453,7 +467,13 @@ class DivisionSalesService
                     'granularity' => 'day',
                 ];
             } else {
-                $daySummary = $this->liveSummary($current);
+                $daySummary = $fallbackByDay[$dateStr] ?? [
+                    'rooms' => 0.0,
+                    'restaurant' => 0.0,
+                    'bar' => 0.0,
+                    'ancillary' => 0.0,
+                    'total' => 0.0,
+                ];
                 $points[] = [
                     'date'       => $dateStr,
                     'label'      => $current->format('d M'),
@@ -505,30 +525,60 @@ class DivisionSalesService
         $folioHourSql = $this->sqlHourExpression('posted_at');
         $paymentHourSql = $this->sqlHourExpression('payments.created_at');
 
-        $folioByHour = FolioTransaction::query()
+        $folioRows = FolioTransaction::query()
             ->forReporting()
             ->whereNull('voided_at')
             ->whereBetween('posted_at', [$dayStart, $dayEnd])
             ->where('amount', '>', 0)
             ->where('transaction_type', '!=', 'payment')
-            ->selectRaw("{$folioHourSql} as hour_key, SUM(amount) as total")
-            ->groupByRaw($folioHourSql)
-            ->pluck('total', 'hour_key')
-            ->mapWithKeys(fn ($total, $hour) => [(int) $hour => (float) $total]);
+            ->selectRaw("{$folioHourSql} as hour_key, transaction_type, SUM(amount) as total")
+            ->groupByRaw("{$folioHourSql}, transaction_type")
+            ->get();
 
-        $directByHour = OrderItem::query()
+        $folioByHour = [];
+        foreach ($folioRows as $row) {
+            $hour = (int) $row->hour_key;
+            $folioByHour[$hour] ??= ['rooms' => 0.0, 'restaurant' => 0.0, 'bar' => 0.0, 'ancillary' => 0.0];
+
+            $amount = (float) $row->total;
+            match ($row->transaction_type) {
+                'room_charge' => $folioByHour[$hour]['rooms'] += $amount,
+                'restaurant', 'lounge' => $folioByHour[$hour]['restaurant'] += $amount,
+                'bar' => $folioByHour[$hour]['bar'] += $amount,
+                default => $folioByHour[$hour]['ancillary'] += $amount,
+            };
+        }
+
+        $directRows = OrderItem::query()
             ->join('orders', 'order_items.order_id', '=', 'orders.id')
             ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
+            ->join('menu_categories', 'menu_items.category_id', '=', 'menu_categories.id')
+            ->join('outlets as source_outlets', 'menu_categories.outlet_id', '=', 'source_outlets.id')
             ->whereNull('payments.folio_id')
             ->whereNotNull('payments.order_id')
             ->where('payments.status', 'captured')
             ->where('orders.status', 'closed')
             ->where('order_items.status', '!=', 'voided')
             ->whereBetween('payments.created_at', [$dayStart, $dayEnd])
-            ->selectRaw("{$paymentHourSql} as hour_key, SUM(order_items.quantity * order_items.unit_price) as total")
+            ->selectRaw("
+                {$paymentHourSql} as hour_key,
+                SUM(CASE WHEN source_outlets.type = 'bar'
+                    THEN order_items.quantity * order_items.unit_price ELSE 0 END) AS drinks,
+                SUM(CASE WHEN source_outlets.type != 'bar'
+                    THEN order_items.quantity * order_items.unit_price ELSE 0 END) AS food
+            ")
             ->groupByRaw($paymentHourSql)
-            ->pluck('total', 'hour_key')
-            ->mapWithKeys(fn ($total, $hour) => [(int) $hour => (float) $total]);
+            ->get();
+
+        $directByHour = [];
+        foreach ($directRows as $row) {
+            $hour = (int) $row->hour_key;
+            $directByHour[$hour] = [
+                'restaurant' => (float) $row->food,
+                'bar' => (float) $row->drinks,
+            ];
+        }
 
         $currentHour = (int) now()->format('G');
         $isToday = $date->isToday();
@@ -536,18 +586,27 @@ class DivisionSalesService
 
         for ($hour = 0; $hour < 24; $hour++) {
             $isFutureHour = $isToday && $hour > $currentHour;
-            $total = $isFutureHour
-                ? 0.0
-                : (float) ($folioByHour[$hour] ?? 0) + (float) ($directByHour[$hour] ?? 0);
+
+            if ($isFutureHour) {
+                $rooms = $restaurant = $bar = $ancillary = $total = 0.0;
+            } else {
+                $folio = $folioByHour[$hour] ?? ['rooms' => 0.0, 'restaurant' => 0.0, 'bar' => 0.0, 'ancillary' => 0.0];
+                $direct = $directByHour[$hour] ?? ['restaurant' => 0.0, 'bar' => 0.0];
+                $rooms = $folio['rooms'];
+                $restaurant = $folio['restaurant'] + $direct['restaurant'];
+                $bar = $folio['bar'] + $direct['bar'];
+                $ancillary = $folio['ancillary'];
+                $total = $rooms + $restaurant + $bar + $ancillary;
+            }
 
             $points[] = [
                 'date'        => $date->toDateString().sprintf(' %02d:00', $hour),
                 'label'       => sprintf('%02d:00', $hour),
                 'total'       => $total,
-                'rooms'       => 0.0,
-                'restaurant'  => 0.0,
-                'bar'         => 0.0,
-                'ancillary'   => 0.0,
+                'rooms'       => $rooms,
+                'restaurant'  => $restaurant,
+                'bar'         => $bar,
+                'ancillary'   => $ancillary,
                 'is_live'     => $isToday && $hour === $currentHour,
                 'granularity' => 'hour',
             ];
@@ -561,6 +620,22 @@ class DivisionSalesService
         return DB::connection()->getDriverName() === 'pgsql'
             ? "EXTRACT(HOUR FROM {$column})::integer"
             : "CAST(strftime('%H', {$column}) AS INTEGER)";
+    }
+
+    private function sqlDateExpression(string $column): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql'
+            ? "({$column})::date"
+            : "date({$column})";
+    }
+
+    private function sqlStayNightsExpression(string $checkIn, string $checkOut): string
+    {
+        return DB::connection()->getDriverName() === 'pgsql'
+            ? "GREATEST(({$checkOut} - {$checkIn})::integer, 1)"
+            : "CASE WHEN CAST(julianday({$checkOut}) - julianday({$checkIn}) AS INTEGER) < 1"
+                .' THEN 1'
+                ." ELSE CAST(julianday({$checkOut}) - julianday({$checkIn}) AS INTEGER) END";
     }
 
     /**
@@ -612,35 +687,32 @@ class DivisionSalesService
      */
     private function rangedSummary(Carbon $from, Carbon $to, string $dateLabel): array
     {
-        // --- Folio-posted charges ---
         $folioRows = FolioTransaction::query()
             ->forReporting()
             ->whereNull('voided_at')
             ->whereBetween('posted_at', [$from, $to])
             ->where('amount', '>', 0)
+            ->where('transaction_type', '!=', 'payment')
             ->selectRaw('transaction_type, SUM(amount) as total')
             ->groupBy('transaction_type')
             ->pluck('total', 'transaction_type');
 
-        // Ancillary = any folio charge not in the known structural types
-        $ancillaryFolio = FolioTransaction::query()
-            ->forReporting()
-            ->whereNull('voided_at')
-            ->whereBetween('posted_at', [$from, $to])
-            ->whereNotIn('transaction_type', self::KNOWN_FOLIO_TYPES)
-            ->where('amount', '>', 0)
-            ->sum('amount');
+        // Ancillary = folio charges outside the known structural types
+        $ancillaryFolio = 0.0;
+        foreach ($folioRows as $type => $amount) {
+            if (! in_array((string) $type, ['room_charge', 'restaurant', 'bar', 'lounge'], true)) {
+                $ancillaryFolio += (float) $amount;
+            }
+        }
 
         $directSplit = $this->orderRevenue->directPaymentRevenueSplit($from, $to);
 
-        // --- Room nights occupied in range ---
         $fromDay = $from->copy()->startOfDay();
         $toDay   = $to->copy()->startOfDay();
         $roomNights = $fromDay->isSameDay($toDay)
             ? $this->occupiedRoomNightsOnDate($fromDay)
             : $this->occupiedRoomNightsInRange($fromDay, $toDay);
 
-        // --- Total payments collected in range ---
         $paymentsCollected = (float) Payment::query()
             ->forReporting()
             ->whereBetween('created_at', [$from, $to])
@@ -653,7 +725,7 @@ class DivisionSalesService
                     + $directSplit['restaurant'];
         $bar        = (float) ($folioRows['bar'] ?? 0)
                     + $directSplit['bar'];
-        $ancillary  = (float) $ancillaryFolio;
+        $ancillary  = $ancillaryFolio;
         $total      = $rooms + $restaurant + $bar + $ancillary;
 
         return [
@@ -666,6 +738,151 @@ class DivisionSalesService
             'room_nights'        => $roomNights,
             'payments_collected' => $paymentsCollected,
         ];
+    }
+
+    /**
+     * Posted revenue breakdown keyed by Y-m-d (no room nights / payments).
+     *
+     * @return array<string, array{rooms: float, restaurant: float, bar: float, ancillary: float, total: float}>
+     */
+    private function dailyRevenueBreakdown(Carbon $from, Carbon $to): array
+    {
+        $dayExpr = $this->sqlDateExpression('posted_at');
+        $paymentDayExpr = $this->sqlDateExpression('payments.created_at');
+
+        $empty = static fn (): array => [
+            'rooms' => 0.0,
+            'restaurant' => 0.0,
+            'bar' => 0.0,
+            'ancillary' => 0.0,
+            'total' => 0.0,
+        ];
+
+        $byDay = [];
+
+        $folioRows = FolioTransaction::query()
+            ->forReporting()
+            ->whereNull('voided_at')
+            ->whereBetween('posted_at', [$from, $to])
+            ->where('amount', '>', 0)
+            ->where('transaction_type', '!=', 'payment')
+            ->selectRaw("{$dayExpr} as day_key, transaction_type, SUM(amount) as total")
+            ->groupByRaw("{$dayExpr}, transaction_type")
+            ->get();
+
+        foreach ($folioRows as $row) {
+            $day = Carbon::parse((string) $row->day_key)->toDateString();
+            $byDay[$day] ??= $empty();
+            $amount = (float) $row->total;
+
+            match ($row->transaction_type) {
+                'room_charge' => $byDay[$day]['rooms'] += $amount,
+                'restaurant', 'lounge' => $byDay[$day]['restaurant'] += $amount,
+                'bar' => $byDay[$day]['bar'] += $amount,
+                default => $byDay[$day]['ancillary'] += $amount,
+            };
+        }
+
+        $directRows = OrderItem::query()
+            ->join('orders', 'order_items.order_id', '=', 'orders.id')
+            ->join('payments', 'payments.order_id', '=', 'orders.id')
+            ->join('menu_items', 'order_items.menu_item_id', '=', 'menu_items.id')
+            ->join('menu_categories', 'menu_items.category_id', '=', 'menu_categories.id')
+            ->join('outlets as source_outlets', 'menu_categories.outlet_id', '=', 'source_outlets.id')
+            ->whereNull('payments.folio_id')
+            ->whereNotNull('payments.order_id')
+            ->where('payments.status', 'captured')
+            ->where('orders.status', 'closed')
+            ->where('order_items.status', '!=', 'voided')
+            ->whereBetween('payments.created_at', [$from, $to])
+            ->selectRaw("
+                {$paymentDayExpr} as day_key,
+                SUM(CASE WHEN source_outlets.type = 'bar'
+                    THEN order_items.quantity * order_items.unit_price ELSE 0 END) AS drinks,
+                SUM(CASE WHEN source_outlets.type != 'bar'
+                    THEN order_items.quantity * order_items.unit_price ELSE 0 END) AS food
+            ")
+            ->groupByRaw($paymentDayExpr)
+            ->get();
+
+        foreach ($directRows as $row) {
+            $day = Carbon::parse((string) $row->day_key)->toDateString();
+            $byDay[$day] ??= $empty();
+            $byDay[$day]['restaurant'] += (float) $row->food;
+            $byDay[$day]['bar'] += (float) $row->drinks;
+        }
+
+        foreach ($byDay as &$point) {
+            $point['total'] = $point['rooms'] + $point['restaurant'] + $point['bar'] + $point['ancillary'];
+        }
+        unset($point);
+
+        return $byDay;
+    }
+
+    /**
+     * Full daily summaries for a range using batched queries (for weekly/monthly reports).
+     *
+     * @return list<array{
+     *     date: string,
+     *     rooms: float,
+     *     restaurant: float,
+     *     bar: float,
+     *     ancillary: float,
+     *     total: float,
+     *     room_nights: int,
+     *     payments_collected: float
+     * }>
+     */
+    private function dailySummariesForRange(Carbon $from, Carbon $to): array
+    {
+        $start = $from->copy()->startOfDay();
+        $end = $to->copy()->startOfDay();
+        $rangeEnd = $to->copy()->endOfDay();
+
+        $revenueByDay = $this->dailyRevenueBreakdown($start, $rangeEnd);
+
+        $paymentDayExpr = $this->sqlDateExpression('created_at');
+        $paymentsByDay = Payment::query()
+            ->forReporting()
+            ->whereBetween('created_at', [$start, $rangeEnd])
+            ->where('status', 'captured')
+            ->selectRaw("{$paymentDayExpr} as day_key, SUM(amount) as total")
+            ->groupByRaw($paymentDayExpr)
+            ->get()
+            ->mapWithKeys(fn ($row) => [
+                Carbon::parse((string) $row->day_key)->toDateString() => (float) $row->total,
+            ]);
+
+        $roomNightsByDay = $this->occupiedRoomNightsByDay($start, $end);
+
+        $rows = [];
+        $current = $start->copy();
+        while ($current->lte($end)) {
+            $dateStr = $current->toDateString();
+            $rev = $revenueByDay[$dateStr] ?? [
+                'rooms' => 0.0,
+                'restaurant' => 0.0,
+                'bar' => 0.0,
+                'ancillary' => 0.0,
+                'total' => 0.0,
+            ];
+
+            $rows[] = [
+                'date'               => $dateStr,
+                'rooms'              => $rev['rooms'],
+                'restaurant'         => $rev['restaurant'],
+                'bar'                => $rev['bar'],
+                'ancillary'          => $rev['ancillary'],
+                'total'              => $rev['total'],
+                'room_nights'        => $roomNightsByDay[$dateStr] ?? 0,
+                'payments_collected' => (float) ($paymentsByDay[$dateStr] ?? 0),
+            ];
+
+            $current->addDay();
+        }
+
+        return $rows;
     }
 
     private function occupiedRoomNightsOnDate(Carbon $date): int
@@ -681,15 +898,51 @@ class DivisionSalesService
 
     private function occupiedRoomNightsInRange(Carbon $from, Carbon $to): int
     {
-        $total   = 0;
-        $current = $from->copy()->startOfDay();
+        return (int) array_sum($this->occupiedRoomNightsByDay($from, $to));
+    }
 
+    /**
+     * @return array<string, int>
+     */
+    private function occupiedRoomNightsByDay(Carbon $from, Carbon $to): array
+    {
+        $fromDate = $from->toDateString();
+        $toDate = $to->toDateString();
+
+        $reservations = Reservation::query()
+            ->whereIn('status', ['confirmed', 'checked_in', 'checked_out'])
+            ->where('check_in_date', '<=', $toDate)
+            ->where('check_out_date', '>', $fromDate)
+            ->get(['check_in_date', 'check_out_date']);
+
+        $counts = [];
+        $current = $from->copy()->startOfDay();
         while ($current->lte($to)) {
-            $total += $this->occupiedRoomNightsOnDate($current);
+            $counts[$current->toDateString()] = 0;
             $current->addDay();
         }
 
-        return $total;
+        foreach ($reservations as $reservation) {
+            $checkIn = Carbon::parse($reservation->check_in_date)->startOfDay();
+            $checkOut = Carbon::parse($reservation->check_out_date)->startOfDay();
+            $day = $checkIn->greaterThan($from->copy()->startOfDay())
+                ? $checkIn->copy()
+                : $from->copy()->startOfDay();
+            $last = $checkOut->copy()->subDay();
+            if ($last->gt($to->copy()->startOfDay())) {
+                $last = $to->copy()->startOfDay();
+            }
+
+            while ($day->lte($last)) {
+                $key = $day->toDateString();
+                if (isset($counts[$key])) {
+                    $counts[$key]++;
+                }
+                $day->addDay();
+            }
+        }
+
+        return $counts;
     }
 
     /**

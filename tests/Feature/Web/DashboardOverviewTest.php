@@ -6,13 +6,37 @@ namespace Tests\Feature\Web;
 
 use App\Domain\HBMS\Models\Reservation;
 use App\Domain\HBMS\Models\RoomType;
+use App\Domain\Shared\Actions\SyncFeatureCeiling;
 use App\Domain\Shared\Models\SalesSnapshot;
 use App\Domain\Shared\Services\DivisionSalesService;
+use App\Models\Tenant;
 use Carbon\Carbon;
 use Tests\TenantTestCase;
 
 class DashboardOverviewTest extends TenantTestCase
 {
+    private Tenant $tenant;
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+
+        config(['tenancy.bootstrappers' => []]);
+
+        $this->tenant = Tenant::withoutEvents(fn () => Tenant::query()->firstOrCreate(['id' => 'demo']));
+        $this->tenant->enabled_features = null;
+        $this->tenant->save();
+    }
+
+    protected function tearDown(): void
+    {
+        if (tenancy()->initialized) {
+            tenancy()->end();
+        }
+
+        parent::tearDown();
+    }
+
     public function test_booked_room_revenue_includes_confirmed_reservations(): void
     {
         $roomType = RoomType::factory()->create();
@@ -122,5 +146,97 @@ class DashboardOverviewTest extends TenantTestCase
         ));
 
         Carbon::setTestNow();
+    }
+
+    public function test_dashboard_shows_both_summaries_when_hotel_and_restaurant_enabled(): void
+    {
+        $this->tenant->enabled_features = ['hotel', 'restaurant'];
+        $this->tenant->save();
+        tenancy()->initialize($this->tenant);
+        app(SyncFeatureCeiling::class)->execute($this->tenant);
+
+        $this->user->refresh();
+        $this->user->unsetRelation('roles');
+        $this->user->unsetRelation('permissions');
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.dashboard'))
+            ->assertOk()
+            ->assertSee('Hotel summary', false)
+            ->assertSee('Restaurant / F&amp;B summary', false)
+            ->assertSee('Hotel revenue', false)
+            ->assertSee('All F&amp;B revenue', false)
+            ->assertSee('All F&amp;B', false)
+            ->assertSee('Restaurant', false)
+            ->assertSee('Bar &amp; lounge', false);
+    }
+
+    public function test_dashboard_shows_only_hotel_summary_when_restaurant_disabled(): void
+    {
+        $this->tenant->enabled_features = ['hotel'];
+        $this->tenant->save();
+        tenancy()->initialize($this->tenant);
+        app(SyncFeatureCeiling::class)->execute($this->tenant);
+
+        $this->user->refresh();
+        $this->user->unsetRelation('roles');
+        $this->user->unsetRelation('permissions');
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.dashboard'))
+            ->assertOk()
+            ->assertSee('Hotel summary', false)
+            ->assertDontSee('Restaurant / F&amp;B summary', false)
+            ->assertDontSee('All F&amp;B revenue', false);
+    }
+
+    public function test_dashboard_shows_only_fb_summary_when_hotel_disabled(): void
+    {
+        $this->tenant->enabled_features = ['restaurant', 'bar', 'lounge'];
+        $this->tenant->save();
+        tenancy()->initialize($this->tenant);
+        app(SyncFeatureCeiling::class)->execute($this->tenant);
+
+        $this->user->refresh();
+        $this->user->unsetRelation('roles');
+        $this->user->unsetRelation('permissions');
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.dashboard'))
+            ->assertOk()
+            ->assertDontSee('Hotel summary', false)
+            ->assertSee('Restaurant / F&amp;B summary', false)
+            ->assertSee('All F&amp;B revenue', false)
+            ->assertDontSee('Today arrivals', false);
+    }
+
+    public function test_dashboard_fb_scope_filter_switches_restaurant_and_bar(): void
+    {
+        $this->tenant->enabled_features = ['hotel', 'restaurant', 'bar'];
+        $this->tenant->save();
+        tenancy()->initialize($this->tenant);
+        app(SyncFeatureCeiling::class)->execute($this->tenant);
+
+        $this->user->refresh();
+        $this->user->unsetRelation('roles');
+        $this->user->unsetRelation('permissions');
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.dashboard', ['fb' => 'restaurant']))
+            ->assertOk()
+            ->assertSee('Restaurant revenue', false)
+            ->assertDontSee('All F&amp;B revenue', false)
+            ->assertSee('fb=bar', false);
+
+        $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.dashboard', ['fb' => 'bar']))
+            ->assertOk()
+            ->assertSee('Bar &amp; lounge revenue', false)
+            ->assertDontSee('Restaurant today', false);
     }
 }

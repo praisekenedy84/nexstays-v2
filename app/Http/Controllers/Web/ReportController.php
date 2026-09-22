@@ -6,6 +6,7 @@ namespace App\Http\Controllers\Web;
 
 use App\Domain\Shared\Services\ReportDeliverySettingsService;
 use App\Http\Controllers\Controller;
+use App\Support\TenantFeatures;
 use Illuminate\View\View;
 
 class ReportController extends Controller
@@ -18,6 +19,7 @@ class ReportController extends Controller
     {
         return view('hbms.reports', [
             'deliverySettings' => $this->settingsService->all(),
+            'features' => TenantFeatures::reportFlags(),
         ]);
     }
 }

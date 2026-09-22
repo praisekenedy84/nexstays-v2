@@ -26,7 +26,7 @@
     <div class="flex flex-wrap gap-1.5">
         @foreach ($presetLabels as $preset => $label)
             <button type="button"
-                    class="date-preset rounded-full border border-slate-200 px-3 py-1 text-xs text-ink-muted transition hover:border-primary/40 hover:text-primary"
+                    class="date-preset min-h-8 rounded-full border border-slate-200 px-3 py-1.5 text-xs text-ink-muted transition hover:border-primary/40 hover:text-primary"
                     data-preset="{{ $preset }}">
                 {{ $label }}
             </button>
@@ -35,17 +35,17 @@
 
     {{-- Inputs row --}}
     <div class="flex flex-wrap items-end gap-3">
-        <div class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none">
+        <div class="flex min-w-0 flex-1 basis-full flex-col gap-1 sm:flex-none sm:basis-auto">
             <label class="text-xs font-medium text-ink-muted">From</label>
             <input type="date" name="from" value="{{ $from }}" class="input-field w-full min-w-0 sm:w-auto" onchange="this.form.submit()">
         </div>
-        <div class="flex min-w-0 flex-1 flex-col gap-1 sm:flex-none">
+        <div class="flex min-w-0 flex-1 basis-full flex-col gap-1 sm:flex-none sm:basis-auto">
             <label class="text-xs font-medium text-ink-muted">To</label>
             <input type="date" name="to" value="{{ $to }}" class="input-field w-full min-w-0 sm:w-auto" onchange="this.form.submit()">
         </div>
         {{ $slot }}
-        @if ($showReportsLink)
-            <a href="{{ route('tenant.reports') }}" class="btn-outline">All reports</a>
+        @if ($showReportsLink && \App\Support\TenantFeatures::allowsReportsHub())
+            <a href="{{ route('tenant.reports') }}" class="btn-outline w-full sm:w-auto">All reports</a>
         @endif
     </div>
 </div>
