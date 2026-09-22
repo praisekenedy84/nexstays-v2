@@ -145,9 +145,22 @@ class TenantController extends Controller
     {
         $tenant = Tenant::findOrFail($tenantId);
 
-        tenancy()->initialize($tenant);
-        app(RoleAndPermissionSeeder::class)->run();
-        tenancy()->end();
+        try {
+            tenancy()->initialize($tenant);
+            app(RoleAndPermissionSeeder::class)->run();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return back()->with(
+                'error',
+                "Reseed failed for [{$tenantId}]: ".$e->getMessage()
+                .' — Try “Run migrations” first, then reseed again.'
+            );
+        } finally {
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
+        }
 
         return back()->with('success', "Roles & permissions reseeded for [{$tenantId}].");
     }
@@ -160,30 +173,46 @@ class TenantController extends Controller
             'role' => ['required', 'string'],
         ]);
 
-        tenancy()->initialize($tenant);
-        $user = User::findOrFail($userId);
-        $user->syncRoles([$validated['role']]);
-        tenancy()->end();
+        $userName = null;
 
-        return back()->with('success', "Role updated for {$user->name}.");
+        try {
+            tenancy()->initialize($tenant);
+            $user = User::findOrFail($userId);
+            $user->syncRoles([$validated['role']]);
+            $userName = $user->name;
+        } finally {
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
+        }
+
+        return back()->with('success', "Role updated for {$userName}.");
     }
 
     public function resetUserPassword(string $tenantId, string $userId): RedirectResponse
     {
         $tenant = Tenant::findOrFail($tenantId);
 
-        tenancy()->initialize($tenant);
-        $user = User::findOrFail($userId);
-        $password = Str::password(12);
-        $user->update(['password' => Hash::make($password)]);
-        tenancy()->end();
+        $payload = [];
 
-        return back()->with('password_reset', [
-            'user_name' => $user->name,
-            'username'  => $user->username,
-            'email'     => $user->email,
-            'password'  => $password,
-        ]);
+        try {
+            tenancy()->initialize($tenant);
+            $user = User::findOrFail($userId);
+            $password = Str::password(12);
+            $user->update(['password' => Hash::make($password)]);
+            $payload = [
+                'user_name' => $user->name,
+                'username'  => $user->username,
+                'email'     => $user->email,
+                'password'  => $password,
+            ];
+        } finally {
+            if (tenancy()->initialized) {
+                tenancy()->end();
+            }
+        }
+
+        return back()->with('password_reset', $payload);
     }
 
     public function updateSettings(Request $request, string $tenantId): RedirectResponse

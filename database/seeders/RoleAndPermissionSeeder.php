@@ -85,7 +85,7 @@ class RoleAndPermissionSeeder extends Seeder
 
     public function run(): void
     {
-        app(PermissionRegistrar::class)->forgetCachedPermissions();
+        $this->forgetPermissionCache();
 
         foreach (self::PERMISSIONS as $permission) {
             Permission::findOrCreate($permission, self::GUARD);
@@ -174,6 +174,24 @@ class RoleAndPermissionSeeder extends Seeder
             'view-availability',
         ]);
 
-        app(\App\Domain\Shared\Actions\SyncFeatureCeiling::class)->execute();
+        app(\App\Domain\Shared\Actions\SyncFeatureCeiling::class)->execute(
+            tenancy()->initialized ? tenant() : null
+        );
+    }
+
+    /**
+     * Avoid Stancl tenant CacheManager tagging (unsupported on database/file stores).
+     */
+    private function forgetPermissionCache(): void
+    {
+        $registrar = app(PermissionRegistrar::class);
+
+        try {
+            $registrar->forgetCachedPermissions();
+        } catch (\BadMethodCallException) {
+            \Illuminate\Support\Facades\Cache::store(config('cache.default'))
+                ->forget(config('permission.cache.key', 'spatie.permission.cache'));
+            $registrar->initializeCache();
+        }
     }
 }

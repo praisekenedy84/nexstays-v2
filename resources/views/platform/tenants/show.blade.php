@@ -13,6 +13,12 @@
         </div>
     @endif
 
+    @if (session('error'))
+        <div class="mb-6 rounded-2xl bg-red-900/40 p-4 ring-1 ring-red-600/40 text-sm text-red-300">
+            {{ session('error') }}
+        </div>
+    @endif
+
     {{-- Password reset result --}}
     @if (session('password_reset'))
         @php $pr = session('password_reset'); @endphp
