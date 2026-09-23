@@ -31,6 +31,7 @@ class RestockStockItem
                 'reference_type' => StockItem::class,
                 'notes' => $notes,
                 'performed_by' => $performedBy,
+                'created_at' => now(),
             ]);
 
             $stockItem->increment('current_stock', $quantity);

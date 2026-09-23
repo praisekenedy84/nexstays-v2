@@ -150,8 +150,9 @@ class TenantFeaturesTest extends TenantTestCase
 
         $this->assertContains('view-orders', $perms);
         $this->assertContains('manage-roles', $perms);
+        $this->assertContains('view-inventory', $perms);
         $this->assertNotContains('view-reservations', $perms);
-        $this->assertNotContains('view-inventory', $perms);
+        $this->assertNotContains('view-purchases', $perms);
     }
 
     public function test_update_tenant_features_action_syncs_ceiling(): void

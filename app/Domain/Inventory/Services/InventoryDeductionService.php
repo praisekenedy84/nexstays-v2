@@ -65,6 +65,7 @@ class InventoryDeductionService
                         'reference_type' => Order::class,
                         'notes' => "Order {$order->order_number} — {$menuItem->name}",
                         'performed_by' => $order->waiter_id,
+                        'created_at' => now(),
                     ]);
 
                     if ($after < 0) {
@@ -76,6 +77,7 @@ class InventoryDeductionService
                             'reference_type' => Order::class,
                             'notes' => "Shortage after order {$order->order_number}: required {$qty}, had {$before}",
                             'performed_by' => $order->waiter_id,
+                            'created_at' => now(),
                         ]);
 
                         Log::warning('Stock shortage on order close', [

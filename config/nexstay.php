@@ -160,6 +160,10 @@ return [
         'view-till',
         'manage-till',
         'view-fb-reports',
+        // Beverage/kitchen stock is part of F&B operations even when the
+        // standalone Inventory module pack is not explicitly checked.
+        'view-inventory',
+        'manage-inventory',
     ],
 
     'always_on_permissions' => [
@@ -231,10 +235,10 @@ return [
             'id' => 'inventory-group',
             'label' => 'Inventory',
             'icon' => 'inventory',
-            'feature' => 'inventory',
+            'features' => ['inventory', 'bar', 'restaurant'],
             'children' => [
-                ['id' => 'inventory', 'label' => 'Stock items', 'route' => 'tenant.stock-items.index', 'permission' => 'view-inventory', 'feature' => 'inventory'],
-                ['id' => 'stock-history', 'label' => 'Stock history', 'route' => 'tenant.stock-items.movements', 'permission' => 'view-inventory', 'feature' => 'inventory'],
+                ['id' => 'inventory', 'label' => 'Stock items', 'route' => 'tenant.stock-items.index', 'permission' => 'view-inventory', 'features' => ['inventory', 'bar', 'restaurant']],
+                ['id' => 'stock-history', 'label' => 'Stock history', 'route' => 'tenant.stock-items.movements', 'permission' => 'view-inventory', 'features' => ['inventory', 'bar', 'restaurant']],
                 ['id' => 'purchases', 'label' => 'Purchases', 'route' => 'tenant.purchases.index', 'permission' => 'view-purchases', 'feature' => 'inventory'],
             ],
         ],

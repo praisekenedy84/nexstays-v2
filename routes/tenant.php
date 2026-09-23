@@ -453,7 +453,7 @@ Route::middleware(['web'])->name('tenant.')->group(function () {
             Route::resource('menu-items', MenuItemController::class)->except(['show']);
         });
 
-        Route::middleware(['permission:view-inventory|manage-inventory', 'feature:inventory'])->group(function () {
+        Route::middleware(['permission:view-inventory|manage-inventory', 'feature:inventory,bar,restaurant'])->group(function () {
             Route::get('/stock-items/json', [StockItemController::class, 'json'])->name('stock-items.json');
             Route::get('/stock-items/history', [StockItemController::class, 'movements'])->name('stock-items.movements');
             Route::get('/stock-items/{stockItem}/history', [StockItemController::class, 'history'])->name('stock-items.history');
@@ -610,7 +610,7 @@ Route::middleware(['api'])->prefix('api/v1')->name('api.v1.')->group(function ()
                 });
             });
 
-            Route::middleware(['permission:view-inventory|manage-inventory', 'feature:inventory'])->group(function () {
+            Route::middleware(['permission:view-inventory|manage-inventory', 'feature:inventory,bar,restaurant'])->group(function () {
                 Route::get('/inventory/stock-items', [ApiStockItemController::class, 'index'])->name('inventory.stock-items.index');
                 Route::post('/inventory/stock-items', [ApiStockItemController::class, 'store'])->name('inventory.stock-items.store');
                 Route::patch('/inventory/stock-items/{stockItem}', [ApiStockItemController::class, 'update'])->name('inventory.stock-items.update');

@@ -81,6 +81,7 @@ class ReceivePurchaseOrder
             'reference_type' => PurchaseOrder::class,
             'notes'          => "PO {$purchaseOrder->po_number}",
             'performed_by'   => $performedBy,
+            'created_at'     => now(),
         ]);
 
         $stockItem->increment('current_stock', $qty);
