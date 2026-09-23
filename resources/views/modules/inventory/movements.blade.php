@@ -36,7 +36,7 @@
                     @endforeach
                 </select>
             </div>
-            <x-ui.search-bar :value="$search" placeholder="Item name…" />
+            <x-ui.search-bar :value="$search" placeholder="Item name…" embedded />
         </form>
         <a href="{{ route('tenant.stock-items.index', ['outlet_id' => $outletId]) }}" class="btn-outline text-sm">Stock items</a>
     </div>

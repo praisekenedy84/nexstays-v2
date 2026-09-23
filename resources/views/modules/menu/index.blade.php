@@ -10,7 +10,7 @@
                     @endforeach
                 </select>
             </div>
-            <x-ui.search-bar :value="$search" placeholder="Item name…" />
+            <x-ui.search-bar :value="$search" placeholder="Item name…" embedded />
         </form>
         <div class="flex flex-wrap gap-2">
             @if ($outletId && $outlets->firstWhere('id', $outletId)?->isBar())

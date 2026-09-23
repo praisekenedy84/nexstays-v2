@@ -12,7 +12,7 @@
                     </select>
                 </div>
             @endif
-            <x-ui.search-bar :value="$search" placeholder="Item name…" />
+            <x-ui.search-bar :value="$search" placeholder="Item name…" embedded />
         </form>
         <div class="flex flex-wrap gap-2">
             @can('manage-inventory')

@@ -161,4 +161,48 @@ class StockHistoryTest extends TenantTestCase
         $restocksOnly->assertSee('Manual restock note');
         $restocksOnly->assertDontSee('Order use');
     }
+
+    public function test_global_movements_filter_switches_away_from_restock(): void
+    {
+        $bar = Outlet::query()->create(['name' => 'Bar', 'type' => 'bar', 'is_active' => true]);
+
+        $stock = StockItem::query()->create([
+            'outlet_id' => $bar->id,
+            'name' => 'Tequila',
+            'unit' => 'bottle',
+            'current_stock' => 8,
+            'reorder_level' => 2,
+        ]);
+
+        StockMovement::query()->create([
+            'stock_item_id' => $stock->id,
+            'movement_type' => 'restock',
+            'quantity' => 4,
+            'performed_by' => $this->user->id,
+            'notes' => 'Restock only note',
+            'created_at' => now(),
+        ]);
+
+        StockMovement::query()->create([
+            'stock_item_id' => $stock->id,
+            'movement_type' => 'consumption',
+            'quantity' => -1,
+            'performed_by' => $this->user->id,
+            'notes' => 'Consumption only note',
+            'created_at' => now(),
+        ]);
+
+        $consumption = $this->web()
+            ->actingAs($this->user, 'web')
+            ->get(route('tenant.stock-items.movements', [
+                'type' => 'consumption',
+                'search' => 'Tequila',
+            ]));
+
+        $consumption->assertOk();
+        $consumption->assertSee('Consumption only note');
+        $consumption->assertDontSee('Restock only note');
+        $consumption->assertSee('value="consumption"', false);
+        $consumption->assertSee('selected', false);
+    }
 }
