@@ -65,10 +65,15 @@ window.refreshLucideIcons = renderLucideIcons;
 
 // Sync browser timezone to the server (used for local-time operations and scheduling).
 (function () {
-    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    let timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     if (!timezone) return;
 
-    const storageKey = 'nexstay-timezone-synced';
+    // Hosts / containers often report UTC; NexStay properties operate on East Africa Time.
+    if (timezone === 'UTC' || timezone === 'Etc/UTC' || timezone === 'GMT' || timezone === 'Etc/GMT') {
+        timezone = 'Africa/Dar_es_Salaam';
+    }
+
+    const storageKey = 'nexstay-timezone-synced-v2';
     if (localStorage.getItem(storageKey) === timezone) return;
 
     const csrf = document.querySelector('meta[name="csrf-token"]')?.content;

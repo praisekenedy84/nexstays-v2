@@ -53,20 +53,30 @@ class TimezoneService
     public function resolve(?User $user = null, ?Tenant $tenant = null): string
     {
         if ($user?->timezone) {
-            return $this->normalize((string) $user->timezone);
+            $normalized = $this->normalize((string) $user->timezone);
+            // Bare UTC usually means "never configured" (env default), not a deliberate EAT hotel preference.
+            if (! $this->isBareUtc($normalized)) {
+                return $normalized;
+            }
         }
 
         $tenant ??= tenant();
         if ($tenant instanceof Tenant) {
             $stored = $tenant->timezone ?? data_get($tenant, 'data.timezone');
             if (is_string($stored) && $stored !== '') {
-                return $this->normalize($stored);
+                $normalized = $this->normalize($stored);
+                if (! $this->isBareUtc($normalized)) {
+                    return $normalized;
+                }
             }
         }
 
         $configured = config('nexstay.timezone.default', config('app.timezone'));
         if (is_string($configured) && $configured !== '') {
-            return $this->normalize($configured);
+            $normalized = $this->normalize($configured);
+            if (! $this->isBareUtc($normalized)) {
+                return $normalized;
+            }
         }
 
         return $this->fallback();
@@ -84,6 +94,9 @@ class TimezoneService
     public function syncForUser(User $user, string $timezone, ?Tenant $tenant = null): string
     {
         $timezone = $this->normalize($timezone);
+        if ($this->isBareUtc($timezone)) {
+            $timezone = $this->fallback();
+        }
 
         if ($user->timezone !== $timezone) {
             $user->forceFill(['timezone' => $timezone])->save();
@@ -102,11 +115,16 @@ class TimezoneService
             return;
         }
 
-        if (! empty($tenant->timezone)) {
+        if (! empty($tenant->timezone) && ! $this->isBareUtc((string) $tenant->timezone)) {
             return;
         }
 
         $tenant->timezone = $timezone;
         $tenant->save();
+    }
+
+    private function isBareUtc(string $timezone): bool
+    {
+        return in_array(strtoupper($timezone), ['UTC', 'ETC/UTC', 'GMT', 'ETC/GMT'], true);
     }
 }

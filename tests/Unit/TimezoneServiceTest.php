@@ -34,6 +34,17 @@ class TimezoneServiceTest extends TestCase
         $this->assertSame('Africa/Dar_es_Salaam', app(TimezoneService::class)->resolve());
     }
 
+    public function test_resolve_treats_bare_utc_as_east_africa_fallback(): void
+    {
+        config()->set('nexstay.timezone.default', 'UTC');
+        config()->set('nexstay.timezone.fallback', 'Africa/Dar_es_Salaam');
+
+        $user = new User(['timezone' => 'UTC']);
+
+        $this->assertSame('Africa/Dar_es_Salaam', app(TimezoneService::class)->resolve($user));
+        $this->assertSame('Africa/Dar_es_Salaam', app(TimezoneService::class)->resolve());
+    }
+
     public function test_apply_sets_runtime_timezone(): void
     {
         $user = new User(['timezone' => 'Africa/Nairobi']);
