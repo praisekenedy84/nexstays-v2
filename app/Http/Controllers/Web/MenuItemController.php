@@ -120,6 +120,13 @@ class MenuItemController extends Controller
         $outlet = $menuItem->category->outlet;
         $tracksInventory = $outlet->tracksBeverageInventory();
         $firstRecipe = $menuItem->recipeIngredients->first();
+        $linkedStock = $menuItem->linkedStockItem;
+        $defaultLinkMode = match (true) {
+            $firstRecipe !== null => 'existing',
+            $linkedStock !== null && (float) $linkedStock->current_stock > 0 => 'existing',
+            $linkedStock !== null && $linkedStock->awaiting_stock => 'awaiting',
+            default => 'awaiting',
+        };
 
         return view('modules.menu.form', [
             'item' => $menuItem,
@@ -129,10 +136,10 @@ class MenuItemController extends Controller
             'stockItems' => $tracksInventory
                 ? $this->beverageStockLink->stockItemsForBarOutlet($outlet->id)
                 : collect(),
-            'linkedStockItemId' => old('linked_stock_item_id', $firstRecipe?->stock_item_id ?? $menuItem->linkedStockItem?->id),
+            'linkedStockItemId' => old('linked_stock_item_id', $firstRecipe?->stock_item_id ?? $linkedStock?->id),
             'serveQuantity' => old('serve_quantity', $firstRecipe?->quantity ?? 1),
-            'serveUnit' => old('serve_unit', $firstRecipe?->unit ?? 'bottle'),
-            'inventoryLinkMode' => old('inventory_link_mode', $firstRecipe ? 'existing' : ($menuItem->linkedStockItem?->awaiting_stock ? 'awaiting' : 'awaiting')),
+            'serveUnit' => old('serve_unit', $firstRecipe?->unit ?? ($linkedStock?->unit ?? 'bottle')),
+            'inventoryLinkMode' => old('inventory_link_mode', $defaultLinkMode),
         ]);
     }
 
@@ -140,6 +147,7 @@ class MenuItemController extends Controller
     {
         $validated = $request->validated();
         $disk = MenuItem::photosDisk();
+        $wantedAvailable = $request->boolean('is_available');
 
         if ($request->boolean('remove_photo') && $menuItem->photo) {
             Storage::disk($disk)->delete($menuItem->photo);
@@ -160,10 +168,20 @@ class MenuItemController extends Controller
         $menuItem->refresh();
         $this->beverageStockLink->mirrorMenuToLinkedStock($menuItem->load(['linkedStockItem', 'category']));
         $this->beverageStockLink->syncMenuAvailability($menuItem->load(['recipeIngredients.stockItem', 'category.outlet']));
+        $menuItem->refresh();
 
-        return redirect()
+        $redirect = redirect()
             ->route('tenant.menu-items.index', ['outlet_id' => $menuItem->category->outlet_id])
             ->with('success', 'Menu item updated.');
+
+        if ($wantedAvailable && ! $menuItem->is_available) {
+            $reason = $this->beverageStockLink->availabilityBlockReason($menuItem)
+                ?? 'Linked stock cannot fulfill one sale yet.';
+
+            return $redirect->with('error', "Saved, but “Available on menu” was turned off: {$reason}");
+        }
+
+        return $redirect;
     }
 
     public function destroy(MenuItem $menuItem): RedirectResponse
@@ -211,7 +229,13 @@ class MenuItemController extends Controller
         $mode = (string) $request->input('inventory_link_mode', 'awaiting');
         $linkedStockId = $request->input('linked_stock_item_id');
         $serveQty = (float) $request->input('serve_quantity', 1);
+        if ($serveQty <= 0) {
+            $serveQty = 1.0;
+        }
         $serveUnit = (string) $request->input('serve_unit', 'bottle');
+        if ($serveUnit === '') {
+            $serveUnit = 'bottle';
+        }
         $recipe = $request->input('recipe', []);
 
         if ($mode === 'recipe') {

@@ -18,8 +18,12 @@ class InventoryAvailabilityService
         }
 
         foreach ($menuItem->recipeIngredients as $ingredient) {
-            $required = (float) $ingredient->quantity * $quantity;
             $stockItem = $ingredient->stockItem;
+            if ($stockItem === null) {
+                throw new InsufficientStockException('Unknown stock item', (float) $ingredient->quantity * $quantity, 0, $ingredient->unit ?? 'pcs');
+            }
+
+            $required = (float) $ingredient->quantity * $quantity;
             $available = (float) $stockItem->current_stock;
 
             if ($available < $required) {

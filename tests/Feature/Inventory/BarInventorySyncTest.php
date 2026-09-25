@@ -83,4 +83,37 @@ class BarInventorySyncTest extends TenantTestCase
         $this->assertFalse($menu->fresh()->is_available);
         $this->assertEquals(0.0, (float) $stock->fresh()->current_stock);
     }
+
+    public function test_awaiting_mode_links_existing_stocked_item_by_name_and_keeps_menu_available(): void
+    {
+        $bar = Outlet::query()->create(['name' => 'Bar', 'type' => 'bar', 'is_active' => true]);
+        $cat = $bar->menuCategories()->create(['name' => 'Spirits', 'display_order' => 1]);
+        $menu = MenuItem::query()->create([
+            'category_id' => $cat->id,
+            'name' => 'Gin',
+            'price' => '12000.00',
+            'is_available' => false,
+        ]);
+
+        $stock = StockItem::query()->create([
+            'outlet_id' => $bar->id,
+            'menu_item_id' => null,
+            'name' => 'Gin',
+            'unit' => 'bottle',
+            'current_stock' => 8,
+            'reorder_level' => 1,
+            'awaiting_stock' => false,
+        ]);
+
+        app(BeverageStockLinkService::class)->createAwaitingStockForMenu($menu, 1, 'bottle');
+        app(BeverageStockLinkService::class)->syncMenuAvailability($menu->fresh(['recipeIngredients.stockItem', 'category.outlet']));
+
+        $menu->refresh();
+        $stock->refresh();
+
+        $this->assertTrue($menu->is_available);
+        $this->assertEquals($stock->id, $menu->recipeIngredients->first()?->stock_item_id);
+        $this->assertEquals(8.0, (float) $stock->current_stock);
+        $this->assertSame(1, StockItem::query()->where('name', 'Gin')->where('outlet_id', $bar->id)->count());
+    }
 }

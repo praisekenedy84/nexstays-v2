@@ -90,10 +90,25 @@ class BeverageStockLinkService
     ): StockItem {
         return DB::transaction(function () use ($menuItem, $quantity, $unit) {
             $outlet = $menuItem->category->outlet;
+            $quantity = $quantity > 0 ? $quantity : 1.0;
 
             $existing = StockItem::query()
                 ->where('menu_item_id', $menuItem->id)
                 ->first();
+
+            // Prefer an already-stocked row for this outlet/name so we never
+            // create a second "awaiting" row at 0 and hide a real stock balance.
+            if ($existing === null) {
+                $existing = StockItem::query()
+                    ->where('outlet_id', $outlet->id)
+                    ->whereRaw('LOWER(name) = ?', [mb_strtolower($menuItem->name)])
+                    ->where(function ($q) {
+                        $q->where('current_stock', '>', 0)
+                            ->orWhere('awaiting_stock', false);
+                    })
+                    ->orderByDesc('current_stock')
+                    ->first();
+            }
 
             if ($existing !== null) {
                 $this->link($menuItem, $existing, $quantity, $unit);
@@ -157,9 +172,48 @@ class BeverageStockLinkService
 
         $canServe = $this->canFulfill($menuItem, 1);
 
-        if ($menuItem->is_available !== $canServe) {
+        if ((bool) $menuItem->is_available !== $canServe) {
             $menuItem->update(['is_available' => $canServe]);
         }
+    }
+
+    /**
+     * Explain why a bar drink cannot be served from current recipe stock.
+     */
+    public function availabilityBlockReason(MenuItem $menuItem, int $quantity = 1): ?string
+    {
+        $menuItem->loadMissing(['category.outlet', 'recipeIngredients.stockItem']);
+
+        if (! $menuItem->category->outlet->tracksBeverageInventory()) {
+            return null;
+        }
+
+        if ($menuItem->recipeIngredients->isEmpty()) {
+            return 'This drink is not linked to any stock item yet.';
+        }
+
+        foreach ($menuItem->recipeIngredients as $ingredient) {
+            $stockItem = $ingredient->stockItem;
+            if ($stockItem === null) {
+                return 'A recipe ingredient points to a missing stock item.';
+            }
+
+            $required = (float) $ingredient->quantity * $quantity;
+            $available = (float) $stockItem->current_stock;
+
+            if ($available < $required) {
+                return sprintf(
+                    'Not enough %s in stock (need %s %s, have %s %s). Restock or lower qty-per-sale.',
+                    $stockItem->name,
+                    rtrim(rtrim(number_format($required, 4, '.', ''), '0'), '.'),
+                    $stockItem->unit,
+                    rtrim(rtrim(number_format($available, 4, '.', ''), '0'), '.'),
+                    $stockItem->unit
+                );
+            }
+        }
+
+        return null;
     }
 
     public function syncStockItem(StockItem $stockItem): void

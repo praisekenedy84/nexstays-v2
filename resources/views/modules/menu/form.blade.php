@@ -189,10 +189,28 @@
         <script>
             function toggleInventoryLinkMode() {
                 const mode = document.querySelector('input[name="inventory_link_mode"]:checked')?.value;
-                document.getElementById('panel-existing').style.display = mode === 'existing' ? 'block' : 'none';
-                document.getElementById('panel-awaiting').style.display = mode === 'awaiting' ? 'block' : 'none';
-                document.getElementById('panel-recipe').style.display = mode === 'recipe' ? 'block' : 'none';
-                document.getElementById('panel-serve-qty').style.display = mode === 'recipe' ? 'none' : 'grid';
+                const panels = {
+                    existing: document.getElementById('panel-existing'),
+                    awaiting: document.getElementById('panel-awaiting'),
+                    recipe: document.getElementById('panel-recipe'),
+                    serve: document.getElementById('panel-serve-qty'),
+                };
+
+                panels.existing.style.display = mode === 'existing' ? 'block' : 'none';
+                panels.awaiting.style.display = mode === 'awaiting' ? 'block' : 'none';
+                panels.recipe.style.display = mode === 'recipe' ? 'block' : 'none';
+                panels.serve.style.display = mode === 'recipe' ? 'none' : 'grid';
+
+                // Disable fields in hidden panels so they do not override the active mode.
+                panels.existing.querySelectorAll('select, input').forEach((el) => {
+                    el.disabled = mode !== 'existing';
+                });
+                panels.recipe.querySelectorAll('select, input').forEach((el) => {
+                    el.disabled = mode !== 'recipe';
+                });
+                panels.serve.querySelectorAll('select, input').forEach((el) => {
+                    el.disabled = mode === 'recipe';
+                });
             }
             function addRecipeLine() {
                 const container = document.getElementById('recipe-lines');
@@ -204,6 +222,7 @@
                     if (name) el.setAttribute('name', name.replace(/\[\d+\]/, '[' + index + ']'));
                     if (el.tagName === 'SELECT') el.selectedIndex = 0;
                     else el.value = el.getAttribute('name')?.includes('[unit]') ? 'ml' : '';
+                    el.disabled = false;
                 });
                 container.appendChild(clone);
             }
